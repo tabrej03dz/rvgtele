@@ -3,27 +3,61 @@
 @section('title', $title)
 
 @section('content')
-<div class="mx-auto max-w-5xl space-y-6">
+@php
+    $isEdit = $item->exists;
 
-    {{-- Page Heading --}}
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900">
-            {{ $title }}
-        </h1>
+    $fieldClass = function (string $name) use ($errors) {
+        return $errors->has($name)
+            ? 'border-rose-300 bg-rose-50 focus:border-rose-500 focus:ring-rose-500'
+            : 'border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-500';
+    };
+@endphp
 
-        <p class="mt-1 text-sm text-slate-500">
-            Fill all required details carefully.
-        </p>
+<div class="mx-auto max-w-5xl space-y-5">
+
+    {{-- Header --}}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <div class="flex items-center gap-2 text-sm text-slate-500">
+                <a
+                    href="{{ route($routeName . '.index') }}"
+                    class="hover:text-blue-600"
+                >
+                    {{ $title }}
+                </a>
+                <span>/</span>
+                <span>{{ $isEdit ? 'Edit' : 'Create' }}</span>
+            </div>
+
+            <h1 class="mt-1 text-2xl font-bold text-slate-900">
+                {{ $title }}
+            </h1>
+
+            <p class="mt-1 text-sm text-slate-500">
+                Required details fill karke record save karein.
+            </p>
+        </div>
+
+        <a
+            href="{{ route($routeName . '.index') }}"
+            class="inline-flex self-start rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:self-auto"
+        >
+            Back
+        </a>
     </div>
 
     {{-- Validation Errors --}}
     @if ($errors->any())
-        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
-            <div class="mb-2 font-semibold">
-                Please correct the following errors:
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3">
+            <div class="font-semibold text-rose-800">
+                Form submit nahi hua
             </div>
 
-            <ul class="list-disc space-y-1 pl-5 text-sm">
+            <p class="mt-1 text-sm text-rose-700">
+                Highlighted fields ko correct karke dobara save karein.
+            </p>
+
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-rose-700">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -33,242 +67,218 @@
 
     <form
         method="POST"
-        action="{{ $item->exists
+        action="{{ $isEdit
             ? route($routeName . '.update', ['item' => $item])
             : route($routeName . '.store') }}"
-        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+        class="space-y-5"
     >
         @csrf
 
-        @if ($item->exists)
+        @if ($isEdit)
             @method('PUT')
         @endif
 
-        <div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
-            <h2 class="font-semibold text-slate-900">
-                {{ $item->exists ? 'Update Information' : 'Basic Information' }}
-            </h2>
-        </div>
+        {{-- Form Fields --}}
+        <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-4">
+                <h2 class="font-bold text-slate-900">
+                    {{ $isEdit ? 'Update Information' : 'Basic Information' }}
+                </h2>
 
-        <div class="grid gap-5 p-6 md:grid-cols-2">
+                <p class="mt-0.5 text-sm text-slate-500">
+                    Fields marked with <span class="text-rose-500">*</span> are required.
+                </p>
+            </div>
 
-            @foreach ($fields as $name => $config)
-                @php
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Backward compatibility
-                    |--------------------------------------------------------------------------
-                    |
-                    | Old controller format:
-                    | 'name' => 'text'
-                    |
-                    | New controller format:
-                    | 'branch_id' => [
-                    |     'type' => 'select',
-                    |     'label' => 'Branch',
-                    |     'options' => $branches,
-                    | ]
-                    |
-                    */
+            <div class="grid gap-4 p-5 md:grid-cols-2">
+                @foreach ($fields as $name => $config)
+                    @php
+                        if (is_string($config)) {
+                            $config = [
+                                'type' => $config,
+                            ];
+                        }
 
-                    if (is_string($config)) {
-                        $config = [
-                            'type' => $config,
-                        ];
-                    }
+                        $type = $config['type'] ?? 'text';
 
-                    $type = $config['type'] ?? 'text';
+                        $label = $config['label']
+                            ?? ucwords(str_replace('_', ' ', $name));
 
-                    $label = $config['label']
-                        ?? ucwords(str_replace('_', ' ', $name));
+                        $required = $config['required'] ?? false;
 
-                    $required = $config['required'] ?? false;
+                        $placeholder = $config['placeholder']
+                            ?? ('Enter ' . strtolower($label));
 
-                    $placeholder = $config['placeholder']
-                        ?? ('Enter ' . strtolower($label));
+                        $options = $config['options'] ?? [];
 
-                    $options = $config['options'] ?? [];
+                        $optionValue = $config['option_value'] ?? 'id';
+                        $optionLabel = $config['option_label'] ?? 'name';
 
-                    $optionValue = $config['option_value'] ?? 'id';
+                        $emptyLabel = $config['empty_label']
+                            ?? ('Select ' . $label);
 
-                    $optionLabel = $config['option_label'] ?? 'name';
+                        $columnClass = in_array($type, ['textarea'], true)
+                            ? 'md:col-span-2'
+                            : '';
 
-                    $emptyLabel = $config['empty_label']
-                        ?? ('Select ' . $label);
+                        $currentValue = old($name, data_get($item, $name));
 
-                    $columnClass = in_array($type, ['textarea'], true)
-                        ? 'md:col-span-2'
-                        : '';
+                        if ($currentValue instanceof \Carbon\CarbonInterface) {
+                            $currentValue = match ($type) {
+                                'date' => $currentValue->format('Y-m-d'),
+                                'datetime-local' => $currentValue->format('Y-m-d\TH:i'),
+                                default => $currentValue,
+                            };
+                        }
+                    @endphp
 
-                    $currentValue = old($name, data_get($item, $name));
+                    <div class="{{ $columnClass }}">
+                        @if ($type === 'checkbox')
+                            <input type="hidden" name="{{ $name }}" value="0">
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Date formatting
-                    |--------------------------------------------------------------------------
-                    */
+                            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 hover:bg-slate-50">
+                                <input
+                                    type="checkbox"
+                                    name="{{ $name }}"
+                                    value="1"
+                                    @checked((bool) old($name, data_get($item, $name)))
+                                    class="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                >
 
-                    if ($currentValue instanceof \Carbon\CarbonInterface) {
-                        $currentValue = match ($type) {
-                            'date' => $currentValue->format('Y-m-d'),
-                            'datetime-local' => $currentValue->format('Y-m-d\TH:i'),
-                            default => $currentValue,
-                        };
-                    }
-                @endphp
+                                <div>
+                                    <div class="text-sm font-medium text-slate-800">
+                                        {{ $label }}
+                                    </div>
 
-                <div class="{{ $columnClass }}">
-
-                    {{-- Checkbox --}}
-                    @if ($type === 'checkbox')
-                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
-                            <input
-                                type="checkbox"
-                                name="{{ $name }}"
-                                value="1"
-                                @checked((bool) old($name, data_get($item, $name)))
-                                class="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            >
-
-                            <div>
-                                <div class="font-medium text-slate-800">
-                                    {{ $label }}
+                                    @if (!empty($config['help']))
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            {{ $config['help'] }}
+                                        </p>
+                                    @endif
                                 </div>
+                            </label>
+
+                        @elseif ($type === 'select')
+                            <label class="block">
+                                <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                    {{ $label }}
+
+                                    @if ($required)
+                                        <span class="text-rose-500">*</span>
+                                    @endif
+                                </span>
+
+                                <select
+                                    name="{{ $name }}"
+                                    @required($required)
+                                    class="w-full rounded-lg border px-3 py-2.5 text-sm {{ $fieldClass($name) }}"
+                                >
+                                    <option value="">{{ $emptyLabel }}</option>
+
+                                    @foreach ($options as $option)
+                                        @php
+                                            $value = data_get($option, $optionValue);
+
+                                            $displayText = is_callable($optionLabel)
+                                                ? $optionLabel($option)
+                                                : data_get($option, $optionLabel);
+                                        @endphp
+
+                                        <option
+                                            value="{{ $value }}"
+                                            @selected((string) $currentValue === (string) $value)
+                                        >
+                                            {{ $displayText }}
+                                        </option>
+                                    @endforeach
+                                </select>
 
                                 @if (!empty($config['help']))
-                                    <div class="text-xs text-slate-500">
+                                    <p class="mt-1 text-xs text-slate-500">
                                         {{ $config['help'] }}
-                                    </div>
+                                    </p>
                                 @endif
-                            </div>
-                        </label>
+                            </label>
 
-                    {{-- Select Dropdown --}}
-                    @elseif ($type === 'select')
-                        <label class="block">
-                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                                {{ $label }}
+                        @elseif ($type === 'textarea')
+                            <label class="block">
+                                <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                    {{ $label }}
 
-                                @if ($required)
-                                    <span class="text-rose-500">*</span>
+                                    @if ($required)
+                                        <span class="text-rose-500">*</span>
+                                    @endif
+                                </span>
+
+                                <textarea
+                                    name="{{ $name }}"
+                                    rows="{{ $config['rows'] ?? 4 }}"
+                                    placeholder="{{ $placeholder }}"
+                                    @required($required)
+                                    class="w-full rounded-lg border px-3 py-2.5 text-sm {{ $fieldClass($name) }}"
+                                >{{ $currentValue }}</textarea>
+
+                                @if (!empty($config['help']))
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ $config['help'] }}
+                                    </p>
                                 @endif
-                            </span>
+                            </label>
 
-                            <select
-                                name="{{ $name }}"
-                                @required($required)
-                                class="w-full rounded-lg border-slate-300 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            >
-                                <option value="">
-                                    {{ $emptyLabel }}
-                                </option>
+                        @else
+                            <label class="block">
+                                <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                    {{ $label }}
 
-                                @foreach ($options as $option)
-                                    @php
-                                        $value = is_array($option)
-                                            ? data_get($option, $optionValue)
-                                            : data_get($option, $optionValue);
+                                    @if ($required)
+                                        <span class="text-rose-500">*</span>
+                                    @endif
+                                </span>
 
-                                        $displayText = is_callable($optionLabel)
-                                            ? $optionLabel($option)
-                                            : data_get($option, $optionLabel);
-                                    @endphp
+                                <input
+                                    type="{{ $type }}"
+                                    name="{{ $name }}"
+                                    value="{{ $type === 'password' ? '' : $currentValue }}"
+                                    placeholder="{{ $placeholder }}"
+                                    @required($required)
+                                    @if (isset($config['min'])) min="{{ $config['min'] }}" @endif
+                                    @if (isset($config['max'])) max="{{ $config['max'] }}" @endif
+                                    @if (isset($config['step'])) step="{{ $config['step'] }}" @endif
+                                    class="w-full rounded-lg border px-3 py-2.5 text-sm {{ $fieldClass($name) }}"
+                                >
 
-                                    <option
-                                        value="{{ $value }}"
-                                        @selected((string) $currentValue === (string) $value)
-                                    >
-                                        {{ $displayText }}
-                                    </option>
-                                @endforeach
-                            </select>
-
-                            @if (!empty($config['help']))
-                                <div class="mt-1 text-xs text-slate-500">
-                                    {{ $config['help'] }}
-                                </div>
-                            @endif
-                        </label>
-
-                    {{-- Textarea --}}
-                    @elseif ($type === 'textarea')
-                        <label class="block">
-                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                                {{ $label }}
-
-                                @if ($required)
-                                    <span class="text-rose-500">*</span>
+                                @if (!empty($config['help']))
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ $config['help'] }}
+                                    </p>
                                 @endif
-                            </span>
+                            </label>
+                        @endif
 
-                            <textarea
-                                name="{{ $name }}"
-                                rows="{{ $config['rows'] ?? 4 }}"
-                                placeholder="{{ $placeholder }}"
-                                @required($required)
-                                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            >{{ $currentValue }}</textarea>
+                        @error($name)
+                            <p class="mt-1 text-xs text-rose-600">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+                @endforeach
+            </div>
+        </section>
 
-                            @if (!empty($config['help']))
-                                <div class="mt-1 text-xs text-slate-500">
-                                    {{ $config['help'] }}
-                                </div>
-                            @endif
-                        </label>
-
-                    {{-- Normal Input --}}
-                    @else
-                        <label class="block">
-                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                                {{ $label }}
-
-                                @if ($required)
-                                    <span class="text-rose-500">*</span>
-                                @endif
-                            </span>
-
-                            <input
-                                type="{{ $type }}"
-                                name="{{ $name }}"
-                                value="{{ $type === 'password' ? '' : $currentValue }}"
-                                placeholder="{{ $placeholder }}"
-                                @required($required)
-                                @if (isset($config['min'])) min="{{ $config['min'] }}" @endif
-                                @if (isset($config['max'])) max="{{ $config['max'] }}" @endif
-                                @if (isset($config['step'])) step="{{ $config['step'] }}" @endif
-                                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            >
-
-                            @if (!empty($config['help']))
-                                <div class="mt-1 text-xs text-slate-500">
-                                    {{ $config['help'] }}
-                                </div>
-                            @endif
-                        </label>
-                    @endif
-
-                    @error($name)
-                        <div class="mt-1 text-sm text-rose-600">
-                            {{ $message }}
-                        </div>
-                    @enderror
-                </div>
-            @endforeach
-        </div>
-
-        <div class="flex flex-wrap justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+        {{-- Actions --}}
+        <div class="flex flex-col-reverse gap-2 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:justify-end">
             <a
                 href="{{ route($routeName . '.index') }}"
-                class="rounded-lg border border-slate-300 bg-white px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-100"
+                class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
                 Cancel
             </a>
 
             <button
                 type="submit"
-                class="rounded-lg bg-indigo-600 px-6 py-2.5 font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
-                {{ $item->exists ? 'Update' : 'Save' }}
+                {{ $isEdit ? 'Update' : 'Save' }}
             </button>
         </div>
     </form>
