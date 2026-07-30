@@ -488,7 +488,7 @@ class LeadController extends Controller
                 'source' => $validated['source'] ?? null,
 
                 'assigned_to' =>
-                    $validated['filter_assigned_to'] ?? null,
+                $validated['filter_assigned_to'] ?? null,
 
                 'team_id' => $validated['team_id'] ?? null,
                 'priority' => $validated['priority'] ?? null,
@@ -498,7 +498,7 @@ class LeadController extends Controller
             ]);
 
             $filterRequest->setUserResolver(
-                fn () => $request->user()
+                fn() => $request->user()
             );
 
             $targetQuery = $this->filteredLeadQuery(
@@ -687,20 +687,20 @@ class LeadController extends Controller
 
             ->when(
                 $request->filled('status'),
-                fn (Builder $query) =>
-                    $query->where(
-                        'lead_status_id',
-                        $request->status
-                    )
+                fn(Builder $query) =>
+                $query->where(
+                    'lead_status_id',
+                    $request->status
+                )
             )
 
             ->when(
                 $request->filled('source'),
-                fn (Builder $query) =>
-                    $query->where(
-                        'lead_source_id',
-                        $request->source
-                    )
+                fn(Builder $query) =>
+                $query->where(
+                    'lead_source_id',
+                    $request->source
+                )
             )
 
             ->when(
@@ -719,49 +719,49 @@ class LeadController extends Controller
 
             ->when(
                 $request->filled('team_id'),
-                fn (Builder $query) =>
-                    $query->where(
-                        'team_id',
-                        $request->team_id
-                    )
+                fn(Builder $query) =>
+                $query->where(
+                    'team_id',
+                    $request->team_id
+                )
             )
 
             ->when(
                 $request->filled('priority'),
-                fn (Builder $query) =>
-                    $query->where(
-                        'priority',
-                        $request->priority
-                    )
+                fn(Builder $query) =>
+                $query->where(
+                    'priority',
+                    $request->priority
+                )
             )
 
             ->when(
                 $request->filled('temperature'),
-                fn (Builder $query) =>
-                    $query->where(
-                        'temperature',
-                        $request->temperature
-                    )
+                fn(Builder $query) =>
+                $query->where(
+                    'temperature',
+                    $request->temperature
+                )
             )
 
             ->when(
                 $request->filled('date_from'),
-                fn (Builder $query) =>
-                    $query->whereDate(
-                        'created_at',
-                        '>=',
-                        $request->date_from
-                    )
+                fn(Builder $query) =>
+                $query->whereDate(
+                    'created_at',
+                    '>=',
+                    $request->date_from
+                )
             )
 
             ->when(
                 $request->filled('date_to'),
-                fn (Builder $query) =>
-                    $query->whereDate(
-                        'created_at',
-                        '<=',
-                        $request->date_to
-                    )
+                fn(Builder $query) =>
+                $query->whereDate(
+                    'created_at',
+                    '<=',
+                    $request->date_to
+                )
             );
     }
 
@@ -816,11 +816,11 @@ class LeadController extends Controller
             'stages' => PipelineStage::query()
                 ->whereHas(
                     'pipeline',
-                    fn (Builder $query) =>
-                        $query->where(
-                            'company_id',
-                            $companyId
-                        )
+                    fn(Builder $query) =>
+                    $query->where(
+                        'company_id',
+                        $companyId
+                    )
                 )
                 ->orderBy('sort_order')
                 ->get(),
@@ -850,11 +850,11 @@ class LeadController extends Controller
 
                 Rule::unique('leads', 'mobile')
                     ->where(
-                        fn ($query) =>
-                            $query->where(
-                                'company_id',
-                                $companyId
-                            )
+                        fn($query) =>
+                        $query->where(
+                            'company_id',
+                            $companyId
+                        )
                     )
                     ->ignore($lead?->id),
             ],
@@ -939,11 +939,11 @@ class LeadController extends Controller
 
                 Rule::exists('teams', 'id')
                     ->where(
-                        fn ($query) =>
-                            $query->where(
-                                'company_id',
-                                $companyId
-                            )
+                        fn($query) =>
+                        $query->where(
+                            'company_id',
+                            $companyId
+                        )
                     ),
             ],
 
@@ -1107,7 +1107,7 @@ class LeadController extends Controller
     ): void {
         abort_unless(
             (int) $lead->company_id ===
-            $this->companyId($request),
+                $this->companyId($request),
             403,
             'Unauthorized lead access.'
         );
