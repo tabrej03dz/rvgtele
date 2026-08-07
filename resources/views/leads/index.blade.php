@@ -61,41 +61,64 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
+
             <button
                 type="button"
                 @click="showFilters = !showFilters"
                 class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
                     <path d="M4 6h16M7 12h10M10 18h4"/>
                 </svg>
+
                 Filters
             </button>
 
-            <button
-                type="button"
-                @click="assignmentScope = 'selected'; showBulkModal = true"
-                class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-                Bulk Assign
-            </button>
+            @if ($hasFullAccess)
 
-            <a
-                href="{{ route('leads.import.create') }}"
-                class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-                Import
-            </a>
+                <button
+                    type="button"
+                    @click="
+                        assignmentScope = 'selected';
+                        showBulkModal = true
+                    "
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                    Bulk Assign
+                </button>
+
+                <a
+                    href="{{ route('leads.import.create') }}"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                    Import
+                </a>
+
+            @endif
 
             <a
                 href="{{ route('leads.create') }}"
                 class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
                     <path d="M12 5v14M5 12h14"/>
                 </svg>
+
                 Create Lead
             </a>
+
         </div>
     </div>
 
@@ -121,26 +144,50 @@
                     >
                 </label>
 
-                <label class="block">
-                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                        Status
-                    </span>
+                @if ($hasFullAccess)
 
-                    <select
-                        name="status"
-                        class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                        <option value="">All statuses</option>
-                        @foreach ($statuses as $status)
-                            <option
-                                value="{{ $status->id }}"
-                                @selected((string) request('status') === (string) $status->id)
-                            >
-                                {{ $status->name }}
+                    <label class="block">
+                        <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                            Assigned Employee
+                        </span>
+
+                        <select
+                            name="assigned_to"
+                            class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                            <option value="">
+                                All employees
                             </option>
-                        @endforeach
-                    </select>
-                </label>
+
+                            <option
+                                value="unassigned"
+                                @selected(
+                                    request('assigned_to') ===
+                                    'unassigned'
+                                )
+                            >
+                                Unassigned
+                            </option>
+
+                            @foreach ($users as $user)
+                                <option
+                                    value="{{ $user->id }}"
+                                    @selected(
+                                        (string) request('assigned_to') ===
+                                        (string) $user->id
+                                    )
+                                >
+                                    {{ $user->name }}
+
+                                    @if ($user->employee_code)
+                                        ({{ $user->employee_code }})
+                                    @endif
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                @endif
 
                 <label class="block">
                     <span class="mb-1.5 block text-sm font-medium text-slate-700">
@@ -306,33 +353,44 @@
     </section>
 
     {{-- Selected Bar --}}
-    <div
-        x-show="selected.length > 0"
-        x-cloak
-        class="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-    >
-        <div class="text-sm font-semibold text-blue-800">
-            <span x-text="selected.length"></span> lead(s) selected
+    @if ($hasFullAccess)
+
+        <div
+            x-show="selected.length > 0"
+            x-cloak
+            class="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div class="text-sm font-semibold text-blue-800">
+                <span x-text="selected.length"></span>
+                lead(s) selected
+            </div>
+
+            <div class="flex gap-2">
+                <button
+                    type="button"
+                    @click="
+                        assignmentScope = 'selected';
+                        showBulkModal = true
+                    "
+                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                    Assign Selected
+                </button>
+
+                <button
+                    type="button"
+                    @click="
+                        selected = [];
+                        selectAllPage = false
+                    "
+                    class="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                    Clear
+                </button>
+            </div>
         </div>
 
-        <div class="flex gap-2">
-            <button
-                type="button"
-                @click="assignmentScope = 'selected'; showBulkModal = true"
-                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-            >
-                Assign Selected
-            </button>
-
-            <button
-                type="button"
-                @click="selected = []; selectAllPage = false"
-                class="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
-            >
-                Clear
-            </button>
-        </div>
-    </div>
+    @endif
 
     {{-- Leads Table --}}
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -353,14 +411,32 @@
             <table class="w-full min-w-[1120px] text-sm">
                 <thead class="bg-slate-50">
                     <tr class="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <th class="w-12 px-4 py-3">
-                            <input
-                                type="checkbox"
-                                x-model="selectAllPage"
-                                @change="togglePage(@js($leads->pluck('id')->map(fn ($id) => (int) $id)->values()))"
-                                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            >
-                        </th>
+                        @if ($hasFullAccess)
+
+                            <th class="w-12 px-4 py-3">
+                                <input
+                                    type="checkbox"
+                                    x-model="selectAllPage"
+
+                                    @change="
+                                        togglePage(
+                                            @js(
+                                                $leads
+                                                    ->pluck('id')
+                                                    ->map(
+                                                        fn ($id) =>
+                                                            (int) $id
+                                                    )
+                                                    ->values()
+                                            )
+                                        )
+                                    "
+
+                                    class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                >
+                            </th>
+
+                        @endif
                         <th class="px-4 py-3">Lead</th>
                         <th class="px-4 py-3">Mobile</th>
                         <th class="px-4 py-3">Source</th>
@@ -390,14 +466,18 @@
                         @endphp
 
                         <tr class="hover:bg-slate-50">
-                            <td class="px-4 py-3">
-                                <input
-                                    type="checkbox"
-                                    value="{{ $lead->id }}"
-                                    x-model.number="selected"
-                                    class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                >
-                            </td>
+                            @if ($hasFullAccess)
+
+                                <td class="px-4 py-3">
+                                    <input
+                                        type="checkbox"
+                                        value="{{ $lead->id }}"
+                                        x-model.number="selected"
+                                        class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    >
+                                </td>
+
+                            @endif
 
                             <td class="px-4 py-3">
                                 <div class="font-semibold text-slate-900">
@@ -506,6 +586,7 @@
     </section>
 
     {{-- Bulk Assignment Modal --}}
+    @if ($hasFullAccess)
     <div
         x-show="showBulkModal"
         x-cloak
@@ -678,5 +759,6 @@
             </form>
         </div>
     </div>
+    @endif
 </div>
 @endsection

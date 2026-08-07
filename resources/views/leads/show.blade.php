@@ -432,78 +432,80 @@
             </form>
 
             {{-- Assign --}}
-            <form
-                method="POST"
-                action="{{ route('leads.assign', $lead) }}"
-                class="rounded-xl border border-slate-200 bg-white shadow-sm"
-            >
-                @csrf
+            @if ($hasFullAccess)
+                <form
+                    method="POST"
+                    action="{{ route('leads.assign', $lead) }}"
+                    class="rounded-xl border border-slate-200 bg-white shadow-sm"
+                >
+                    @csrf
 
-                <div class="border-b border-slate-200 px-5 py-4">
-                    <h3 class="font-bold text-slate-900">
-                        Assign Lead
-                    </h3>
-                    <p class="mt-0.5 text-xs text-slate-500">
-                        Lead owner change karein.
-                    </p>
-                </div>
+                    <div class="border-b border-slate-200 px-5 py-4">
+                        <h3 class="font-bold text-slate-900">
+                            Assign Lead
+                        </h3>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Lead owner change karein.
+                        </p>
+                    </div>
 
-                <div class="space-y-4 p-5">
-                    <label class="block">
-                        <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                            Employee <span class="text-rose-500">*</span>
-                        </span>
+                    <div class="space-y-4 p-5">
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Employee <span class="text-rose-500">*</span>
+                            </span>
 
-                        <select
-                            name="assigned_to"
-                            required
-                            class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                            <select
+                                name="assigned_to"
+                                required
+                                class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                            >
+                                <option value="">Select employee</option>
+                                @foreach ($users as $user)
+                                    <option
+                                        value="{{ $user->id }}"
+                                        @selected((string) old('assigned_to', $lead->assigned_to) === (string) $user->id)
+                                    >
+                                        {{ $user->name }}
+                                        @if ($user->employee_code)
+                                            ({{ $user->employee_code }})
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            @error('assigned_to')
+                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </label>
+
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Reason <span class="text-rose-500">*</span>
+                            </span>
+
+                            <textarea
+                                name="reason"
+                                rows="3"
+                                required
+                                placeholder="Assignment ka reason..."
+                                class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                            >{{ old('reason') }}</textarea>
+
+                            @error('reason')
+                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </label>
+
+                        <button
+                            type="submit"
+                            class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                         >
-                            <option value="">Select employee</option>
-                            @foreach ($users as $user)
-                                <option
-                                    value="{{ $user->id }}"
-                                    @selected((string) old('assigned_to', $lead->assigned_to) === (string) $user->id)
-                                >
-                                    {{ $user->name }}
-                                    @if ($user->employee_code)
-                                        ({{ $user->employee_code }})
-                                    @endif
-                                </option>
-                            @endforeach
-                        </select>
-
-                        @error('assigned_to')
-                            <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                        @enderror
-                    </label>
-
-                    <label class="block">
-                        <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                            Reason <span class="text-rose-500">*</span>
-                        </span>
-
-                        <textarea
-                            name="reason"
-                            rows="3"
-                            required
-                            placeholder="Assignment ka reason..."
-                            class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                        >{{ old('reason') }}</textarea>
-
-                        @error('reason')
-                            <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                        @enderror
-                    </label>
-
-                    <button
-                        type="submit"
-                        class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                    >
-                        Assign Lead
-                    </button>
-                </div>
-            </form>
+                            Assign Lead
+                        </button>
+                    </div>
+                </form>
+            @endif
 
             {{-- Add Note --}}
             <form

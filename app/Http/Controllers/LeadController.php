@@ -20,12 +20,46 @@ use Illuminate\View\View;
 
 class LeadController extends Controller
 {
-    /**
-     * Display lead listing with advanced filters.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | FULL ACCESS ROLES
+    |--------------------------------------------------------------------------
+    |
+    | In roles ko company ki saari leads dikhengi.
+    |
+    */
+
+    private array $fullAccessRoles = [
+        'super_admin',
+        'admin',
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Listing
+    |--------------------------------------------------------------------------
+    */
+
     public function index(Request $request): View
     {
         $companyId = $this->companyId($request);
+
+        $hasFullAccess = $this->hasFullAccess($request);
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT
+        |--------------------------------------------------------------------------
+        |
+        | filteredLeadQuery() ke andar hi role based restriction lagi hui hai.
+        |
+        | Admin:
+        | company ki saari leads
+        |
+        | Employee:
+        | assigned_to = login user id
+        |
+        */
 
         $query = $this->filteredLeadQuery($request)
             ->with([
@@ -41,119 +75,235 @@ class LeadController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('leads.index', [
-            'leads' => $leads,
+        /*
+        |--------------------------------------------------------------------------
+        | Statuses
+        |--------------------------------------------------------------------------
+        */
 
-            'statuses' => LeadStatus::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(),
+        $statuses = LeadStatus::query()
+            ->where(function (Builder $query) use ($companyId) {
+                $query
+                    ->whereNull('company_id')
+                    ->orWhere(
+                        'company_id',
+                        $companyId
+                    );
+            })
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
 
-            'sources' => LeadSource::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->orderBy('name')
-                ->get(),
+        /*
+        |--------------------------------------------------------------------------
+        | Sources
+        |--------------------------------------------------------------------------
+        */
 
-            'users' => User::query()
-                ->where('company_id', $companyId)
-                ->where('is_active', true)
+        $sources = LeadSource::query()
+            ->where(function (Builder $query) use ($companyId) {
+                $query
+                    ->whereNull('company_id')
+                    ->orWhere(
+                        'company_id',
+                        $companyId
+                    );
+            })
+            ->orderBy('name')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employees
+        |--------------------------------------------------------------------------
+        |
+        | Employee ko doosre employees ka dropdown dene ki zarurat nahi.
+        |
+        */
+
+        $users = $hasFullAccess
+            ? User::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
                 ->orderBy('name')
                 ->get([
                     'id',
                     'name',
                     'employee_code',
-                ]),
+                ])
+            : collect();
 
-            'teams' => Team::query()
-                ->where('company_id', $companyId)
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                ]),
+        /*
+        |--------------------------------------------------------------------------
+        | Teams
+        |--------------------------------------------------------------------------
+        */
+
+        $teams = Team::query()
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+            ]);
+
+        return view('leads.index', [
+            'leads' => $leads,
+            'statuses' => $statuses,
+            'sources' => $sources,
+            'users' => $users,
+            'teams' => $teams,
+
+            /*
+            | Blade role control
+            */
+
+            'hasFullAccess' => $hasFullAccess,
         ]);
     }
 
-    /**
-     * Show create form.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Create Lead Form
+    |--------------------------------------------------------------------------
+    */
+
     public function create(Request $request): View
     {
-        return view('leads.form', $this->formData($request));
+        return view(
+            'leads.form',
+            $this->formData($request)
+        );
     }
 
-    /**
-     * Store new lead.
-     */
-    public function store(Request $request): RedirectResponse
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Store Lead
+    |--------------------------------------------------------------------------
+    */
+
+    public function store(
+        Request $request
+    ): RedirectResponse {
         $companyId = $this->companyId($request);
 
         $validated = $this->validateData($request);
 
         /*
         |--------------------------------------------------------------------------
-        | Default pipeline stage
+        | Normal Employee
         |--------------------------------------------------------------------------
         |
-        | leads table me pipeline_id column nahi hai.
-        | Lead ko pipeline_stage_id ke through pipeline me rakha jayega.
+        | Employee agar Lead create karta hai to Lead automatically usi ko
+        | assign hogi.
         |
+        | Wo manually kisi aur employee ko assign nahi kar sakta.
+        |
+        */
+
+        if (!$this->hasFullAccess($request)) {
+            $validated['assigned_to'] =
+                (int) $request->user()->id;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Default Pipeline Stage
+        |--------------------------------------------------------------------------
         */
 
         if (empty($validated['pipeline_stage_id'])) {
             $validated['pipeline_stage_id'] =
-                $this->defaultPipelineStageId($companyId);
+                $this->defaultPipelineStageId(
+                    $companyId
+                );
         }
 
         $validated['company_id'] = $companyId;
-        $validated['created_by'] = $request->user()->id;
-        $validated['priority'] = $validated['priority'] ?? 'normal';
-        $validated['temperature'] = $validated['temperature'] ?? 'cold';
 
-        $lead = DB::transaction(function () use (
-            $validated,
-            $request,
-            $companyId
-        ) {
-            $lead = Lead::create($validated);
+        $validated['created_by'] =
+            (int) $request->user()->id;
 
-            if (!empty($validated['assigned_to'])) {
-                $this->createAssignmentHistory(
-                    lead: $lead,
-                    previousUserId: null,
-                    newUserId: (int) $validated['assigned_to'],
-                    assignedBy: (int) $request->user()->id,
-                    reason: 'Lead assigned during creation',
-                    companyId: $companyId
+        $validated['priority'] =
+            $validated['priority'] ?? 'normal';
+
+        $validated['temperature'] =
+            $validated['temperature'] ?? 'cold';
+
+        $lead = DB::transaction(
+            function () use (
+                $validated,
+                $request,
+                $companyId
+            ) {
+                $lead = Lead::create(
+                    $validated
                 );
-            }
 
-            return $lead;
-        });
+                /*
+                |--------------------------------------------------------------------------
+                | Assignment History
+                |--------------------------------------------------------------------------
+                */
+
+                if (!empty($validated['assigned_to'])) {
+                    $this->createAssignmentHistory(
+                        lead: $lead,
+                        previousUserId: null,
+                        newUserId:
+                            (int) $validated['assigned_to'],
+                        assignedBy:
+                            (int) $request->user()->id,
+                        reason:
+                            $this->hasFullAccess($request)
+                                ? 'Lead assigned during creation'
+                                : 'Lead created by employee and automatically assigned to self',
+                        companyId: $companyId
+                    );
+                }
+
+                return $lead;
+            }
+        );
 
         return redirect()
-            ->route('leads.show', $lead)
-            ->with('success', 'Lead created successfully.');
+            ->route(
+                'leads.show',
+                $lead
+            )
+            ->with(
+                'success',
+                'Lead created successfully.'
+            );
     }
 
-    /**
-     * Display lead detail.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Detail
+    |--------------------------------------------------------------------------
+    */
+
     public function show(
         Request $request,
         Lead $lead
     ): View {
-        $this->guard($request, $lead);
+        /*
+        | Employee doosre employee ki lead URL se open nahi kar sakta.
+        */
+
+        $this->guard(
+            $request,
+            $lead
+        );
 
         $lead->load([
             'assignedUser',
@@ -161,48 +311,103 @@ class LeadController extends Controller
             'status',
             'stage',
             'team',
+
             'calls.user',
             'calls.disposition',
+
             'followUps.assignedUser',
+
             'notes.user',
+
             'assignments',
         ]);
 
-        $companyId = $this->companyId($request);
+        $companyId =
+            $this->companyId($request);
 
-        return view('leads.show', [
-            'lead' => $lead,
+        /*
+        |--------------------------------------------------------------------------
+        | Assignment Dropdown
+        |--------------------------------------------------------------------------
+        |
+        | Sirf Admin/Super Admin ko employee list denge.
+        |
+        */
 
-            'users' => User::query()
-                ->where('company_id', $companyId)
-                ->where('is_active', true)
+        $users = $this->hasFullAccess($request)
+            ? User::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
                 ->orderBy('name')
                 ->get([
                     'id',
                     'name',
                     'employee_code',
-                ]),
+                ])
+            : collect();
 
-            'dispositions' => \App\Models\CallDisposition::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->where('is_active', true)
+        /*
+        |--------------------------------------------------------------------------
+        | Dispositions
+        |--------------------------------------------------------------------------
+        */
+
+        $dispositions =
+            \App\Models\CallDisposition::query()
+                ->where(
+                    function (
+                        Builder $query
+                    ) use ($companyId) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
                 ->orderBy('name')
-                ->get(),
+                ->get();
+
+        return view('leads.show', [
+            'lead' => $lead,
+
+            'users' => $users,
+
+            'dispositions' =>
+                $dispositions,
+
+            'hasFullAccess' =>
+                $this->hasFullAccess($request),
         ]);
     }
 
-    /**
-     * Show lead edit form.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Edit Lead
+    |--------------------------------------------------------------------------
+    */
+
     public function edit(
         Request $request,
         Lead $lead
     ): View {
-        $this->guard($request, $lead);
+        $this->guard(
+            $request,
+            $lead
+        );
 
         return view(
             'leads.form',
@@ -213,14 +418,20 @@ class LeadController extends Controller
         );
     }
 
-    /**
-     * Update lead.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Update Lead
+    |--------------------------------------------------------------------------
+    */
+
     public function update(
         Request $request,
         Lead $lead
     ): RedirectResponse {
-        $this->guard($request, $lead);
+        $this->guard(
+            $request,
+            $lead
+        );
 
         $validated = $this->validateData(
             $request,
@@ -229,116 +440,226 @@ class LeadController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Assignment changed from edit form
+        | Employee cannot change owner
         |--------------------------------------------------------------------------
         */
 
-        $oldAssignedUserId = $lead->assigned_to;
-        $newAssignedUserId = $validated['assigned_to'] ?? null;
+        if (!$this->hasFullAccess($request)) {
+            $validated['assigned_to'] =
+                $lead->assigned_to;
+        }
 
-        DB::transaction(function () use (
-            $lead,
-            $validated,
-            $oldAssignedUserId,
-            $newAssignedUserId,
-            $request
-        ) {
-            $lead->update($validated);
+        $oldAssignedUserId =
+            $lead->assigned_to;
 
-            if (
-                (int) $oldAssignedUserId !==
-                (int) $newAssignedUserId
-                && !empty($newAssignedUserId)
+        $newAssignedUserId =
+            $validated['assigned_to'] ?? null;
+
+        DB::transaction(
+            function () use (
+                $lead,
+                $validated,
+                $oldAssignedUserId,
+                $newAssignedUserId,
+                $request
             ) {
-                $this->createAssignmentHistory(
-                    lead: $lead,
-                    previousUserId: $oldAssignedUserId
-                        ? (int) $oldAssignedUserId
-                        : null,
-                    newUserId: (int) $newAssignedUserId,
-                    assignedBy: (int) $request->user()->id,
-                    reason: 'Lead owner changed from edit form',
-                    companyId: $this->companyId($request)
+                $lead->update(
+                    $validated
                 );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Admin changed assignment from edit form
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    $this->hasFullAccess($request)
+                    &&
+                    (int) $oldAssignedUserId !==
+                    (int) $newAssignedUserId
+                    &&
+                    !empty($newAssignedUserId)
+                ) {
+                    $this->createAssignmentHistory(
+                        lead: $lead,
+
+                        previousUserId:
+                            $oldAssignedUserId
+                                ? (int) $oldAssignedUserId
+                                : null,
+
+                        newUserId:
+                            (int) $newAssignedUserId,
+
+                        assignedBy:
+                            (int) $request->user()->id,
+
+                        reason:
+                            'Lead owner changed from edit form',
+
+                        companyId:
+                            $this->companyId($request)
+                    );
+                }
             }
-        });
+        );
 
         return redirect()
-            ->route('leads.show', $lead)
-            ->with('success', 'Lead updated successfully.');
+            ->route(
+                'leads.show',
+                $lead
+            )
+            ->with(
+                'success',
+                'Lead updated successfully.'
+            );
     }
 
-    /**
-     * Soft delete lead.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Lead
+    |--------------------------------------------------------------------------
+    |
+    | Sirf Admin/Super Admin.
+    |
+    */
+
     public function destroy(
         Request $request,
         Lead $lead
     ): RedirectResponse {
-        $this->guard($request, $lead);
+        $this->ensureFullAccess(
+            $request
+        );
+
+        $this->guardCompany(
+            $request,
+            $lead
+        );
 
         $lead->delete();
 
         return redirect()
             ->route('leads.index')
-            ->with('success', 'Lead moved to trash.');
+            ->with(
+                'success',
+                'Lead moved to trash.'
+            );
     }
 
-    /**
-     * Assign one lead.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Single Assignment
+    |--------------------------------------------------------------------------
+    |
+    | Sirf Admin/Super Admin.
+    |
+    */
+
     public function assign(
         Request $request,
         Lead $lead
     ): RedirectResponse {
-        $this->guard($request, $lead);
+        $this->ensureFullAccess(
+            $request
+        );
 
-        $companyId = $this->companyId($request);
-
-        $validated = $request->validate([
-            'assigned_to' => [
-                'required',
-                'integer',
-
-                Rule::exists('users', 'id')
-                    ->where(function ($query) use ($companyId) {
-                        $query
-                            ->where('company_id', $companyId)
-                            ->where('is_active', true);
-                    }),
-            ],
-
-            'reason' => [
-                'required',
-                'string',
-                'max:500',
-            ],
-        ]);
-
-        $oldAssignedUserId = $lead->assigned_to;
-
-        DB::transaction(function () use (
-            $lead,
-            $validated,
-            $oldAssignedUserId,
+        $this->guardCompany(
             $request,
-            $companyId
-        ) {
-            $lead->update([
-                'assigned_to' => $validated['assigned_to'],
+            $lead
+        );
+
+        $companyId =
+            $this->companyId($request);
+
+        $validated =
+            $request->validate([
+                'assigned_to' => [
+                    'required',
+                    'integer',
+
+                    Rule::exists(
+                        'users',
+                        'id'
+                    )->where(
+                        function ($query) use (
+                            $companyId
+                        ) {
+                            $query
+                                ->where(
+                                    'company_id',
+                                    $companyId
+                                )
+                                ->where(
+                                    'is_active',
+                                    true
+                                );
+                        }
+                    ),
+                ],
+
+                'reason' => [
+                    'required',
+                    'string',
+                    'max:500',
+                ],
             ]);
 
-            $this->createAssignmentHistory(
-                lead: $lead,
-                previousUserId: $oldAssignedUserId
-                    ? (int) $oldAssignedUserId
-                    : null,
-                newUserId: (int) $validated['assigned_to'],
-                assignedBy: (int) $request->user()->id,
-                reason: $validated['reason'],
-                companyId: $companyId
+        $oldAssignedUserId =
+            $lead->assigned_to;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Already same employee
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            (int) $oldAssignedUserId ===
+            (int) $validated['assigned_to']
+        ) {
+            return back()->with(
+                'error',
+                'Lead is already assigned to this employee.'
             );
-        });
+        }
+
+        DB::transaction(
+            function () use (
+                $lead,
+                $validated,
+                $oldAssignedUserId,
+                $request,
+                $companyId
+            ) {
+                $lead->update([
+                    'assigned_to' =>
+                        $validated['assigned_to'],
+                ]);
+
+                $this->createAssignmentHistory(
+                    lead: $lead,
+
+                    previousUserId:
+                        $oldAssignedUserId
+                            ? (int) $oldAssignedUserId
+                            : null,
+
+                    newUserId:
+                        (int) $validated['assigned_to'],
+
+                    assignedBy:
+                        (int) $request->user()->id,
+
+                    reason:
+                        $validated['reason'],
+
+                    companyId:
+                        $companyId
+                );
+            }
+        );
 
         return back()->with(
             'success',
@@ -346,167 +667,256 @@ class LeadController extends Controller
         );
     }
 
-    /**
-     * Assign selected or filtered leads in bulk.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Bulk Assignment
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | Employee direct POST request bhejkar bhi bulk assignment nahi kar sakta.
+    |
+    */
+
     public function bulkAssign(
         Request $request
     ): RedirectResponse {
-        $companyId = $this->companyId($request);
-
-        $validated = $request->validate([
-            'assignment_scope' => [
-                'required',
-                Rule::in([
-                    'selected',
-                    'filtered',
-                ]),
-            ],
-
-            'lead_ids' => [
-                'nullable',
-                'array',
-                'required_if:assignment_scope,selected',
-            ],
-
-            'lead_ids.*' => [
-                'integer',
-
-                Rule::exists('leads', 'id')
-                    ->where(function ($query) use ($companyId) {
-                        $query
-                            ->where('company_id', $companyId)
-                            ->whereNull('deleted_at');
-                    }),
-            ],
-
-            'assigned_to' => [
-                'required',
-                'integer',
-
-                Rule::exists('users', 'id')
-                    ->where(function ($query) use ($companyId) {
-                        $query
-                            ->where('company_id', $companyId)
-                            ->where('is_active', true);
-                    }),
-            ],
-
-            'reason' => [
-                'required',
-                'string',
-                'max:500',
-            ],
-
-            /*
-            |--------------------------------------------------------------------------
-            | Filter values
-            |--------------------------------------------------------------------------
-            */
-
-            'search' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'status' => [
-                'nullable',
-                'integer',
-            ],
-
-            'source' => [
-                'nullable',
-                'integer',
-            ],
-
-            'filter_assigned_to' => [
-                'nullable',
-                'string',
-            ],
-
-            'team_id' => [
-                'nullable',
-                'integer',
-            ],
-
-            'priority' => [
-                'nullable',
-                Rule::in([
-                    'low',
-                    'normal',
-                    'high',
-                    'urgent',
-                    'hot',
-                ]),
-            ],
-
-            'temperature' => [
-                'nullable',
-                Rule::in([
-                    'cold',
-                    'warm',
-                    'hot',
-                ]),
-            ],
-
-            'date_from' => [
-                'nullable',
-                'date',
-            ],
-
-            'date_to' => [
-                'nullable',
-                'date',
-                'after_or_equal:date_from',
-            ],
-        ]);
-
         /*
         |--------------------------------------------------------------------------
-        | Build target lead query
+        | ROLE SECURITY
         |--------------------------------------------------------------------------
         */
 
-        if ($validated['assignment_scope'] === 'selected') {
-            $targetQuery = Lead::query()
-                ->where('company_id', $companyId)
-                ->whereIn(
-                    'id',
-                    $validated['lead_ids'] ?? []
-                );
-        } else {
-            /*
-            | Create a separate request containing filter values because
-            | bulk form uses filter_assigned_to to avoid conflict with the
-            | new employee assigned_to field.
-            */
+        $this->ensureFullAccess(
+            $request
+        );
 
-            $filterRequest = new Request([
-                'search' => $validated['search'] ?? null,
-                'status' => $validated['status'] ?? null,
-                'source' => $validated['source'] ?? null,
+        $companyId =
+            $this->companyId($request);
 
-                'assigned_to' =>
-                $validated['filter_assigned_to'] ?? null,
+        $validated =
+            $request->validate([
+                'assignment_scope' => [
+                    'required',
 
-                'team_id' => $validated['team_id'] ?? null,
-                'priority' => $validated['priority'] ?? null,
-                'temperature' => $validated['temperature'] ?? null,
-                'date_from' => $validated['date_from'] ?? null,
-                'date_to' => $validated['date_to'] ?? null,
+                    Rule::in([
+                        'selected',
+                        'filtered',
+                    ]),
+                ],
+
+                'lead_ids' => [
+                    'nullable',
+                    'array',
+                    'required_if:assignment_scope,selected',
+                ],
+
+                'lead_ids.*' => [
+                    'integer',
+
+                    Rule::exists(
+                        'leads',
+                        'id'
+                    )->where(
+                        function ($query) use (
+                            $companyId
+                        ) {
+                            $query
+                                ->where(
+                                    'company_id',
+                                    $companyId
+                                )
+                                ->whereNull(
+                                    'deleted_at'
+                                );
+                        }
+                    ),
+                ],
+
+                'assigned_to' => [
+                    'required',
+                    'integer',
+
+                    Rule::exists(
+                        'users',
+                        'id'
+                    )->where(
+                        function ($query) use (
+                            $companyId
+                        ) {
+                            $query
+                                ->where(
+                                    'company_id',
+                                    $companyId
+                                )
+                                ->where(
+                                    'is_active',
+                                    true
+                                );
+                        }
+                    ),
+                ],
+
+                'reason' => [
+                    'required',
+                    'string',
+                    'max:500',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Current Filters
+                |--------------------------------------------------------------------------
+                */
+
+                'search' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
+                'status' => [
+                    'nullable',
+                    'integer',
+                ],
+
+                'source' => [
+                    'nullable',
+                    'integer',
+                ],
+
+                'filter_assigned_to' => [
+                    'nullable',
+                    'string',
+                ],
+
+                'team_id' => [
+                    'nullable',
+                    'integer',
+                ],
+
+                'priority' => [
+                    'nullable',
+
+                    Rule::in([
+                        'low',
+                        'normal',
+                        'high',
+                        'urgent',
+                        'hot',
+                    ]),
+                ],
+
+                'temperature' => [
+                    'nullable',
+
+                    Rule::in([
+                        'cold',
+                        'warm',
+                        'hot',
+                    ]),
+                ],
+
+                'date_from' => [
+                    'nullable',
+                    'date',
+                ],
+
+                'date_to' => [
+                    'nullable',
+                    'date',
+                    'after_or_equal:date_from',
+                ],
             ]);
 
-            $filterRequest->setUserResolver(
-                fn() => $request->user()
-            );
+        /*
+        |--------------------------------------------------------------------------
+        | Selected Leads
+        |--------------------------------------------------------------------------
+        */
 
-            $targetQuery = $this->filteredLeadQuery(
-                $filterRequest
-            );
+        if (
+            $validated['assignment_scope'] ===
+            'selected'
+        ) {
+            $targetQuery =
+                Lead::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->whereIn(
+                        'id',
+                        $validated['lead_ids']
+                            ?? []
+                    );
         }
 
-        $totalLeads = (clone $targetQuery)->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Filtered Leads
+        |--------------------------------------------------------------------------
+        */
+
+        else {
+            $filterRequest =
+                new Request([
+                    'search' =>
+                        $validated['search']
+                            ?? null,
+
+                    'status' =>
+                        $validated['status']
+                            ?? null,
+
+                    'source' =>
+                        $validated['source']
+                            ?? null,
+
+                    'assigned_to' =>
+                        $validated[
+                            'filter_assigned_to'
+                        ] ?? null,
+
+                    'team_id' =>
+                        $validated['team_id']
+                            ?? null,
+
+                    'priority' =>
+                        $validated['priority']
+                            ?? null,
+
+                    'temperature' =>
+                        $validated['temperature']
+                            ?? null,
+
+                    'date_from' =>
+                        $validated['date_from']
+                            ?? null,
+
+                    'date_to' =>
+                        $validated['date_to']
+                            ?? null,
+                ]);
+
+            $filterRequest->setUserResolver(
+                fn () =>
+                    $request->user()
+            );
+
+            $targetQuery =
+                $this->filteredLeadQuery(
+                    $filterRequest
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Count
+        |--------------------------------------------------------------------------
+        */
+
+        $totalLeads =
+            (clone $targetQuery)->count();
 
         if ($totalLeads < 1) {
             return back()->with(
@@ -515,19 +925,23 @@ class LeadController extends Controller
             );
         }
 
-        $newUserId = (int) $validated['assigned_to'];
-        $assignedBy = (int) $request->user()->id;
-        $reason = $validated['reason'];
+        $newUserId =
+            (int) $validated['assigned_to'];
+
+        $assignedBy =
+            (int) $request->user()->id;
+
+        $reason =
+            $validated['reason'];
 
         $updatedCount = 0;
 
+        $skippedCount = 0;
+
         /*
         |--------------------------------------------------------------------------
-        | Chunk assignment
+        | Chunk Processing
         |--------------------------------------------------------------------------
-        |
-        | Large number of filtered leads ko ek saath memory me load nahi karega.
-        |
         */
 
         $targetQuery
@@ -539,83 +953,119 @@ class LeadController extends Controller
             ->orderBy('id')
             ->chunkById(
                 200,
+
                 function ($leads) use (
                     $newUserId,
                     $assignedBy,
                     $reason,
                     $companyId,
-                    &$updatedCount
+                    &$updatedCount,
+                    &$skippedCount
                 ) {
-                    DB::transaction(function () use (
-                        $leads,
-                        $newUserId,
-                        $assignedBy,
-                        $reason,
-                        $companyId,
-                        &$updatedCount
-                    ) {
-                        foreach ($leads as $lead) {
-                            $previousUserId = $lead->assigned_to;
-
-                            /*
-                            | Already same employee ko assigned lead ko skip.
-                            */
-
-                            if (
-                                (int) $previousUserId ===
-                                $newUserId
+                    DB::transaction(
+                        function () use (
+                            $leads,
+                            $newUserId,
+                            $assignedBy,
+                            $reason,
+                            $companyId,
+                            &$updatedCount,
+                            &$skippedCount
+                        ) {
+                            foreach (
+                                $leads as $lead
                             ) {
-                                continue;
+                                $previousUserId =
+                                    $lead->assigned_to;
+
+                                /*
+                                | Already same employee
+                                */
+
+                                if (
+                                    (int) $previousUserId ===
+                                    $newUserId
+                                ) {
+                                    $skippedCount++;
+
+                                    continue;
+                                }
+
+                                $lead->update([
+                                    'assigned_to' =>
+                                        $newUserId,
+                                ]);
+
+                                $this->createAssignmentHistory(
+                                    lead: $lead,
+
+                                    previousUserId:
+                                        $previousUserId
+                                            ? (int) $previousUserId
+                                            : null,
+
+                                    newUserId:
+                                        $newUserId,
+
+                                    assignedBy:
+                                        $assignedBy,
+
+                                    reason:
+                                        $reason,
+
+                                    companyId:
+                                        $companyId
+                                );
+
+                                $updatedCount++;
                             }
-
-                            $lead->update([
-                                'assigned_to' => $newUserId,
-                            ]);
-
-                            $this->createAssignmentHistory(
-                                lead: $lead,
-                                previousUserId: $previousUserId
-                                    ? (int) $previousUserId
-                                    : null,
-                                newUserId: $newUserId,
-                                assignedBy: $assignedBy,
-                                reason: $reason,
-                                companyId: $companyId
-                            );
-
-                            $updatedCount++;
                         }
-                    });
+                    );
                 }
             );
 
         return back()->with(
             'success',
-            "{$updatedCount} leads assigned successfully."
+            "{$updatedCount} leads assigned successfully. {$skippedCount} already assigned leads skipped."
         );
     }
 
-    /**
-     * Add lead note.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Add Note
+    |--------------------------------------------------------------------------
+    |
+    | Employee apni assigned Lead par note add kar sakta hai.
+    |
+    */
+
     public function note(
         Request $request,
         Lead $lead
     ): RedirectResponse {
-        $this->guard($request, $lead);
+        $this->guard(
+            $request,
+            $lead
+        );
 
-        $validated = $request->validate([
-            'body' => [
-                'required',
-                'string',
-                'max:3000',
-            ],
-        ]);
+        $validated =
+            $request->validate([
+                'body' => [
+                    'required',
+                    'string',
+                    'max:3000',
+                ],
+            ]);
 
         Note::create([
-            'lead_id' => $lead->id,
-            'user_id' => $request->user()->id,
-            'body' => $validated['body'],
+            'lead_id' =>
+                $lead->id,
+
+            'user_id' =>
+                $request->user()->id,
+
+            'body' =>
+                $validated['body'],
         ]);
 
         return back()->with(
@@ -624,217 +1074,403 @@ class LeadController extends Controller
         );
     }
 
-    /**
-     * Reusable filtered lead query.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Filtered Lead Query
+    |--------------------------------------------------------------------------
+    |
+    | YE SABSE IMPORTANT METHOD HAI.
+    |
+    | Har Lead listing/query sabse pehle role access lagayegi.
+    |
+    */
+
     private function filteredLeadQuery(
         Request $request
     ): Builder {
-        $companyId = $this->companyId($request);
+        $companyId =
+            $this->companyId($request);
 
-        return Lead::query()
-            ->where('company_id', $companyId)
+        $user =
+            $request->user();
 
-            ->when(
-                $request->filled('search'),
-                function (Builder $query) use ($request) {
-                    $search = trim(
-                        (string) $request->search
-                    );
+        $hasFullAccess =
+            $this->hasFullAccess($request);
 
-                    $query->where(
-                        function (Builder $subQuery) use ($search) {
-                            $subQuery
-                                ->where(
-                                    'name',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'mobile',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'alternate_mobile',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'whatsapp_number',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'company_name',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'email',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'city',
-                                    'like',
-                                    "%{$search}%"
-                                );
-                        }
-                    );
-                }
-            )
+        $query =
+            Lead::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                );
 
-            ->when(
-                $request->filled('status'),
-                fn(Builder $query) =>
-                $query->where(
-                    'lead_status_id',
-                    $request->status
-                )
-            )
+        /*
+        |--------------------------------------------------------------------------
+        | ROLE BASED LEAD ACCESS
+        |--------------------------------------------------------------------------
+        |
+        | Admin:
+        | company ki all leads.
+        |
+        | Employee:
+        | only assigned leads.
+        |
+        */
 
-            ->when(
-                $request->filled('source'),
-                fn(Builder $query) =>
-                $query->where(
-                    'lead_source_id',
-                    $request->source
-                )
-            )
-
-            ->when(
-                $request->filled('assigned_to'),
-                function (Builder $query) use ($request) {
-                    if ($request->assigned_to === 'unassigned') {
-                        $query->whereNull('assigned_to');
-                    } else {
-                        $query->where(
-                            'assigned_to',
-                            $request->assigned_to
-                        );
-                    }
-                }
-            )
-
-            ->when(
-                $request->filled('team_id'),
-                fn(Builder $query) =>
-                $query->where(
-                    'team_id',
-                    $request->team_id
-                )
-            )
-
-            ->when(
-                $request->filled('priority'),
-                fn(Builder $query) =>
-                $query->where(
-                    'priority',
-                    $request->priority
-                )
-            )
-
-            ->when(
-                $request->filled('temperature'),
-                fn(Builder $query) =>
-                $query->where(
-                    'temperature',
-                    $request->temperature
-                )
-            )
-
-            ->when(
-                $request->filled('date_from'),
-                fn(Builder $query) =>
-                $query->whereDate(
-                    'created_at',
-                    '>=',
-                    $request->date_from
-                )
-            )
-
-            ->when(
-                $request->filled('date_to'),
-                fn(Builder $query) =>
-                $query->whereDate(
-                    'created_at',
-                    '<=',
-                    $request->date_to
-                )
+        if (!$hasFullAccess) {
+            $query->where(
+                'assigned_to',
+                $user->id
             );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('search')) {
+            $search =
+                trim(
+                    (string)
+                    $request->search
+                );
+
+            $query->where(
+                function (
+                    Builder $subQuery
+                ) use ($search) {
+                    $subQuery
+                        ->where(
+                            'name',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'mobile',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'alternate_mobile',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'whatsapp_number',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'company_name',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'email',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'city',
+                            'like',
+                            "%{$search}%"
+                        );
+                }
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('status')) {
+            $query->where(
+                'lead_status_id',
+                $request->status
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Source
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('source')) {
+            $query->where(
+                'lead_source_id',
+                $request->source
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Assigned Employee Filter
+        |--------------------------------------------------------------------------
+        |
+        | Sirf Admin/Super Admin ke liye.
+        |
+        */
+
+        if (
+            $hasFullAccess
+            &&
+            $request->filled(
+                'assigned_to'
+            )
+        ) {
+            if (
+                $request->assigned_to ===
+                'unassigned'
+            ) {
+                $query->whereNull(
+                    'assigned_to'
+                );
+            } else {
+                $query->where(
+                    'assigned_to',
+                    $request->assigned_to
+                );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Team
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->filled(
+                'team_id'
+            )
+        ) {
+            $query->where(
+                'team_id',
+                $request->team_id
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Priority
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->filled(
+                'priority'
+            )
+        ) {
+            $query->where(
+                'priority',
+                $request->priority
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Temperature
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->filled(
+                'temperature'
+            )
+        ) {
+            $query->where(
+                'temperature',
+                $request->temperature
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Date From
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->filled(
+                'date_from'
+            )
+        ) {
+            $query->whereDate(
+                'created_at',
+                '>=',
+                $request->date_from
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Date To
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $request->filled(
+                'date_to'
+            )
+        ) {
+            $query->whereDate(
+                'created_at',
+                '<=',
+                $request->date_to
+            );
+        }
+
+        return $query;
     }
 
-    /**
-     * Form dropdown data.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Form Data
+    |--------------------------------------------------------------------------
+    */
+
     private function formData(
         Request $request
     ): array {
-        $companyId = $this->companyId($request);
+        $companyId =
+            $this->companyId($request);
 
-        return [
-            'sources' => LeadSource::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(),
+        $hasFullAccess =
+            $this->hasFullAccess($request);
 
-            'statuses' => LeadStatus::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(),
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        |
+        | Normal employee ko doosra employee choose nahi karna hai.
+        |
+        */
 
-            'users' => User::query()
-                ->where('company_id', $companyId)
-                ->where('is_active', true)
+        $users = $hasFullAccess
+            ? User::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
                 ->orderBy('name')
                 ->get([
                     'id',
                     'name',
                     'employee_code',
-                ]),
+                ])
+            : collect([
+                $request->user(),
+            ]);
 
-            'teams' => Team::query()
-                ->where('company_id', $companyId)
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                ]),
+        return [
+            'sources' =>
+                LeadSource::query()
+                    ->where(
+                        function (
+                            Builder $query
+                        ) use ($companyId) {
+                            $query
+                                ->whereNull(
+                                    'company_id'
+                                )
+                                ->orWhere(
+                                    'company_id',
+                                    $companyId
+                                );
+                        }
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->orderBy('name')
+                    ->get(),
 
-            'stages' => PipelineStage::query()
-                ->whereHas(
-                    'pipeline',
-                    fn(Builder $query) =>
-                    $query->where(
+            'statuses' =>
+                LeadStatus::query()
+                    ->where(
+                        function (
+                            Builder $query
+                        ) use ($companyId) {
+                            $query
+                                ->whereNull(
+                                    'company_id'
+                                )
+                                ->orWhere(
+                                    'company_id',
+                                    $companyId
+                                );
+                        }
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->orderBy(
+                        'sort_order'
+                    )
+                    ->orderBy('name')
+                    ->get(),
+
+            'users' =>
+                $users,
+
+            'teams' =>
+                Team::query()
+                    ->where(
                         'company_id',
                         $companyId
                     )
-                )
-                ->orderBy('sort_order')
-                ->get(),
+                    ->orderBy('name')
+                    ->get([
+                        'id',
+                        'name',
+                    ]),
+
+            'stages' =>
+                PipelineStage::query()
+                    ->whereHas(
+                        'pipeline',
+                        fn (
+                            Builder $query
+                        ) =>
+                            $query->where(
+                                'company_id',
+                                $companyId
+                            )
+                    )
+                    ->orderBy(
+                        'sort_order'
+                    )
+                    ->get(),
+
+            'hasFullAccess' =>
+                $hasFullAccess,
         ];
     }
 
-    /**
-     * Lead validation.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    */
+
     private function validateData(
         Request $request,
         ?Lead $lead = null
     ): array {
-        $companyId = $this->companyId($request);
+        $companyId =
+            $this->companyId($request);
 
         return $request->validate([
             'name' => [
@@ -848,15 +1484,20 @@ class LeadController extends Controller
                 'string',
                 'max:20',
 
-                Rule::unique('leads', 'mobile')
+                Rule::unique(
+                    'leads',
+                    'mobile'
+                )
                     ->where(
-                        fn($query) =>
-                        $query->where(
-                            'company_id',
-                            $companyId
-                        )
+                        fn ($query) =>
+                            $query->where(
+                                'company_id',
+                                $companyId
+                            )
                     )
-                    ->ignore($lead?->id),
+                    ->ignore(
+                        $lead?->id
+                    ),
             ],
 
             'alternate_mobile' => [
@@ -887,64 +1528,98 @@ class LeadController extends Controller
                 'required',
                 'integer',
 
-                Rule::exists('lead_sources', 'id')
-                    ->where(function ($query) use ($companyId) {
+                Rule::exists(
+                    'lead_sources',
+                    'id'
+                )->where(
+                    function ($query) use (
+                        $companyId
+                    ) {
                         $query->where(
-                            function ($subQuery) use ($companyId) {
+                            function (
                                 $subQuery
-                                    ->whereNull('company_id')
+                            ) use ($companyId) {
+                                $subQuery
+                                    ->whereNull(
+                                        'company_id'
+                                    )
                                     ->orWhere(
                                         'company_id',
                                         $companyId
                                     );
                             }
                         );
-                    }),
+                    }
+                ),
             ],
 
             'lead_status_id' => [
                 'required',
                 'integer',
 
-                Rule::exists('lead_statuses', 'id')
-                    ->where(function ($query) use ($companyId) {
+                Rule::exists(
+                    'lead_statuses',
+                    'id'
+                )->where(
+                    function ($query) use (
+                        $companyId
+                    ) {
                         $query->where(
-                            function ($subQuery) use ($companyId) {
+                            function (
                                 $subQuery
-                                    ->whereNull('company_id')
+                            ) use ($companyId) {
+                                $subQuery
+                                    ->whereNull(
+                                        'company_id'
+                                    )
                                     ->orWhere(
                                         'company_id',
                                         $companyId
                                     );
                             }
                         );
-                    }),
+                    }
+                ),
             ],
 
             'assigned_to' => [
                 'nullable',
                 'integer',
 
-                Rule::exists('users', 'id')
-                    ->where(function ($query) use ($companyId) {
+                Rule::exists(
+                    'users',
+                    'id'
+                )->where(
+                    function ($query) use (
+                        $companyId
+                    ) {
                         $query
-                            ->where('company_id', $companyId)
-                            ->where('is_active', true);
-                    }),
+                            ->where(
+                                'company_id',
+                                $companyId
+                            )
+                            ->where(
+                                'is_active',
+                                true
+                            );
+                    }
+                ),
             ],
 
             'team_id' => [
                 'nullable',
                 'integer',
 
-                Rule::exists('teams', 'id')
-                    ->where(
-                        fn($query) =>
+                Rule::exists(
+                    'teams',
+                    'id'
+                )->where(
+                    fn ($query) =>
                         $query->where(
                             'company_id',
                             $companyId
                         )
-                    ),
+                ),
             ],
 
             'pipeline_stage_id' => [
@@ -955,6 +1630,7 @@ class LeadController extends Controller
 
             'priority' => [
                 'required',
+
                 Rule::in([
                     'low',
                     'normal',
@@ -966,6 +1642,7 @@ class LeadController extends Controller
 
             'temperature' => [
                 'required',
+
                 Rule::in([
                     'cold',
                     'warm',
@@ -1039,37 +1716,49 @@ class LeadController extends Controller
         ]);
     }
 
-    /**
-     * Get default first pipeline stage.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Default Pipeline Stage
+    |--------------------------------------------------------------------------
+    */
+
     private function defaultPipelineStageId(
         int $companyId
     ): ?int {
-        /*
-        | Aapke pipelines table me is_active column nahi hai,
-        | isliye uski condition nahi lagayi gayi.
-        */
-
-        $pipeline = Pipeline::query()
-            ->where('company_id', $companyId)
-            ->orderByDesc('is_default')
-            ->orderBy('id')
-            ->first();
+        $pipeline =
+            Pipeline::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->orderByDesc(
+                    'is_default'
+                )
+                ->orderBy('id')
+                ->first();
 
         if (!$pipeline) {
             return null;
         }
 
         return PipelineStage::query()
-            ->where('pipeline_id', $pipeline->id)
-            ->orderBy('sort_order')
+            ->where(
+                'pipeline_id',
+                $pipeline->id
+            )
+            ->orderBy(
+                'sort_order'
+            )
             ->orderBy('id')
             ->value('id');
     }
 
-    /**
-     * Save assignment history.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Assignment History
+    |--------------------------------------------------------------------------
+    */
+
     private function createAssignmentHistory(
         Lead $lead,
         ?int $previousUserId,
@@ -1079,37 +1768,145 @@ class LeadController extends Controller
         int $companyId
     ): void {
         LeadAssignment::create([
-            'company_id' => $companyId,
-            'lead_id' => $lead->id,
-            'previous_user_id' => $previousUserId,
-            'new_user_id' => $newUserId,
-            'assigned_by' => $assignedBy,
-            'reason' => $reason,
-            'assigned_at' => now(),
+            'company_id' =>
+                $companyId,
+
+            'lead_id' =>
+                $lead->id,
+
+            'previous_user_id' =>
+                $previousUserId,
+
+            'new_user_id' =>
+                $newUserId,
+
+            'assigned_by' =>
+                $assignedBy,
+
+            'reason' =>
+                $reason,
+
+            'assigned_at' =>
+                now(),
         ]);
     }
 
-    /**
-     * Current company ID.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Company ID
+    |--------------------------------------------------------------------------
+    */
+
     private function companyId(
         Request $request
     ): int {
-        return (int) $request->user()->company_id;
+        return (int)
+            $request->user()->company_id;
     }
 
-    /**
-     * Company data access guard.
-     */
-    private function guard(
+    /*
+    |--------------------------------------------------------------------------
+    | Full Access Check
+    |--------------------------------------------------------------------------
+    */
+
+    private function hasFullAccess(
+        Request $request
+    ): bool {
+        return $request
+            ->user()
+            ->hasAnyRole(
+                $this->fullAccessRoles
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ensure Admin Access
+    |--------------------------------------------------------------------------
+    */
+
+    private function ensureFullAccess(
+        Request $request
+    ): void {
+        abort_unless(
+            $this->hasFullAccess($request),
+            403,
+            'You do not have permission to manage lead assignments.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company Guard
+    |--------------------------------------------------------------------------
+    */
+
+    private function guardCompany(
         Request $request,
         Lead $lead
     ): void {
         abort_unless(
             (int) $lead->company_id ===
-                $this->companyId($request),
+            $this->companyId($request),
             403,
-            'Unauthorized lead access.'
+            'Unauthorized company lead access.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Access Guard
+    |--------------------------------------------------------------------------
+    |
+    | Super Admin/Admin:
+    | company ki lead open kar sakte hain.
+    |
+    | Employee:
+    | sirf assigned lead open kar sakta hai.
+    |
+    */
+
+    private function guard(
+        Request $request,
+        Lead $lead
+    ): void {
+        /*
+        |--------------------------------------------------------------------------
+        | Company Check
+        |--------------------------------------------------------------------------
+        */
+
+        $this->guardCompany(
+            $request,
+            $lead
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Full Access
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $this->hasFullAccess(
+                $request
+            )
+        ) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employee Access
+        |--------------------------------------------------------------------------
+        */
+
+        abort_unless(
+            (int) $lead->assigned_to ===
+            (int) $request->user()->id,
+            403,
+            'This lead is not assigned to you.'
         );
     }
 }
