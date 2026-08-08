@@ -56,7 +56,13 @@
             </h1>
 
             <p class="mt-1 text-sm text-slate-500">
-                Manage, filter and assign your CRM leads.
+                @if ($hasFullAccess)
+                    Manage, filter and assign company CRM leads.
+                @elseif ($isTeamLeader)
+                    View your own leads and leads assigned to employees in your team.
+                @else
+                    View and manage leads assigned to you.
+                @endif
             </p>
         </div>
 
@@ -130,6 +136,8 @@
     >
         <form method="GET" action="{{ route('leads.index') }}">
             <div class="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+
+                {{-- Search --}}
                 <label class="block sm:col-span-2">
                     <span class="mb-1.5 block text-sm font-medium text-slate-700">
                         Search
@@ -144,8 +152,60 @@
                     >
                 </label>
 
-                @if ($hasFullAccess)
+                {{-- Status --}}
+                <label class="block">
+                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                        Status
+                    </span>
 
+                    <select
+                        name="status"
+                        class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                    >
+                        <option value="">All statuses</option>
+
+                        @foreach ($statuses as $status)
+                            <option
+                                value="{{ $status->id }}"
+                                @selected(
+                                    (string) request('status') ===
+                                    (string) $status->id
+                                )
+                            >
+                                {{ $status->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+
+                {{-- Source --}}
+                <label class="block">
+                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                        Source
+                    </span>
+
+                    <select
+                        name="source"
+                        class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                    >
+                        <option value="">All sources</option>
+
+                        @foreach ($sources as $source)
+                            <option
+                                value="{{ $source->id }}"
+                                @selected(
+                                    (string) request('source') ===
+                                    (string) $source->id
+                                )
+                            >
+                                {{ $source->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+
+                {{-- Assigned Employee --}}
+                @if ($canFilterByEmployee)
                     <label class="block">
                         <span class="mb-1.5 block text-sm font-medium text-slate-700">
                             Assigned Employee
@@ -156,18 +216,17 @@
                             class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
                         >
                             <option value="">
-                                All employees
+                                {{ $hasFullAccess ? 'All employees' : 'All team employees' }}
                             </option>
 
-                            <option
-                                value="unassigned"
-                                @selected(
-                                    request('assigned_to') ===
-                                    'unassigned'
-                                )
-                            >
-                                Unassigned
-                            </option>
+                            @if ($hasFullAccess)
+                                <option
+                                    value="unassigned"
+                                    @selected(request('assigned_to') === 'unassigned')
+                                >
+                                    Unassigned
+                                </option>
+                            @endif
 
                             @foreach ($users as $user)
                                 <option
@@ -186,79 +245,39 @@
                             @endforeach
                         </select>
                     </label>
-
                 @endif
 
-                <label class="block">
-                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                        Source
-                    </span>
+                {{-- Team --}}
+                @if ($canFilterByTeam)
+                    <label class="block">
+                        <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                            Team
+                        </span>
 
-                    <select
-                        name="source"
-                        class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                        <option value="">All sources</option>
-                        @foreach ($sources as $source)
-                            <option
-                                value="{{ $source->id }}"
-                                @selected((string) request('source') === (string) $source->id)
-                            >
-                                {{ $source->name }}
+                        <select
+                            name="team_id"
+                            class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                            <option value="">
+                                {{ $hasFullAccess ? 'All teams' : 'All my teams' }}
                             </option>
-                        @endforeach
-                    </select>
-                </label>
 
-                <label class="block">
-                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                        Assigned Employee
-                    </span>
+                            @foreach ($teams as $team)
+                                <option
+                                    value="{{ $team->id }}"
+                                    @selected(
+                                        (string) request('team_id') ===
+                                        (string) $team->id
+                                    )
+                                >
+                                    {{ $team->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                @endif
 
-                    <select
-                        name="assigned_to"
-                        class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                        <option value="">All employees</option>
-                        <option value="unassigned" @selected(request('assigned_to') === 'unassigned')>
-                            Unassigned
-                        </option>
-
-                        @foreach ($users as $user)
-                            <option
-                                value="{{ $user->id }}"
-                                @selected((string) request('assigned_to') === (string) $user->id)
-                            >
-                                {{ $user->name }}
-                                @if ($user->employee_code)
-                                    ({{ $user->employee_code }})
-                                @endif
-                            </option>
-                        @endforeach
-                    </select>
-                </label>
-
-                <label class="block">
-                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                        Team
-                    </span>
-
-                    <select
-                        name="team_id"
-                        class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                        <option value="">All teams</option>
-                        @foreach ($teams as $team)
-                            <option
-                                value="{{ $team->id }}"
-                                @selected((string) request('team_id') === (string) $team->id)
-                            >
-                                {{ $team->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </label>
-
+                {{-- Priority --}}
                 <label class="block">
                     <span class="mb-1.5 block text-sm font-medium text-slate-700">
                         Priority
@@ -269,6 +288,7 @@
                         class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
                     >
                         <option value="">All priorities</option>
+
                         @foreach (['low', 'normal', 'high', 'urgent', 'hot'] as $priority)
                             <option
                                 value="{{ $priority }}"
@@ -280,6 +300,7 @@
                     </select>
                 </label>
 
+                {{-- Temperature --}}
                 <label class="block">
                     <span class="mb-1.5 block text-sm font-medium text-slate-700">
                         Temperature
@@ -290,6 +311,7 @@
                         class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
                     >
                         <option value="">All temperatures</option>
+
                         @foreach (['cold', 'warm', 'hot'] as $temperature)
                             <option
                                 value="{{ $temperature }}"
@@ -301,6 +323,7 @@
                     </select>
                 </label>
 
+                {{-- Date From --}}
                 <label class="block">
                     <span class="mb-1.5 block text-sm font-medium text-slate-700">
                         Created From
@@ -314,6 +337,7 @@
                     >
                 </label>
 
+                {{-- Date To --}}
                 <label class="block">
                     <span class="mb-1.5 block text-sm font-medium text-slate-700">
                         Created To
@@ -556,7 +580,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-5 py-14 text-center">
+                            <td colspan="{{ $hasFullAccess ? 10 : 9 }}" class="px-5 py-14 text-center">
                                 <div class="font-semibold text-slate-700">
                                     No leads found
                                 </div>

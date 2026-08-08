@@ -43,27 +43,47 @@ class LeadController extends Controller
     public function index(Request $request): View
     {
         $companyId = $this->companyId($request);
-
         $hasFullAccess = $this->hasFullAccess($request);
 
         /*
         |--------------------------------------------------------------------------
-        | IMPORTANT
+        | Team Leader Access
         |--------------------------------------------------------------------------
         |
-        | filteredLeadQuery() ke andar hi role based restriction lagi hui hai.
+        | Team Leader ko role name se nahi, actual teams.leader_id mapping se
+        | identify kiya ja raha hai.
         |
-        | Admin:
-        | company ki saari leads
+        | Admin / Super Admin:
+        | Company ki saari leads.
+        |
+        | Team Leader:
+        | Apni assigned leads + apni team ke employees ki assigned leads.
         |
         | Employee:
-        | assigned_to = login user id
+        | Sirf apni assigned leads.
         |
+        */
+
+        $leaderTeamIds = $this->leaderTeamIds($request);
+        $isTeamLeader =
+            !$hasFullAccess &&
+            !empty($leaderTeamIds);
+
+        $canFilterByEmployee =
+            $hasFullAccess || $isTeamLeader;
+
+        $canFilterByTeam =
+            $hasFullAccess || $isTeamLeader;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Leads
+        |--------------------------------------------------------------------------
         */
 
         $query = $this->filteredLeadQuery($request)
             ->with([
-                'assignedUser:id,name,employee_code',
+                'assignedUser:id,name,employee_code,team_id',
                 'source:id,name',
                 'status:id,name,color',
                 'team:id,name',
@@ -85,10 +105,7 @@ class LeadController extends Controller
             ->where(function (Builder $query) use ($companyId) {
                 $query
                     ->whereNull('company_id')
-                    ->orWhere(
-                        'company_id',
-                        $companyId
-                    );
+                    ->orWhere('company_id', $companyId);
             })
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -104,57 +121,97 @@ class LeadController extends Controller
             ->where(function (Builder $query) use ($companyId) {
                 $query
                     ->whereNull('company_id')
-                    ->orWhere(
-                        'company_id',
-                        $companyId
-                    );
+                    ->orWhere('company_id', $companyId);
             })
             ->orderBy('name')
             ->get();
 
         /*
         |--------------------------------------------------------------------------
-        | Employees
+        | Employees For Filter
         |--------------------------------------------------------------------------
         |
-        | Employee ko doosre employees ka dropdown dene ki zarurat nahi.
+        | Admin:
+        | Company ke active users.
+        |
+        | Team Leader:
+        | Khud + jis team ka leader hai us team ke active employees.
+        |
+        | Employee:
+        | Employee dropdown nahi.
         |
         */
 
-        $users = $hasFullAccess
-            ? User::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'is_active',
-                    true
-                )
+        if ($hasFullAccess) {
+            $users = User::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
                 ->orderBy('name')
                 ->get([
                     'id',
                     'name',
                     'employee_code',
-                ])
-            : collect();
+                    'team_id',
+                ]);
+        } elseif ($isTeamLeader) {
+            $users = User::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->where(function (Builder $query) use (
+                    $request,
+                    $leaderTeamIds
+                ) {
+                    $query
+                        ->whereKey($request->user()->id)
+                        ->orWhereIn('team_id', $leaderTeamIds);
+                })
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                    'employee_code',
+                    'team_id',
+                ]);
+        } else {
+            $users = collect();
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | Teams
+        | Teams For Filter
         |--------------------------------------------------------------------------
+        |
+        | Admin:
+        | Company ki all teams.
+        |
+        | Team Leader:
+        | Sirf wo teams jinka leader login user hai.
+        |
+        | Employee:
+        | Team dropdown nahi.
+        |
         */
 
-        $teams = Team::query()
-            ->where(
-                'company_id',
-                $companyId
-            )
-            ->orderBy('name')
-            ->get([
-                'id',
-                'name',
-            ]);
+        if ($hasFullAccess) {
+            $teams = Team::query()
+                ->where('company_id', $companyId)
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                ]);
+        } elseif ($isTeamLeader) {
+            $teams = Team::query()
+                ->where('company_id', $companyId)
+                ->whereIn('id', $leaderTeamIds)
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                ]);
+        } else {
+            $teams = collect();
+        }
 
         return view('leads.index', [
             'leads' => $leads,
@@ -164,10 +221,13 @@ class LeadController extends Controller
             'teams' => $teams,
 
             /*
-            | Blade role control
+            | Blade access control
             */
 
             'hasFullAccess' => $hasFullAccess,
+            'isTeamLeader' => $isTeamLeader,
+            'canFilterByEmployee' => $canFilterByEmployee,
+            'canFilterByTeam' => $canFilterByTeam,
         ]);
     }
 
@@ -1088,40 +1148,81 @@ class LeadController extends Controller
     private function filteredLeadQuery(
         Request $request
     ): Builder {
-        $companyId =
-            $this->companyId($request);
+        $companyId = $this->companyId($request);
+        $user = $request->user();
+        $hasFullAccess = $this->hasFullAccess($request);
 
-        $user =
-            $request->user();
-
-        $hasFullAccess =
-            $this->hasFullAccess($request);
-
-        $query =
-            Lead::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                );
+        $query = Lead::query()
+            ->where('company_id', $companyId);
 
         /*
         |--------------------------------------------------------------------------
         | ROLE BASED LEAD ACCESS
         |--------------------------------------------------------------------------
         |
-        | Admin:
-        | company ki all leads.
+        | Admin / Super Admin:
+        | Company ki saari leads.
+        |
+        | Team Leader:
+        | 1. Khud ko assigned leads
+        | 2. Jis team ka wo leader hai, un teams ke employees ko assigned leads
         |
         | Employee:
-        | only assigned leads.
+        | Sirf khud ko assigned leads.
+        |
+        | IMPORTANT:
+        | Lead ka team_id blank ho tab bhi Team Leader ko lead dikhegi agar
+        | assigned employee uski team ka member hai.
         |
         */
 
+        $leaderTeamIds = [];
+
         if (!$hasFullAccess) {
-            $query->where(
-                'assigned_to',
-                $user->id
-            );
+            $leaderTeamIds =
+                $this->leaderTeamIds($request);
+
+            if (empty($leaderTeamIds)) {
+                /*
+                | Normal Employee
+                */
+
+                $query->where(
+                    'assigned_to',
+                    $user->id
+                );
+            } else {
+                /*
+                | Team Leader
+                */
+
+                $query->where(
+                    function (Builder $accessQuery) use (
+                        $user,
+                        $companyId,
+                        $leaderTeamIds
+                    ) {
+                        $accessQuery
+                            ->where(
+                                'assigned_to',
+                                $user->id
+                            )
+                            ->orWhereIn(
+                                'assigned_to',
+                                User::query()
+                                    ->select('id')
+                                    ->where(
+                                        'company_id',
+                                        $companyId
+                                    )
+                                    ->whereIn(
+                                        'team_id',
+                                        $leaderTeamIds
+                                    )
+                            );
+                    }
+                );
+            }
         }
 
         /*
@@ -1131,16 +1232,12 @@ class LeadController extends Controller
         */
 
         if ($request->filled('search')) {
-            $search =
-                trim(
-                    (string)
-                    $request->search
-                );
+            $search = trim(
+                (string) $request->search
+            );
 
             $query->where(
-                function (
-                    Builder $subQuery
-                ) use ($search) {
+                function (Builder $subQuery) use ($search) {
                     $subQuery
                         ->where(
                             'name',
@@ -1212,24 +1309,50 @@ class LeadController extends Controller
         | Assigned Employee Filter
         |--------------------------------------------------------------------------
         |
-        | Sirf Admin/Super Admin ke liye.
+        | Admin:
+        | Company ke employee / unassigned filter kar sakta hai.
+        |
+        | Team Leader:
+        | Apne visible team employees ko filter kar sakta hai.
+        |
+        | Normal Employee:
+        | Is filter ki zarurat nahi.
+        |
+        | Security:
+        | Team Leader manually kisi doosre employee ka ID URL me dale tab bhi
+        | initial access scope ke kaaran doosri team ki lead nahi milegi.
         |
         */
 
+        $isTeamLeader =
+            !$hasFullAccess &&
+            !empty($leaderTeamIds);
+
         if (
-            $hasFullAccess
+            ($hasFullAccess || $isTeamLeader)
             &&
-            $request->filled(
-                'assigned_to'
-            )
+            $request->filled('assigned_to')
         ) {
             if (
                 $request->assigned_to ===
                 'unassigned'
             ) {
-                $query->whereNull(
-                    'assigned_to'
-                );
+                /*
+                | Unassigned leads sirf full-access users ko visible hain.
+                */
+
+                if ($hasFullAccess) {
+                    $query->whereNull(
+                        'assigned_to'
+                    );
+                } else {
+                    /*
+                    | Team Leader access assigned employees par based hai,
+                    | isliye unassigned filter ka result intentionally empty.
+                    */
+
+                    $query->whereRaw('1 = 0');
+                }
             } else {
                 $query->where(
                     'assigned_to',
@@ -1240,18 +1363,42 @@ class LeadController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Team
+        | Team Filter
         |--------------------------------------------------------------------------
+        |
+        | Lead.team_id present ho ya sirf assigned employee ka users.team_id
+        | present ho, dono cases me team filter kaam karega.
+        |
         */
 
-        if (
-            $request->filled(
-                'team_id'
-            )
-        ) {
+        if ($request->filled('team_id')) {
+            $teamId =
+                (int) $request->team_id;
+
             $query->where(
-                'team_id',
-                $request->team_id
+                function (Builder $teamQuery) use (
+                    $companyId,
+                    $teamId
+                ) {
+                    $teamQuery
+                        ->where(
+                            'team_id',
+                            $teamId
+                        )
+                        ->orWhereIn(
+                            'assigned_to',
+                            User::query()
+                                ->select('id')
+                                ->where(
+                                    'company_id',
+                                    $companyId
+                                )
+                                ->where(
+                                    'team_id',
+                                    $teamId
+                                )
+                        );
+                }
             );
         }
 
@@ -1261,11 +1408,7 @@ class LeadController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $request->filled(
-                'priority'
-            )
-        ) {
+        if ($request->filled('priority')) {
             $query->where(
                 'priority',
                 $request->priority
@@ -1278,11 +1421,7 @@ class LeadController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $request->filled(
-                'temperature'
-            )
-        ) {
+        if ($request->filled('temperature')) {
             $query->where(
                 'temperature',
                 $request->temperature
@@ -1295,11 +1434,7 @@ class LeadController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $request->filled(
-                'date_from'
-            )
-        ) {
+        if ($request->filled('date_from')) {
             $query->whereDate(
                 'created_at',
                 '>=',
@@ -1313,11 +1448,7 @@ class LeadController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $request->filled(
-                'date_to'
-            )
-        ) {
+        if ($request->filled('date_to')) {
             $query->whereDate(
                 'created_at',
                 '<=',
@@ -1806,6 +1937,53 @@ class LeadController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | Team Leader Team IDs
+    |--------------------------------------------------------------------------
+    |
+    | Actual team leadership teams.leader_id se determine hogi.
+    | Role name team_leader hona required nahi hai.
+    |
+    */
+
+    private function leaderTeamIds(
+        Request $request
+    ): array {
+        $companyId =
+            $this->companyId($request);
+
+        return Team::query()
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->where(
+                'leader_id',
+                $request->user()->id
+            )
+            ->pluck('id')
+            ->map(
+                fn ($id) => (int) $id
+            )
+            ->values()
+            ->all();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Team Leader Check
+    |--------------------------------------------------------------------------
+    */
+
+    private function isTeamLeader(
+        Request $request
+    ): bool {
+        return !empty(
+            $this->leaderTeamIds($request)
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Full Access Check
     |--------------------------------------------------------------------------
     */
@@ -1884,29 +2062,74 @@ class LeadController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Full Access
+        | Admin / Super Admin
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->hasFullAccess($request)) {
+            return;
+        }
+
+        $user = $request->user();
+        $companyId =
+            $this->companyId($request);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Own Assigned Lead
         |--------------------------------------------------------------------------
         */
 
         if (
-            $this->hasFullAccess(
-                $request
-            )
+            (int) $lead->assigned_to ===
+            (int) $user->id
         ) {
             return;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Employee Access
+        | Team Leader Access
+        |--------------------------------------------------------------------------
+        |
+        | Agar login user kisi team ka leader hai aur lead jis employee ko
+        | assigned hai wo employee uski team me hai, to access allowed.
+        |
+        */
+
+        $leaderTeamIds =
+            $this->leaderTeamIds($request);
+
+        if (!empty($leaderTeamIds)) {
+            $assignedEmployeeIsInLeaderTeam =
+                User::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->whereKey(
+                        $lead->assigned_to
+                    )
+                    ->whereIn(
+                        'team_id',
+                        $leaderTeamIds
+                    )
+                    ->exists();
+
+            if ($assignedEmployeeIsInLeaderTeam) {
+                return;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | No Access
         |--------------------------------------------------------------------------
         */
 
-        abort_unless(
-            (int) $lead->assigned_to ===
-            (int) $request->user()->id,
+        abort(
             403,
-            'This lead is not assigned to you.'
+            'This lead is not assigned to you or your team.'
         );
     }
 }
