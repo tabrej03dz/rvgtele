@@ -32,7 +32,55 @@
             </h1>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
+            @if ($previousLead)
+                <a
+                    href="{{ route('leads.show', $previousLead) }}"
+                    title="{{ $previousLead->name }}"
+                    class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m15 18-6-6 6-6"/>
+                    </svg>
+                    Previous
+                </a>
+            @else
+                <button
+                    type="button"
+                    disabled
+                    class="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400"
+                >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m15 18-6-6 6-6"/>
+                    </svg>
+                    Previous
+                </button>
+            @endif
+
+            @if ($nextLead)
+                <a
+                    href="{{ route('leads.show', $nextLead) }}"
+                    title="{{ $nextLead->name }}"
+                    class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                    Next
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m9 18 6-6-6-6"/>
+                    </svg>
+                </a>
+            @else
+                <button
+                    type="button"
+                    disabled
+                    class="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400"
+                >
+                    Next
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m9 18 6-6-6-6"/>
+                    </svg>
+                </button>
+            @endif
+
             <a
                 href="{{ route('leads.index') }}"
                 class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -320,6 +368,7 @@
 
             {{-- Save Call --}}
             <form
+                id="saveCallForm"
                 method="POST"
                 action="{{ route('calls.store', $lead) }}"
                 class="rounded-xl border border-slate-200 bg-white shadow-sm"
@@ -423,7 +472,8 @@
                     </label>
 
                     <button
-                        type="submit"
+                        type="button"
+                        onclick="openSaveCallConfirmation()"
                         class="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
                     >
                         Save Call
@@ -551,4 +601,182 @@
         </aside>
     </div>
 </div>
+
+{{-- Save Call Confirmation Modal --}}
+<div
+    id="saveCallConfirmationModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="saveCallConfirmationTitle"
+>
+    <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div class="border-b border-slate-200 px-5 py-4">
+            <h3 id="saveCallConfirmationTitle" class="text-lg font-bold text-slate-900">
+                Save Call Result?
+            </h3>
+            <p class="mt-1 text-sm leading-6 text-slate-500">
+                Save karne ke baad current lead par reh sakte hain ya seedha next lead open kar sakte hain.
+            </p>
+        </div>
+
+        <div class="space-y-3 p-5">
+            <button
+                type="button"
+                onclick="confirmSaveCall(false)"
+                class="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+            >
+                <span>
+                    <span class="block text-sm font-bold text-slate-900">Save</span>
+                    <span class="mt-0.5 block text-xs text-slate-500">Call save hoga aur yahi lead open rahegi.</span>
+                </span>
+
+                <svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14"/>
+                    <path d="m13 6 6 6-6 6"/>
+                </svg>
+            </button>
+
+            @if ($nextLead)
+                <button
+                    type="button"
+                    onclick="confirmSaveCall(true)"
+                    class="flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left hover:bg-emerald-100"
+                >
+                    <span>
+                        <span class="block text-sm font-bold text-emerald-900">Save & Next</span>
+                        <span class="mt-0.5 block text-xs text-emerald-700">
+                            Save ke baad {{ $nextLead->name }} open hogi.
+                        </span>
+                    </span>
+
+                    <svg class="h-5 w-5 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14"/>
+                        <path d="m13 6 6 6-6 6"/>
+                    </svg>
+                </button>
+            @else
+                <button
+                    type="button"
+                    disabled
+                    class="flex w-full cursor-not-allowed items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left opacity-70"
+                >
+                    <span>
+                        <span class="block text-sm font-bold text-slate-500">Save & Next</span>
+                        <span class="mt-0.5 block text-xs text-slate-400">Ye last accessible lead hai.</span>
+                    </span>
+                </button>
+            @endif
+
+            <button
+                type="button"
+                onclick="closeSaveCallConfirmation()"
+                class="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            >
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const storageKey = 'crm_save_call_next_lead_{{ $lead->id }}';
+
+        @if ($errors->any())
+            // Validation failed: stay on the current lead and cancel pending navigation.
+            sessionStorage.removeItem(storageKey);
+        @elseif (session('success'))
+            // The normal POST has completed successfully and returned to this lead.
+            const pendingNextUrl = sessionStorage.getItem(storageKey);
+
+            if (pendingNextUrl) {
+                sessionStorage.removeItem(storageKey);
+                window.location.replace(pendingNextUrl);
+                return;
+            }
+        @endif
+
+        // Remove stale navigation when this page was opened normally.
+        if (!sessionStorage.getItem(storageKey)) {
+            sessionStorage.removeItem(storageKey);
+        }
+    })();
+
+    function openSaveCallConfirmation() {
+        const form = document.getElementById('saveCallForm');
+
+        if (!form) {
+            return;
+        }
+
+        // Browser's required/min validation should run before confirmation.
+        if (!form.reportValidity()) {
+            return;
+        }
+
+        const modal = document.getElementById('saveCallConfirmationModal');
+
+        if (!modal) {
+            return;
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeSaveCallConfirmation() {
+        const modal = document.getElementById('saveCallConfirmationModal');
+
+        if (!modal) {
+            return;
+        }
+
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function confirmSaveCall(saveAndNext) {
+        const form = document.getElementById('saveCallForm');
+
+        if (!form) {
+            return;
+        }
+
+        const storageKey = 'crm_save_call_next_lead_{{ $lead->id }}';
+
+        if (saveAndNext) {
+            @if ($nextLead)
+                sessionStorage.setItem(
+                    storageKey,
+                    @json(route('leads.show', $nextLead))
+                );
+            @else
+                sessionStorage.removeItem(storageKey);
+            @endif
+        } else {
+            sessionStorage.removeItem(storageKey);
+        }
+
+        closeSaveCallConfirmation();
+
+        // Prevent double click while the request is being submitted.
+        const buttons = document.querySelectorAll('#saveCallConfirmationModal button');
+        buttons.forEach(button => button.disabled = true);
+
+        form.submit();
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeSaveCallConfirmation();
+        }
+    });
+
+    document.getElementById('saveCallConfirmationModal')?.addEventListener('click', function (event) {
+        if (event.target === this) {
+            closeSaveCallConfirmation();
+        }
+    });
+</script>
 @endsection
