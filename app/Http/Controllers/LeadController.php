@@ -319,14 +319,11 @@ class LeadController extends Controller
                     $this->createAssignmentHistory(
                         lead: $lead,
                         previousUserId: null,
-                        newUserId:
-                            (int) $validated['assigned_to'],
-                        assignedBy:
-                            (int) $request->user()->id,
-                        reason:
-                            $this->hasFullAccess($request)
-                                ? 'Lead assigned during creation'
-                                : 'Lead created by employee and automatically assigned to self',
+                        newUserId: (int) $validated['assigned_to'],
+                        assignedBy: (int) $request->user()->id,
+                        reason: $this->hasFullAccess($request)
+                            ? 'Lead assigned during creation'
+                            : 'Lead created by employee and automatically assigned to self',
                         companyId: $companyId
                     );
                 }
@@ -387,6 +384,55 @@ class LeadController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Previous / Next Lead Navigation
+        |--------------------------------------------------------------------------
+        |
+        | Navigation always stays inside the leads currently accessible to the
+        | logged-in user. The same role-based query used by the lead listing is
+        | reused here, so an employee/team leader can never navigate into a lead
+        | that they are not allowed to open.
+        |
+        | Lead listing is latest ID first:
+        | Previous = newer lead (higher ID)
+        | Next     = older lead (lower ID)
+        |
+        */
+
+       $navigationQuery =
+    $this->filteredLeadQuery($request);
+
+/*
+|--------------------------------------------------------------------------
+| Previous Lead
+|--------------------------------------------------------------------------
+| Current ID se chhoti ID = pichhli lead
+*/
+$previousLead =
+    (clone $navigationQuery)
+    ->where('id', '<', $lead->id)
+    ->orderByDesc('id')
+    ->first([
+        'id',
+        'name',
+    ]);
+
+/*
+|--------------------------------------------------------------------------
+| Next Lead
+|--------------------------------------------------------------------------
+| Current ID se badi ID = agli lead
+*/
+$nextLead =
+    (clone $navigationQuery)
+    ->where('id', '>', $lead->id)
+    ->orderBy('id')
+    ->first([
+        'id',
+        'name',
+    ]);
+
+        /*
+        |--------------------------------------------------------------------------
         | Assignment Dropdown
         |--------------------------------------------------------------------------
         |
@@ -396,20 +442,20 @@ class LeadController extends Controller
 
         $users = $this->hasFullAccess($request)
             ? User::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'is_active',
-                    true
-                )
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                    'employee_code',
-                ])
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->where(
+                'is_active',
+                true
+            )
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'employee_code',
+            ])
             : collect();
 
         /*
@@ -420,26 +466,26 @@ class LeadController extends Controller
 
         $dispositions =
             \App\Models\CallDisposition::query()
-                ->where(
-                    function (
-                        Builder $query
-                    ) use ($companyId) {
-                        $query
-                            ->whereNull(
-                                'company_id'
-                            )
-                            ->orWhere(
-                                'company_id',
-                                $companyId
-                            );
-                    }
-                )
-                ->where(
-                    'is_active',
-                    true
-                )
-                ->orderBy('name')
-                ->get();
+            ->where(
+                function (
+                    Builder $query
+                ) use ($companyId) {
+                    $query
+                        ->whereNull(
+                            'company_id'
+                        )
+                        ->orWhere(
+                            'company_id',
+                            $companyId
+                        );
+                }
+            )
+            ->where(
+                'is_active',
+                true
+            )
+            ->orderBy('name')
+            ->get();
 
         return view('leads.show', [
             'lead' => $lead,
@@ -447,10 +493,16 @@ class LeadController extends Controller
             'users' => $users,
 
             'dispositions' =>
-                $dispositions,
+            $dispositions,
 
             'hasFullAccess' =>
-                $this->hasFullAccess($request),
+            $this->hasFullAccess($request),
+
+            'previousLead' =>
+            $previousLead,
+
+            'nextLead' =>
+            $nextLead,
         ]);
     }
 
@@ -544,22 +596,17 @@ class LeadController extends Controller
                     $this->createAssignmentHistory(
                         lead: $lead,
 
-                        previousUserId:
-                            $oldAssignedUserId
-                                ? (int) $oldAssignedUserId
-                                : null,
+                        previousUserId: $oldAssignedUserId
+                            ? (int) $oldAssignedUserId
+                            : null,
 
-                        newUserId:
-                            (int) $newAssignedUserId,
+                        newUserId: (int) $newAssignedUserId,
 
-                        assignedBy:
-                            (int) $request->user()->id,
+                        assignedBy: (int) $request->user()->id,
 
-                        reason:
-                            'Lead owner changed from edit form',
+                        reason: 'Lead owner changed from edit form',
 
-                        companyId:
-                            $this->companyId($request)
+                        companyId: $this->companyId($request)
                     );
                 }
             }
@@ -695,28 +742,23 @@ class LeadController extends Controller
             ) {
                 $lead->update([
                     'assigned_to' =>
-                        $validated['assigned_to'],
+                    $validated['assigned_to'],
                 ]);
 
                 $this->createAssignmentHistory(
                     lead: $lead,
 
-                    previousUserId:
-                        $oldAssignedUserId
-                            ? (int) $oldAssignedUserId
-                            : null,
+                    previousUserId: $oldAssignedUserId
+                        ? (int) $oldAssignedUserId
+                        : null,
 
-                    newUserId:
-                        (int) $validated['assigned_to'],
+                    newUserId: (int) $validated['assigned_to'],
 
-                    assignedBy:
-                        (int) $request->user()->id,
+                    assignedBy: (int) $request->user()->id,
 
-                    reason:
-                        $validated['reason'],
+                    reason: $validated['reason'],
 
-                    companyId:
-                        $companyId
+                    companyId: $companyId
                 );
             }
         );
@@ -900,67 +942,63 @@ class LeadController extends Controller
         ) {
             $targetQuery =
                 Lead::query()
-                    ->where(
-                        'company_id',
-                        $companyId
-                    )
-                    ->whereIn(
-                        'id',
-                        $validated['lead_ids']
-                            ?? []
-                    );
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->whereIn(
+                    'id',
+                    $validated['lead_ids']
+                        ?? []
+                );
         }
 
         /*
         |--------------------------------------------------------------------------
         | Filtered Leads
         |--------------------------------------------------------------------------
-        */
-
-        else {
+        */ else {
             $filterRequest =
                 new Request([
                     'search' =>
-                        $validated['search']
-                            ?? null,
+                    $validated['search']
+                        ?? null,
 
                     'status' =>
-                        $validated['status']
-                            ?? null,
+                    $validated['status']
+                        ?? null,
 
                     'source' =>
-                        $validated['source']
-                            ?? null,
+                    $validated['source']
+                        ?? null,
 
                     'assigned_to' =>
-                        $validated[
-                            'filter_assigned_to'
-                        ] ?? null,
+                    $validated['filter_assigned_to'] ?? null,
 
                     'team_id' =>
-                        $validated['team_id']
-                            ?? null,
+                    $validated['team_id']
+                        ?? null,
 
                     'priority' =>
-                        $validated['priority']
-                            ?? null,
+                    $validated['priority']
+                        ?? null,
 
                     'temperature' =>
-                        $validated['temperature']
-                            ?? null,
+                    $validated['temperature']
+                        ?? null,
 
                     'date_from' =>
-                        $validated['date_from']
-                            ?? null,
+                    $validated['date_from']
+                        ?? null,
 
                     'date_to' =>
-                        $validated['date_to']
-                            ?? null,
+                    $validated['date_to']
+                        ?? null,
                 ]);
 
             $filterRequest->setUserResolver(
-                fn () =>
-                    $request->user()
+                fn() =>
+                $request->user()
             );
 
             $targetQuery =
@@ -1053,28 +1091,23 @@ class LeadController extends Controller
 
                                 $lead->update([
                                     'assigned_to' =>
-                                        $newUserId,
+                                    $newUserId,
                                 ]);
 
                                 $this->createAssignmentHistory(
                                     lead: $lead,
 
-                                    previousUserId:
-                                        $previousUserId
-                                            ? (int) $previousUserId
-                                            : null,
+                                    previousUserId: $previousUserId
+                                        ? (int) $previousUserId
+                                        : null,
 
-                                    newUserId:
-                                        $newUserId,
+                                    newUserId: $newUserId,
 
-                                    assignedBy:
-                                        $assignedBy,
+                                    assignedBy: $assignedBy,
 
-                                    reason:
-                                        $reason,
+                                    reason: $reason,
 
-                                    companyId:
-                                        $companyId
+                                    companyId: $companyId
                                 );
 
                                 $updatedCount++;
@@ -1119,13 +1152,13 @@ class LeadController extends Controller
 
         Note::create([
             'lead_id' =>
-                $lead->id,
+            $lead->id,
 
             'user_id' =>
-                $request->user()->id,
+            $request->user()->id,
 
             'body' =>
-                $validated['body'],
+            $validated['body'],
         ]);
 
         return back()->with(
@@ -1485,108 +1518,108 @@ class LeadController extends Controller
 
         $users = $hasFullAccess
             ? User::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'is_active',
-                    true
-                )
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                    'employee_code',
-                ])
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->where(
+                'is_active',
+                true
+            )
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'employee_code',
+            ])
             : collect([
                 $request->user(),
             ]);
 
         return [
             'sources' =>
-                LeadSource::query()
-                    ->where(
-                        function (
-                            Builder $query
-                        ) use ($companyId) {
-                            $query
-                                ->whereNull(
-                                    'company_id'
-                                )
-                                ->orWhere(
-                                    'company_id',
-                                    $companyId
-                                );
-                        }
-                    )
-                    ->where(
-                        'is_active',
-                        true
-                    )
-                    ->orderBy('name')
-                    ->get(),
+            LeadSource::query()
+                ->where(
+                    function (
+                        Builder $query
+                    ) use ($companyId) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy('name')
+                ->get(),
 
             'statuses' =>
-                LeadStatus::query()
-                    ->where(
-                        function (
-                            Builder $query
-                        ) use ($companyId) {
-                            $query
-                                ->whereNull(
-                                    'company_id'
-                                )
-                                ->orWhere(
-                                    'company_id',
-                                    $companyId
-                                );
-                        }
-                    )
-                    ->where(
-                        'is_active',
-                        true
-                    )
-                    ->orderBy(
-                        'sort_order'
-                    )
-                    ->orderBy('name')
-                    ->get(),
+            LeadStatus::query()
+                ->where(
+                    function (
+                        Builder $query
+                    ) use ($companyId) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy(
+                    'sort_order'
+                )
+                ->orderBy('name')
+                ->get(),
 
             'users' =>
-                $users,
+            $users,
 
             'teams' =>
-                Team::query()
-                    ->where(
+            Team::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                ]),
+
+            'stages' =>
+            PipelineStage::query()
+                ->whereHas(
+                    'pipeline',
+                    fn(
+                        Builder $query
+                    ) =>
+                    $query->where(
                         'company_id',
                         $companyId
                     )
-                    ->orderBy('name')
-                    ->get([
-                        'id',
-                        'name',
-                    ]),
-
-            'stages' =>
-                PipelineStage::query()
-                    ->whereHas(
-                        'pipeline',
-                        fn (
-                            Builder $query
-                        ) =>
-                            $query->where(
-                                'company_id',
-                                $companyId
-                            )
-                    )
-                    ->orderBy(
-                        'sort_order'
-                    )
-                    ->get(),
+                )
+                ->orderBy(
+                    'sort_order'
+                )
+                ->get(),
 
             'hasFullAccess' =>
-                $hasFullAccess,
+            $hasFullAccess,
         ];
     }
 
@@ -1620,11 +1653,11 @@ class LeadController extends Controller
                     'mobile'
                 )
                     ->where(
-                        fn ($query) =>
-                            $query->where(
-                                'company_id',
-                                $companyId
-                            )
+                        fn($query) =>
+                        $query->where(
+                            'company_id',
+                            $companyId
+                        )
                     )
                     ->ignore(
                         $lead?->id
@@ -1745,11 +1778,11 @@ class LeadController extends Controller
                     'teams',
                     'id'
                 )->where(
-                    fn ($query) =>
-                        $query->where(
-                            'company_id',
-                            $companyId
-                        )
+                    fn($query) =>
+                    $query->where(
+                        'company_id',
+                        $companyId
+                    )
                 ),
             ],
 
@@ -1858,15 +1891,15 @@ class LeadController extends Controller
     ): ?int {
         $pipeline =
             Pipeline::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->orderByDesc(
-                    'is_default'
-                )
-                ->orderBy('id')
-                ->first();
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->orderByDesc(
+                'is_default'
+            )
+            ->orderBy('id')
+            ->first();
 
         if (!$pipeline) {
             return null;
@@ -1900,25 +1933,25 @@ class LeadController extends Controller
     ): void {
         LeadAssignment::create([
             'company_id' =>
-                $companyId,
+            $companyId,
 
             'lead_id' =>
-                $lead->id,
+            $lead->id,
 
             'previous_user_id' =>
-                $previousUserId,
+            $previousUserId,
 
             'new_user_id' =>
-                $newUserId,
+            $newUserId,
 
             'assigned_by' =>
-                $assignedBy,
+            $assignedBy,
 
             'reason' =>
-                $reason,
+            $reason,
 
             'assigned_at' =>
-                now(),
+            now(),
         ]);
     }
 
@@ -1932,7 +1965,7 @@ class LeadController extends Controller
         Request $request
     ): int {
         return (int)
-            $request->user()->company_id;
+        $request->user()->company_id;
     }
 
     /*
@@ -1962,7 +1995,7 @@ class LeadController extends Controller
             )
             ->pluck('id')
             ->map(
-                fn ($id) => (int) $id
+                fn($id) => (int) $id
             )
             ->values()
             ->all();
@@ -1977,9 +2010,7 @@ class LeadController extends Controller
     private function isTeamLeader(
         Request $request
     ): bool {
-        return !empty(
-            $this->leaderTeamIds($request)
-        );
+        return !empty($this->leaderTeamIds($request));
     }
 
     /*
@@ -2026,7 +2057,7 @@ class LeadController extends Controller
     ): void {
         abort_unless(
             (int) $lead->company_id ===
-            $this->companyId($request),
+                $this->companyId($request),
             403,
             'Unauthorized company lead access.'
         );
@@ -2103,18 +2134,18 @@ class LeadController extends Controller
         if (!empty($leaderTeamIds)) {
             $assignedEmployeeIsInLeaderTeam =
                 User::query()
-                    ->where(
-                        'company_id',
-                        $companyId
-                    )
-                    ->whereKey(
-                        $lead->assigned_to
-                    )
-                    ->whereIn(
-                        'team_id',
-                        $leaderTeamIds
-                    )
-                    ->exists();
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->whereKey(
+                    $lead->assigned_to
+                )
+                ->whereIn(
+                    'team_id',
+                    $leaderTeamIds
+                )
+                ->exists();
 
             if ($assignedEmployeeIsInLeaderTeam) {
                 return;
