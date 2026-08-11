@@ -391,20 +391,40 @@
                         </span>
 
                         <select
+                            id="callDispositionSelect"
                             name="call_disposition_id"
                             required
+                            onchange="updateDispositionFields()"
                             class="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500"
                         >
-                            <option value="">Select disposition</option>
+                            <option
+                                value=""
+                                data-requires-remarks="0"
+                                data-requires-follow-up="0"
+                            >
+                                Select disposition
+                            </option>
+
                             @foreach ($dispositions as $disposition)
                                 <option
                                     value="{{ $disposition->id }}"
-                                    @selected((string) old('call_disposition_id') === (string) $disposition->id)
+                                    data-requires-remarks="{{ $disposition->requires_remarks ? '1' : '0' }}"
+                                    data-requires-follow-up="{{ $disposition->requires_follow_up ? '1' : '0' }}"
+                                    @selected(
+                                        (string) old('call_disposition_id')
+                                        ===
+                                        (string) $disposition->id
+                                    )
                                 >
                                     {{ $disposition->name }}
                                 </option>
                             @endforeach
                         </select>
+
+                        <div
+                            id="dispositionRuleHint"
+                            class="mt-2 hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                        ></div>
 
                         @error('call_disposition_id')
                             <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
@@ -436,40 +456,82 @@
                         @enderror
                     </label>
 
-                    <label class="block">
-                        <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                            Call Remarks <span class="text-rose-500">*</span>
-                        </span>
+                    <div
+                        id="remarksFieldWrapper"
+                        class="hidden"
+                    >
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Call Remarks
+                                <span
+                                    id="remarksRequiredMark"
+                                    class="hidden text-rose-500"
+                                >
+                                    *
+                                </span>
+                            </span>
 
-                        <textarea
-                            name="remarks"
-                            rows="4"
-                            required
-                            placeholder="Call discussion aur customer response..."
-                            class="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-                        >{{ old('remarks') }}</textarea>
+                            <textarea
+                                id="callRemarks"
+                                name="remarks"
+                                rows="4"
+                                placeholder="Call discussion aur customer response..."
+                                class="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            >{{ old('remarks') }}</textarea>
 
-                        @error('remarks')
-                            <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                        @enderror
-                    </label>
+                            <p
+                                id="remarksHelpText"
+                                class="mt-1 text-xs text-slate-500"
+                            >
+                                Selected disposition ke liye remarks required hain.
+                            </p>
 
-                    <label class="block">
-                        <span class="mb-1.5 block text-sm font-medium text-slate-700">
-                            Follow-up Date
-                        </span>
+                            @error('remarks')
+                                <p class="mt-1 text-xs text-rose-600">
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </label>
+                    </div>
 
-                        <input
-                            name="follow_up_at"
-                            type="datetime-local"
-                            value="{{ old('follow_up_at') }}"
-                            class="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500"
-                        >
+                    <div
+                        id="followUpFieldWrapper"
+                        class="hidden"
+                    >
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Follow-up Date & Time
+                                <span
+                                    id="followUpRequiredMark"
+                                    class="hidden text-rose-500"
+                                >
+                                    *
+                                </span>
+                            </span>
 
-                        @error('follow_up_at')
-                            <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                        @enderror
-                    </label>
+                            <input
+                                id="followUpAt"
+                                name="follow_up_at"
+                                type="datetime-local"
+                                value="{{ old('follow_up_at') }}"
+                                min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                                class="w-full rounded-lg border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            >
+
+                            <p
+                                id="followUpHelpText"
+                                class="mt-1 text-xs text-slate-500"
+                            >
+                                Is disposition ke liye next follow-up date/time mandatory hai.
+                            </p>
+
+                            @error('follow_up_at')
+                                <p class="mt-1 text-xs text-rose-600">
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </label>
+                    </div>
 
                     <button
                         type="button"
@@ -702,6 +764,130 @@
             sessionStorage.removeItem(storageKey);
         }
     })();
+
+    function updateDispositionFields() {
+        const select = document.getElementById('callDispositionSelect');
+        const remarksWrapper = document.getElementById('remarksFieldWrapper');
+        const remarksInput = document.getElementById('callRemarks');
+        const remarksRequiredMark = document.getElementById('remarksRequiredMark');
+
+        const followUpWrapper = document.getElementById('followUpFieldWrapper');
+        const followUpInput = document.getElementById('followUpAt');
+        const followUpRequiredMark = document.getElementById('followUpRequiredMark');
+
+        const hint = document.getElementById('dispositionRuleHint');
+
+        if (
+            !select
+            || !remarksWrapper
+            || !remarksInput
+            || !followUpWrapper
+            || !followUpInput
+        ) {
+            return;
+        }
+
+        const option = select.options[select.selectedIndex];
+
+        const hasDisposition =
+            !!option
+            &&
+            !!option.value;
+
+        const requiresRemarks =
+            hasDisposition
+            &&
+            option.dataset.requiresRemarks === '1';
+
+        const requiresFollowUp =
+            hasDisposition
+            &&
+            option.dataset.requiresFollowUp === '1';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remarks
+        |--------------------------------------------------------------------------
+        */
+
+        remarksInput.required = requiresRemarks;
+
+        if (requiresRemarks) {
+            remarksWrapper.classList.remove('hidden');
+            remarksRequiredMark?.classList.remove('hidden');
+        } else {
+            remarksWrapper.classList.add('hidden');
+            remarksRequiredMark?.classList.add('hidden');
+
+            /*
+            | Validation error ke baad old value ho sakti hai.
+            | User agar disposition change karke non-remarks disposition select
+            | kare to stale remarks submit nahi hone denge.
+            */
+            remarksInput.value = '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Follow-up
+        |--------------------------------------------------------------------------
+        */
+
+        followUpInput.required = requiresFollowUp;
+
+        if (requiresFollowUp) {
+            followUpWrapper.classList.remove('hidden');
+            followUpRequiredMark?.classList.remove('hidden');
+        } else {
+            followUpWrapper.classList.add('hidden');
+            followUpRequiredMark?.classList.add('hidden');
+
+            /*
+            | Stale follow-up value clear karo.
+            */
+            followUpInput.value = '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Rule Hint
+        |--------------------------------------------------------------------------
+        */
+
+        if (!hint) {
+            return;
+        }
+
+        if (!hasDisposition) {
+            hint.classList.add('hidden');
+            hint.textContent = '';
+
+            return;
+        }
+
+        const rules = [];
+
+        if (requiresRemarks) {
+            rules.push('Remarks required');
+        }
+
+        if (requiresFollowUp) {
+            rules.push('Follow-up required');
+        }
+
+        if (rules.length === 0) {
+            rules.push('No remarks or follow-up required');
+        }
+
+        hint.textContent =
+            `${option.text.trim()} — ${rules.join(' • ')}`;
+
+        hint.classList.remove('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        updateDispositionFields();
+    });
 
     function openSaveCallConfirmation() {
         const form = document.getElementById('saveCallForm');
