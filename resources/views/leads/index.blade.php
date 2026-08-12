@@ -203,6 +203,7 @@
         selected: [],
         selectAllPage: false,
         showBulkModal: false,
+        bulkAction: 'assign',
         assignmentScope: 'selected',
         showFilters: @js(request()->hasAny([
             'search',
@@ -307,6 +308,7 @@
                         <button
                             type="button"
                             @click="
+                                bulkAction = 'assign';
                                 assignmentScope = 'selected';
                                 showBulkModal = true
                             "
@@ -318,6 +320,22 @@
                                 <path d="M19 8v6M22 11h-6" />
                             </svg>
                             BULK ASSIGN
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="
+                                bulkAction = 'unassign';
+                                assignmentScope = 'selected';
+                                showBulkModal = true
+                            "
+                            class="software-btn border-rose-300 text-rose-700 hover:border-rose-400 hover:bg-rose-50 hover:text-rose-800"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 12h14" />
+                                <circle cx="12" cy="12" r="9" />
+                            </svg>
+                            BULK UNASSIGN
                         </button>
 
                         <a
@@ -647,11 +665,22 @@
                 <div class="flex gap-2">
                     <button type="button"
                         @click="
+                        bulkAction = 'assign';
                         assignmentScope = 'selected';
                         showBulkModal = true
                     "
                         class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                         Assign Selected
+                    </button>
+
+                    <button type="button"
+                        @click="
+                        bulkAction = 'unassign';
+                        assignmentScope = 'selected';
+                        showBulkModal = true
+                    "
+                        class="rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">
+                        Unassign Selected
                     </button>
 
                     <button type="button"
@@ -886,65 +915,141 @@
             @endif
         </section>
 
-        {{-- Bulk Assignment Modal --}}
+        {{-- Bulk Assign / Unassign Modal --}}
         @if ($hasFullAccess)
             <div x-show="showBulkModal" x-cloak
                 class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
                 @keydown.escape.window="showBulkModal = false">
                 <div class="max-h-[90vh] w-full max-w-xl overflow-y-auto border border-slate-500 bg-white shadow-2xl"
                     @click.outside="showBulkModal = false">
+
                     <form method="POST" action="{{ route('leads.bulk-assign') }}"
                         @submit="
-                    if (assignmentScope === 'selected' && selected.length === 0) {
-                        $event.preventDefault();
-                        alert('Please select at least one lead.');
-                    }
-                ">
+                            if (assignmentScope === 'selected' && selected.length === 0) {
+                                $event.preventDefault();
+                                alert('Please select at least one lead.');
+                                return;
+                            }
+
+                            if (bulkAction === 'unassign') {
+                                const ok = confirm(
+                                    assignmentScope === 'selected'
+                                        ? 'Selected leads ko unassign karna hai?'
+                                        : 'Current filtered leads ko unassign karna hai?'
+                                );
+
+                                if (!ok) {
+                                    $event.preventDefault();
+                                }
+                            }
+                        ">
                         @csrf
+
+                        <input type="hidden" name="bulk_action" :value="bulkAction">
+                        <input type="hidden" name="assignment_scope" :value="assignmentScope">
+
+                        {{-- Selected Lead IDs --}}
+                        <template x-for="leadId in selected" :key="leadId">
+                            <input type="hidden" name="lead_ids[]" :value="leadId">
+                        </template>
+
+                        {{-- Current Filters --}}
+                        <input type="hidden" name="search" value="{{ request('search') }}">
+                        <input type="hidden" name="status" value="{{ request('status') }}">
+                        <input type="hidden" name="source" value="{{ request('source') }}">
+                        <input type="hidden" name="filter_assigned_to" value="{{ request('assigned_to') }}">
+                        <input type="hidden" name="team_id" value="{{ request('team_id') }}">
+                        <input type="hidden" name="priority" value="{{ request('priority') }}">
+                        <input type="hidden" name="temperature" value="{{ request('temperature') }}">
+                        <input type="hidden" name="call_disposition" value="{{ request('call_disposition') }}">
+                        <input type="hidden" name="per_page" value="{{ request('per_page') }}">
+                        <input type="hidden" name="date_from" value="{{ request('date_from') }}">
+                        <input type="hidden" name="date_to" value="{{ request('date_to') }}">
 
                         <div class="flex items-start justify-between border-b border-slate-200 px-5 py-4">
                             <div>
-                                <h2 class="text-lg font-bold text-slate-900">
-                                    Bulk Assign Leads
+                                <h2 class="text-lg font-bold"
+                                    :class="bulkAction === 'unassign' ? 'text-rose-700' : 'text-slate-900'"
+                                    x-text="bulkAction === 'unassign' ? 'Bulk Unassign Leads' : 'Bulk Assign Leads'">
                                 </h2>
 
-                                <p class="mt-1 text-sm text-slate-500">
-                                    Selected ya filtered leads assign karein.
+                                <p class="mt-1 text-sm text-slate-500"
+                                    x-text="bulkAction === 'unassign'
+                                        ? 'Galat assigned leads ka current owner remove karein.'
+                                        : 'Selected ya filtered leads employee ko assign karein.'">
                                 </p>
                             </div>
 
-                            <button type="button" @click="showBulkModal = false"
-                                class="rounded-lg p-2 text-slate-400 hover:bg-slate-100">
-                                ✕
+                            <button type="button"
+                                @click="showBulkModal = false"
+                                class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path d="M18 6 6 18M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
 
-                        <div class="space-y-5 p-5">
-                            <input type="hidden" name="assignment_scope" x-model="assignmentScope">
+                        <div class="space-y-4 p-5">
 
-                            <template x-for="leadId in selected" :key="leadId">
-                                <input type="hidden" name="lead_ids[]" :value="leadId">
-                            </template>
-
-                            <input type="hidden" name="search" value="{{ request('search') }}">
-                            <input type="hidden" name="source" value="{{ request('source') }}">
-                            <input type="hidden" name="filter_assigned_to" value="{{ request('assigned_to') }}">
-                            <input type="hidden" name="team_id" value="{{ request('team_id') }}">
-                            <input type="hidden" name="priority" value="{{ request('priority') }}">
-                            <input type="hidden" name="temperature" value="{{ request('temperature') }}">
-                            <input type="hidden" name="call_disposition" value="{{ request('call_disposition') }}">
-                            <input type="hidden" name="per_page" value="{{ $perPage }}">
-                            <input type="hidden" name="date_from" value="{{ request('date_from') }}">
-                            <input type="hidden" name="date_to" value="{{ request('date_to') }}">
-
+                            {{-- Action --}}
                             <div>
                                 <div class="mb-2 text-sm font-semibold text-slate-700">
-                                    Assignment Scope
+                                    Action
+                                </div>
+
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <label class="flex cursor-pointer gap-3 rounded-lg border p-4"
+                                        :class="bulkAction === 'assign'
+                                            ? 'border-blue-300 bg-blue-50'
+                                            : 'border-slate-200 bg-white'">
+                                        <input type="radio"
+                                            value="assign"
+                                            x-model="bulkAction"
+                                            class="mt-1 text-blue-600 focus:ring-blue-500">
+
+                                        <div>
+                                            <div class="font-semibold text-slate-800">
+                                                Assign
+                                            </div>
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                Lead ko employee ko assign/reassign karein.
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    <label class="flex cursor-pointer gap-3 rounded-lg border p-4"
+                                        :class="bulkAction === 'unassign'
+                                            ? 'border-rose-300 bg-rose-50'
+                                            : 'border-slate-200 bg-white'">
+                                        <input type="radio"
+                                            value="unassign"
+                                            x-model="bulkAction"
+                                            class="mt-1 text-rose-600 focus:ring-rose-500">
+
+                                        <div>
+                                            <div class="font-semibold text-rose-700">
+                                                Unassign
+                                            </div>
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                Current employee owner remove karein.
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {{-- Assignment Scope --}}
+                            <div>
+                                <div class="mb-2 text-sm font-semibold text-slate-700">
+                                    Scope
                                 </div>
 
                                 <div class="grid gap-3 sm:grid-cols-2">
                                     <label class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4">
-                                        <input type="radio" value="selected" x-model="assignmentScope"
+                                        <input type="radio"
+                                            value="selected"
+                                            x-model="assignmentScope"
                                             class="mt-1 text-blue-600 focus:ring-blue-500">
 
                                         <div>
@@ -959,7 +1064,9 @@
                                     </label>
 
                                     <label class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4">
-                                        <input type="radio" value="filtered" x-model="assignmentScope"
+                                        <input type="radio"
+                                            value="filtered"
+                                            x-model="assignmentScope"
                                             class="mt-1 text-blue-600 focus:ring-blue-500">
 
                                         <div>
@@ -975,18 +1082,25 @@
                                 </div>
                             </div>
 
-                            <label class="block">
+                            {{-- Assign Employee: only for assign --}}
+                            <label class="block" x-show="bulkAction === 'assign'" x-cloak>
                                 <span class="software-label">
                                     Assign Employee
                                     <span class="text-rose-500">*</span>
                                 </span>
 
-                                <select name="assigned_to" required
+                                <select name="assigned_to"
+                                    :required="bulkAction === 'assign'"
+                                    :disabled="bulkAction !== 'assign'"
                                     class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="">Select employee</option>
+                                    <option value="">
+                                        Select employee
+                                    </option>
+
                                     @foreach ($users as $user)
                                         <option value="{{ $user->id }}">
                                             {{ $user->name }}
+
                                             @if ($user->employee_code)
                                                 ({{ $user->employee_code }})
                                             @endif
@@ -995,13 +1109,19 @@
                                 </select>
                             </label>
 
+                            {{-- Reason --}}
                             <label class="block">
                                 <span class="software-label">
-                                    Assignment Reason
+                                    <span x-text="bulkAction === 'unassign' ? 'Unassign Reason' : 'Assignment Reason'"></span>
                                     <span class="text-rose-500">*</span>
                                 </span>
 
-                                <textarea name="reason" rows="3" required placeholder="Assignment reason..."
+                                <textarea name="reason"
+                                    rows="3"
+                                    required
+                                    :placeholder="bulkAction === 'unassign'
+                                        ? 'Example: Wrong leads assigned to employee...'
+                                        : 'Assignment reason...'"
                                     class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
                             </label>
 
@@ -1009,19 +1129,31 @@
                                 class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                                 Current filters se match hone wali
                                 <strong>{{ $leads->total() }}</strong>
-                                leads assign hongi.
+                                leads par ye action apply hoga.
+                            </div>
+
+                            <div x-show="bulkAction === 'unassign'"
+                                x-cloak
+                                class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                                Unassign ke baad lead delete nahi hogi. Sirf uska
+                                <strong>current assigned employee remove</strong>
+                                hoga aur lead <strong>Unassigned</strong> ho jayegi.
                             </div>
                         </div>
 
                         <div class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
-                            <button type="button" @click="showBulkModal = false"
+                            <button type="button"
+                                @click="showBulkModal = false"
                                 class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                                 Cancel
                             </button>
 
                             <button type="submit"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                                Assign Leads
+                                :class="bulkAction === 'unassign'
+                                    ? 'bg-rose-600 hover:bg-rose-700'
+                                    : 'bg-blue-600 hover:bg-blue-700'"
+                                class="rounded-lg px-4 py-2 text-sm font-semibold text-white"
+                                x-text="bulkAction === 'unassign' ? 'Unassign Leads' : 'Assign Leads'">
                             </button>
                         </div>
                     </form>
