@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Models\LeadLabel;
 
 class LeadController extends Controller
 {
@@ -82,14 +83,25 @@ class LeadController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        // $query = $this->filteredLeadQuery($request)
+        //     ->with([
+        //         'assignedUser:id,name,employee_code,team_id',
+        //         'source:id,name',
+        //         'status:id,name,color',
+        //         'team:id,name',
+        //         'stage:id,name,color',
+        //     ]);
+
+
         $query = $this->filteredLeadQuery($request)
-            ->with([
-                'assignedUser:id,name,employee_code,team_id',
-                'source:id,name',
-                'status:id,name,color',
-                'team:id,name',
-                'stage:id,name,color',
-            ]);
+    ->with([
+        'assignedUser:id,name,employee_code,team_id',
+        'source:id,name',
+        'status:id,name,color',
+        'team:id,name',
+        'stage:id,name,color',
+        'labels:id,company_id,name,color',
+    ]);
 
         /*
         |--------------------------------------------------------------------------
@@ -257,6 +269,12 @@ class LeadController extends Controller
             $teams = collect();
         }
 
+        $labels = LeadLabel::query()
+    ->where('company_id', $companyId)
+    ->withCount('leads')
+    ->orderBy('name')
+    ->get();
+
         return view('leads.index', [
             'leads' => $leads,
             'statuses' => $statuses,
@@ -265,6 +283,7 @@ class LeadController extends Controller
             'perPage' => $perPage,
             'users' => $users,
             'teams' => $teams,
+            'labels' => $labels,
 
             /*
             | Blade access control
@@ -423,6 +442,7 @@ class LeadController extends Controller
             'notes.user',
 
             'assignments',
+            'labels:id,company_id,name,color',
         ]);
 
         $companyId =
@@ -534,6 +554,11 @@ class LeadController extends Controller
             ->orderBy('name')
             ->get();
 
+        $labels = LeadLabel::query()
+            ->where('company_id', $companyId)
+            ->orderBy('name')
+            ->get(['id', 'company_id', 'name', 'color']);
+
         return view('leads.show', [
             'lead' => $lead,
 
@@ -553,6 +578,8 @@ class LeadController extends Controller
 
             'navigationParams' =>
             $navigationParams,
+
+            'labels' => $labels,
         ]);
     }
 
@@ -671,6 +698,149 @@ class LeadController extends Controller
                 'success',
                 'Lead updated successfully.'
             );
+    }
+
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Labels
+    |--------------------------------------------------------------------------
+    */
+
+    public function storeLabel(Request $request): RedirectResponse
+    {
+        $companyId = $this->companyId($request);
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('lead_labels', 'name')->where(
+                    fn ($query) => $query->where('company_id', $companyId)
+                ),
+            ],
+            'color' => [
+                'required',
+                'regex:/^#[0-9A-Fa-f]{6}$/',
+            ],
+        ]);
+
+        LeadLabel::create([
+            'company_id' => $companyId,
+            'name' => trim($validated['name']),
+            'color' => strtoupper($validated['color']),
+            'created_by' => (int) $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Label created successfully.');
+    }
+
+    public function addLabel(Request $request, Lead $lead): RedirectResponse
+    {
+        $this->guard($request, $lead);
+        $companyId = $this->companyId($request);
+
+        $validated = $request->validate([
+            'label_id' => [
+                'required',
+                'integer',
+                Rule::exists('lead_labels', 'id')->where(
+                    fn ($query) => $query->where('company_id', $companyId)
+                ),
+            ],
+        ]);
+
+        $lead->labels()->syncWithoutDetaching([(int) $validated['label_id']]);
+
+        return back()->with('success', 'Lead added to label successfully.');
+    }
+
+    public function removeLabel(
+        Request $request,
+        Lead $lead,
+        LeadLabel $label
+    ): RedirectResponse {
+        $this->guard($request, $lead);
+
+        abort_unless(
+            (int) $label->company_id === $this->companyId($request),
+            403
+        );
+
+        $lead->labels()->detach($label->id);
+
+        return back()->with('success', 'Label removed from lead.');
+    }
+
+    public function bulkLabel(Request $request): RedirectResponse
+    {
+        $companyId = $this->companyId($request);
+
+        $validated = $request->validate([
+            'lead_ids' => ['required', 'array', 'min:1'],
+            'lead_ids.*' => ['required', 'integer'],
+            'label_id' => [
+                'required',
+                'integer',
+                Rule::exists('lead_labels', 'id')->where(
+                    fn ($query) => $query->where('company_id', $companyId)
+                ),
+            ],
+            'label_action' => ['required', Rule::in(['add', 'remove'])],
+        ]);
+
+        // Always start from the current user's access scope.
+        $accessRequest = new Request();
+        $accessRequest->setUserResolver(fn () => $request->user());
+
+        $leads = $this->filteredLeadQuery($accessRequest)
+            ->whereIn('leads.id', $validated['lead_ids'])
+            ->get(['leads.id']);
+
+        if ($leads->isEmpty()) {
+            return back()->with('error', 'No accessible leads selected.');
+        }
+
+        $labelId = (int) $validated['label_id'];
+        $action = $validated['label_action'];
+
+        DB::transaction(function () use ($leads, $labelId, $action) {
+            foreach ($leads as $lead) {
+                if ($action === 'add') {
+                    $lead->labels()->syncWithoutDetaching([$labelId]);
+                } else {
+                    $lead->labels()->detach($labelId);
+                }
+            }
+        });
+
+        $count = $leads->count();
+
+        return back()->with(
+            'success',
+            $action === 'add'
+                ? "{$count} lead(s) added to label successfully."
+                : "{$count} lead(s) removed from label successfully."
+        );
+    }
+
+    public function destroyLabel(
+        Request $request,
+        LeadLabel $label
+    ): RedirectResponse {
+        $this->ensureFullAccess($request);
+
+        abort_unless(
+            (int) $label->company_id === $this->companyId($request),
+            403
+        );
+
+        $label->delete();
+
+        return back()->with('success', 'Label deleted successfully.');
     }
 
     /*
@@ -1030,6 +1200,11 @@ class LeadController extends Controller
                     'date',
                     'after_or_equal:date_from',
                 ],
+
+                'label_id_filter' => [
+                    'nullable',
+                    'integer',
+                ],
             ]);
 
         /*
@@ -1104,6 +1279,10 @@ class LeadController extends Controller
 
                     'date_to' =>
                     $validated['date_to']
+                        ?? null,
+
+                    'label_id' =>
+                    $validated['label_id_filter']
                         ?? null,
                 ]);
 
@@ -1687,6 +1866,29 @@ class LeadController extends Controller
                 } else {
                     $query->whereRaw('1 = 0');
                 }
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Label Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('label_id')) {
+            $labelId = (int) $request->label_id;
+
+            $validLabel = LeadLabel::query()
+                ->whereKey($labelId)
+                ->where('company_id', $companyId)
+                ->exists();
+
+            if ($validLabel) {
+                $query->whereHas('labels', function (Builder $labelQuery) use ($labelId) {
+                    $labelQuery->where('lead_labels.id', $labelId);
+                });
             } else {
                 $query->whereRaw('1 = 0');
             }

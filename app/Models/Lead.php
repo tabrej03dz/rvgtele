@@ -94,4 +94,15 @@ class Lead extends Model
             'pipeline_stage_id'
         );
     }
+
+
+
+
+    public function labels()
+{
+    return $this->belongsToMany(
+        LeadLabel::class,
+        'lead_label_lead'
+    )->withTimestamps();
+}
 }

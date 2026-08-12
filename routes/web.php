@@ -138,6 +138,37 @@ Route::middleware([
     )->name('leads.import.template');
 
 
+
+
+
+
+    Route::post(
+    '/lead-labels',
+    [LeadController::class, 'storeLabel']
+)->name('lead-labels.store');
+
+Route::delete(
+    '/lead-labels/{label}',
+    [LeadController::class, 'destroyLabel']
+)->name('lead-labels.destroy');
+
+Route::post(
+    '/leads/bulk-label',
+    [LeadController::class, 'bulkLabel']
+)->name('leads.bulk-label');
+
+Route::post(
+    '/leads/{lead}/labels',
+    [LeadController::class, 'addLabel']
+)->name('leads.labels.add');
+
+Route::delete(
+    '/leads/{lead}/labels/{label}',
+    [LeadController::class, 'removeLabel']
+)->name('leads.labels.remove');
+
+
+
     /*
     |--------------------------------------------------------------------------
     | Lead Bulk Assignment

@@ -154,6 +154,14 @@
                         <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize {{ $priorityClass }}">
                             {{ $lead->priority }}
                         </span>
+
+                        @foreach ($lead->labels as $label)
+                            <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold"
+                                  style="border-color: {{ $label->color }}55; background: {{ $label->color }}12; color: {{ $label->color }};">
+                                <span class="h-2 w-2 rounded-full" style="background: {{ $label->color }};"></span>
+                                {{ $label->name }}
+                            </span>
+                        @endforeach
                     </div>
                 </div>
 
@@ -365,6 +373,52 @@
 
         {{-- Right Sidebar --}}
         <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
+
+            {{-- Manage Labels --}}
+            <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 px-5 py-4">
+                    <h3 class="font-bold text-slate-900">Lead Labels</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Is lead ko custom groups me add/remove karein.</p>
+                </div>
+                <div class="space-y-4 p-5">
+                    @if ($lead->labels->isNotEmpty())
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($lead->labels as $label)
+                                <form method="POST" action="{{ route('leads.labels.remove', ['lead' => $lead->id, 'label' => $label->id]) }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            title="Remove {{ $label->name }}"
+                                            class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold hover:opacity-80"
+                                            style="border-color: {{ $label->color }}55; background: {{ $label->color }}12; color: {{ $label->color }};">
+                                        <span class="h-2 w-2 rounded-full" style="background: {{ $label->color }};"></span>
+                                        {{ $label->name }}
+                                        <span class="ml-1">×</span>
+                                    </button>
+                                </form>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-center text-xs text-slate-500">No label assigned yet.</div>
+                    @endif
+
+                    @php $availableLabels = $labels->whereNotIn('id', $lead->labels->pluck('id')); @endphp
+                    @if ($availableLabels->isNotEmpty())
+                        <form method="POST" action="{{ route('leads.labels.add', $lead) }}" class="space-y-3">
+                            @csrf
+                            <select name="label_id" required class="w-full rounded-lg border-slate-300 text-sm focus:border-violet-500 focus:ring-violet-500">
+                                <option value="">Select label...</option>
+                                @foreach ($availableLabels as $label)
+                                    <option value="{{ $label->id }}">{{ $label->name }}</option>
+                                @endforeach
+                            </select>
+                            <button type="submit" class="w-full rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">Add Label</button>
+                        </form>
+                    @else
+                        <div class="text-center text-xs text-slate-500">All available labels are already attached.</div>
+                    @endif
+                </div>
+            </section>
 
             {{-- Save Call --}}
             <form
