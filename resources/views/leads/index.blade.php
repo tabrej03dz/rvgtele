@@ -880,7 +880,10 @@
                                 </td>
 
                                 <td class="px-3 py-2.5 text-right">
-                                    <a href="{{ route('leads.show', $lead) }}"
+                                    <a href="{{ route('leads.show', array_merge(
+                                            ['lead' => $lead->id],
+                                            request()->except('page')
+                                        )) }}"
                                         class="software-btn !h-[25px] !px-2.5 !text-[10px] text-blue-700">
                                         Open
                                     </a>

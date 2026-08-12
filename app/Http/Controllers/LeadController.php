@@ -430,52 +430,53 @@ class LeadController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Previous / Next Lead Navigation
+        | Preserve Listing Filters
         |--------------------------------------------------------------------------
         |
-        | Navigation always stays inside the leads currently accessible to the
-        | logged-in user. The same role-based query used by the lead listing is
-        | reused here, so an employee/team leader can never navigate into a lead
-        | that they are not allowed to open.
-        |
-        | Lead listing is latest ID first:
-        | Previous = newer lead (higher ID)
-        | Next     = older lead (lower ID)
+        | Lead list se jo bhi GET filters aaye hain unko detail page, Previous,
+        | Next aur Back navigation me preserve rakhenge. `page` intentionally
+        | hata rahe hain, kyunki Previous/Next poore filtered result set par chalega.
         |
         */
 
-       $navigationQuery =
-    $this->filteredLeadQuery($request);
+        $navigationParams = $request->except([
+            'page',
+        ]);
 
-/*
-|--------------------------------------------------------------------------
-| Previous Lead
-|--------------------------------------------------------------------------
-| Current ID se chhoti ID = pichhli lead
-*/
-$previousLead =
-    (clone $navigationQuery)
-    ->where('id', '<', $lead->id)
-    ->orderByDesc('id')
-    ->first([
-        'id',
-        'name',
-    ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Previous / Next Lead Navigation
+        |--------------------------------------------------------------------------
+        |
+        | Same filteredLeadQuery() reuse ho rahi hai, isliye navigation exactly
+        | usi filtered result set ke andar rahegi jo Leads listing par tha.
+        |
+        | Listing order: latest('id') => ID DESC
+        | Previous = current row se upar wali/newer lead = higher ID
+        | Next     = current row se neeche wali/older lead = lower ID
+        |
+        */
 
-/*
-|--------------------------------------------------------------------------
-| Next Lead
-|--------------------------------------------------------------------------
-| Current ID se badi ID = agli lead
-*/
-$nextLead =
-    (clone $navigationQuery)
-    ->where('id', '>', $lead->id)
-    ->orderBy('id')
-    ->first([
-        'id',
-        'name',
-    ]);
+        $navigationQuery =
+            $this->filteredLeadQuery($request);
+
+        $previousLead =
+            (clone $navigationQuery)
+            ->where('id', '>', $lead->id)
+            ->orderBy('id')
+            ->first([
+                'id',
+                'name',
+            ]);
+
+        $nextLead =
+            (clone $navigationQuery)
+            ->where('id', '<', $lead->id)
+            ->orderByDesc('id')
+            ->first([
+                'id',
+                'name',
+            ]);
 
         /*
         |--------------------------------------------------------------------------
@@ -549,6 +550,9 @@ $nextLead =
 
             'nextLead' =>
             $nextLead,
+
+            'navigationParams' =>
+            $navigationParams,
         ]);
     }
 

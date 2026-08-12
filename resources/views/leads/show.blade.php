@@ -20,7 +20,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <div class="flex items-center gap-2 text-sm text-slate-500">
-                <a href="{{ route('leads.index') }}" class="hover:text-blue-600">
+                <a href="{{ route('leads.index', $navigationParams) }}" class="hover:text-blue-600">
                     Leads
                 </a>
                 <span>/</span>
@@ -35,7 +35,7 @@
         <div class="flex flex-wrap gap-2">
             @if ($previousLead)
                 <a
-                    href="{{ route('leads.show', $previousLead) }}"
+                    href="{{ route('leads.show', array_merge(['lead' => $previousLead->id], $navigationParams)) }}"
                     title="{{ $previousLead->name }}"
                     class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
@@ -59,7 +59,7 @@
 
             @if ($nextLead)
                 <a
-                    href="{{ route('leads.show', $nextLead) }}"
+                    href="{{ route('leads.show', array_merge(['lead' => $nextLead->id], $navigationParams)) }}"
                     title="{{ $nextLead->name }}"
                     class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
@@ -82,14 +82,14 @@
             @endif
 
             <a
-                href="{{ route('leads.index') }}"
+                href="{{ route('leads.index', $navigationParams) }}"
                 class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
                 Back
             </a>
 
             <a
-                href="{{ route('leads.edit', $lead) }}"
+                href="{{ route('leads.edit', array_merge(['lead' => $lead->id], $navigationParams)) }}"
                 class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
