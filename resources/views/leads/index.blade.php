@@ -206,7 +206,6 @@
         bulkAction: 'assign',
         assignmentScope: 'selected',
         showFilters: @js(request()->hasAny([
-            'search',
             'source',
             'category',
             'assigned_to',
@@ -300,7 +299,7 @@
 
                         FILTERS
 
-                        @if (request()->hasAny(['search', 'source', 'category', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to']))
+                        @if (request()->hasAny(['source', 'category', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to']))
                             <span class="h-1.5 w-1.5 bg-blue-600"></span>
                         @endif
                     </button>
@@ -364,6 +363,53 @@
             </div>
         </section>
 
+        {{-- Search - Always Visible --}}
+        <section class="software-panel">
+            <form method="GET" action="{{ route('leads.index') }}" class="p-3">
+                @foreach (request()->except(['page', 'search']) as $key => $value)
+                    @if (is_scalar($value) && $value !== '')
+                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                    @endif
+                @endforeach
+
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div class="relative flex-1">
+                        <svg
+                            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+
+                        <input
+                            type="text"
+                            name="search"
+                            value="{{ request('search') }}"
+                            placeholder="Search by name, mobile, company, category, email or city"
+                            class="w-full pl-10 pr-3"
+                        >
+                    </div>
+
+                    <button type="submit" class="software-btn software-btn-primary">
+                        SEARCH
+                    </button>
+
+                    @if (request()->filled('search'))
+                        <a
+                            href="{{ route('leads.index', request()->except(['page', 'search'])) }}"
+                            class="software-btn"
+                        >
+                            CLEAR SEARCH
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </section>
+
         {{-- Quick Tabs --}}
         @php
             $dispositionBaseQuery = request()->except([
@@ -376,7 +422,59 @@
             $activeDisposition = $dispositions->first(
                 fn ($disposition) => (string) $disposition->id === $currentDisposition
             );
+
+            $demoBaseQuery = request()->except([
+                'page',
+                'demo_send',
+            ]);
+
+            $isDemoSendTab = request()->boolean('demo_send');
         @endphp
+
+        <section class="software-panel">
+            <div class="software-panel-title">
+                <div class="flex items-center gap-2">
+                    <svg class="h-3.5 w-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7h16M4 12h16M4 17h10" />
+                    </svg>
+                    <span>Lead Type</span>
+                </div>
+
+                @if ($isDemoSendTab)
+                    <span class="text-[10px] font-bold uppercase text-emerald-700">
+                        Demo Send Leads
+                    </span>
+                @endif
+            </div>
+
+            <div class="bg-slate-50/60 px-3 pt-2">
+                <div class="crm-scrollbar overflow-x-auto">
+                    <div class="flex min-w-max items-end gap-1">
+                        <a
+                            href="{{ route('leads.index', $demoBaseQuery) }}"
+                            class="software-tab {{ !$isDemoSendTab ? 'software-tab-dark-active' : '' }}"
+                        >
+                            ALL LEADS
+                        </a>
+
+                        @php
+                            $demoSendQuery = array_merge(
+                                $demoBaseQuery,
+                                ['demo_send' => 1]
+                            );
+                        @endphp
+
+                        <a
+                            href="{{ route('leads.index', $demoSendQuery) }}"
+                            class="software-tab {{ $isDemoSendTab ? 'software-tab-active' : '' }}"
+                        >
+                            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                            DEMO SEND
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <section class="software-panel">
             <div class="software-panel-title">
@@ -479,24 +577,16 @@
                     </div>
 
                     <span class="text-[10px] font-normal text-slate-500">
-                        Search, employee, team, priority and date range
+                        Employee, team, source, priority and date range
                     </span>
                 </div>
 
                 <div class="grid gap-x-4 gap-y-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
 
-                    {{-- Search --}}
-                    <label class="block sm:col-span-2">
-                        <span class="software-label">
-                            Search
-                        </span>
+                    {{-- Keep Search / Tab Filters --}}
 
-                        <input type="text" name="search" value="{{ request('search') }}"
-                            placeholder="Name, mobile, company, category, email or city"
-                            class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
-                    </label>
-
-                    {{-- Keep Tab Filters --}}
+                    <input type="hidden" name="search" value="{{ request('search') }}">
+                    <input type="hidden" name="demo_send" value="{{ request('demo_send') }}">
 
                     <input
                         type="hidden"
@@ -800,6 +890,7 @@
                             <th class="px-3 py-2.5">Temperature</th>
                             <th class="px-3 py-2.5">Team</th>
                             <th class="px-3 py-2.5">Owner</th>
+                            <th class="px-3 py-2.5">Demo Send</th>
                             <th class="px-3 py-2.5 text-right">Action</th>
                         </tr>
                     </thead>
@@ -906,6 +997,17 @@
                                     @endif
                                 </td>
 
+                                <td class="px-3 py-2.5">
+                                    @if ($lead->demo_send)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                            Sent
+                                        </span>
+                                    @else
+                                        <span class="text-xs font-medium text-slate-400">Not Sent</span>
+                                    @endif
+                                </td>
+
                                 <td class="px-3 py-2.5 text-right">
                                     <a href="{{ route('leads.show', array_merge(
                                             ['lead' => $lead->id],
@@ -918,7 +1020,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $hasFullAccess ? 11 : 10 }}" class="px-5 py-14 text-center">
+                                <td colspan="{{ $hasFullAccess ? 12 : 11 }}" class="px-5 py-14 text-center">
                                     <div class="font-semibold text-slate-700">
                                         No leads found
                                     </div>
@@ -993,6 +1095,7 @@
                         <input type="hidden" name="priority" value="{{ request('priority') }}">
                         <input type="hidden" name="temperature" value="{{ request('temperature') }}">
                         <input type="hidden" name="call_disposition" value="{{ request('call_disposition') }}">
+                        <input type="hidden" name="demo_send" value="{{ request('demo_send') }}">
                         <input type="hidden" name="per_page" value="{{ request('per_page') }}">
                         <input type="hidden" name="date_from" value="{{ request('date_from') }}">
                         <input type="hidden" name="date_to" value="{{ request('date_to') }}">
