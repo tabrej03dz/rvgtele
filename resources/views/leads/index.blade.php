@@ -5,117 +5,131 @@
 @section('content')
     @once
         <style>
-            [x-cloak] {
-                display: none !important;
-            }
+            [x-cloak] { display: none !important; }
 
             .software-ui {
-                font-family: Arial, Helvetica, sans-serif;
+                font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                color: #1e293b;
                 font-size: 12px;
-                color: #1f2937;
             }
 
-            .software-ui .software-panel {
-                border: 1px solid #b9c1cc;
-                background: #ffffff;
-                box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+            .software-ui::before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                z-index: -1;
+                background: #f5f7fb;
+            }
+
+            .software-ui .software-panel,
+            .software-ui .software-toolbar {
+                border: 1px solid #d8dee8;
+                background: #fff;
+                border-radius: 10px;
+                box-shadow: 0 2px 8px rgba(15, 23, 42, .05);
+            }
+
+            .software-ui .software-toolbar {
+                border-top: 3px solid #2563eb;
             }
 
             .software-ui .software-panel-title {
-                min-height: 32px;
+                min-height: 40px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 gap: 12px;
-                padding: 6px 10px;
-                border-bottom: 1px solid #cbd5e1;
-                background: linear-gradient(to bottom, #ffffff 0%, #f3f4f6 100%);
-                color: #111827;
-                font-size: 13px;
-                font-weight: 700;
-            }
-
-            .software-ui .software-toolbar {
-                border: 1px solid #b9c1cc;
-                background: linear-gradient(to bottom, #ffffff 0%, #eef2f7 100%);
-                box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+                padding: 9px 12px;
+                border-bottom: 1px solid #e2e8f0;
+                background: #f8fafc;
+                color: #0f172a;
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: .015em;
+                border-radius: 10px 10px 0 0;
             }
 
             .software-ui .software-btn {
                 display: inline-flex;
-                height: 30px;
+                min-height: 32px;
                 align-items: center;
                 justify-content: center;
                 gap: 6px;
-                border: 1px solid #b8c0ca;
-                border-radius: 2px;
-                background: linear-gradient(to bottom, #ffffff, #f1f3f6);
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                background: #fff;
                 padding: 0 11px;
-                color: #1f2937;
-                font-size: 11px;
-                font-weight: 600;
+                color: #334155;
+                font-size: 10px;
+                font-weight: 800;
                 line-height: 1;
-                box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+                letter-spacing: .02em;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
                 transition: .15s ease;
+                white-space: nowrap;
             }
 
             .software-ui .software-btn:hover {
-                border-color: #7c8da3;
-                background: #e9edf3;
+                border-color: #94a3b8;
+                background: #f8fafc;
+                color: #0f172a;
             }
 
             .software-ui .software-btn-primary {
                 border-color: #1d4ed8;
-                background: linear-gradient(to bottom, #3b82f6, #2563eb);
-                color: #ffffff;
+                background: #2563eb;
+                color: #fff;
             }
 
             .software-ui .software-btn-primary:hover {
                 background: #1d4ed8;
+                color: #fff;
             }
 
             .software-ui .software-tab {
                 display: inline-flex;
-                height: 28px;
+                min-height: 31px;
                 align-items: center;
                 gap: 6px;
-                border: 1px solid #c5ccd5;
-                border-radius: 2px 2px 0 0;
-                background: linear-gradient(to bottom, #ffffff, #eef1f5);
-                padding: 0 12px;
-                color: #334155;
-                font-size: 11px;
-                font-weight: 600;
+                border: 1px solid transparent;
+                border-bottom: 2px solid transparent;
+                border-radius: 6px 6px 0 0;
+                background: transparent;
+                padding: 0 11px;
+                color: #64748b;
+                font-size: 10px;
+                font-weight: 800;
                 white-space: nowrap;
+                transition: .15s ease;
             }
 
             .software-ui .software-tab:hover {
-                background: #e8edf4;
+                background: #f1f5f9;
+                color: #0f172a;
             }
 
             .software-ui .software-tab-active {
-                border-color: #6b7f99;
-                border-bottom-color: #ffffff;
-                background: #ffffff;
-                color: #0f4c8a;
-                font-weight: 700;
+                border-color: #dbeafe;
+                border-bottom-color: #2563eb;
+                background: #eff6ff;
+                color: #1d4ed8;
             }
 
             .software-ui .software-tab-dark-active {
-                border-color: #475569;
-                border-bottom-color: #ffffff;
-                background: #475569;
-                color: #ffffff;
+                border-color: #cbd5e1;
+                border-bottom-color: #0f172a;
+                background: #f1f5f9;
+                color: #0f172a;
             }
 
             .software-ui .software-label {
-                margin-bottom: 4px;
+                margin-bottom: 5px;
                 display: block;
-                color: #334155;
-                font-size: 10px;
-                font-weight: 700;
+                color: #475569;
+                font-size: 9px;
+                font-weight: 800;
                 text-transform: uppercase;
-                letter-spacing: .025em;
+                letter-spacing: .055em;
             }
 
             .software-ui input[type="text"],
@@ -123,87 +137,69 @@
             .software-ui input[type="email"],
             .software-ui select,
             .software-ui textarea {
-                min-height: 30px;
-                border: 1px solid #bfc7d1 !important;
-                border-radius: 1px !important;
-                background: #fbfcfd;
-                padding-top: 5px;
-                padding-bottom: 5px;
+                min-height: 34px;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 6px !important;
+                background: #fff;
+                padding-top: 6px;
+                padding-bottom: 6px;
                 font-size: 11px !important;
-                box-shadow: inset 0 1px 2px rgba(15,23,42,.04);
+                color: #0f172a;
+                box-shadow: inset 0 1px 1px rgba(15,23,42,.02);
             }
 
             .software-ui input:focus,
             .software-ui select:focus,
             .software-ui textarea:focus {
-                border-color: #2563eb !important;
-                background: #ffffff;
+                border-color: #3b82f6 !important;
                 outline: none;
-                box-shadow: 0 0 0 1px #2563eb !important;
+                box-shadow: 0 0 0 3px rgba(59,130,246,.10) !important;
             }
 
-            .software-ui table {
-                border-collapse: collapse;
-            }
+            .software-ui table { border-collapse: separate; border-spacing: 0; }
 
             .software-ui thead th {
-                border-right: 1px solid #d5dae1;
-                border-bottom: 1px solid #aeb8c4 !important;
-                background: linear-gradient(to bottom, #f8fafc 0%, #e8edf3 100%);
-                color: #334155 !important;
-                font-size: 10px !important;
-                font-weight: 700 !important;
-                letter-spacing: .025em !important;
+                border-bottom: 1px solid #cbd5e1 !important;
+                background: #f8fafc;
+                color: #475569 !important;
+                font-size: 9px !important;
+                font-weight: 800 !important;
+                letter-spacing: .055em !important;
+                position: sticky;
+                top: 0;
+                z-index: 2;
             }
 
             .software-ui tbody td {
-                border-right: 1px solid #edf0f3;
+                border-bottom: 1px solid #eef2f7;
+                vertical-align: middle;
             }
 
-            .software-ui tbody tr:nth-child(even) {
-                background: #fafbfc;
-            }
-
-            .software-ui tbody tr:hover {
-                background: #eef6ff !important;
-            }
+            .software-ui tbody tr:hover { background: #f8fbff !important; }
 
             .software-ui .rounded-2xl,
             .software-ui .rounded-xl,
-            .software-ui .rounded-lg {
-                border-radius: 2px !important;
-            }
+            .software-ui .rounded-lg { border-radius: 6px !important; }
 
-            .software-ui .shadow-sm {
-                box-shadow: 0 1px 3px rgba(15, 23, 42, .10) !important;
-            }
+            .software-ui .shadow-sm { box-shadow: 0 1px 3px rgba(15,23,42,.06) !important; }
 
-            .crm-scrollbar {
-                scrollbar-width: thin;
-                scrollbar-color: #9ca3af #eef1f4;
-            }
+            .crm-scrollbar { scrollbar-width: thin; scrollbar-color: #b8c2cf #eef2f7; }
+            .crm-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+            .crm-scrollbar::-webkit-scrollbar-track { background: #eef2f7; }
+            .crm-scrollbar::-webkit-scrollbar-thumb { background: #b8c2cf; border-radius: 8px; }
+            .crm-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-            .crm-scrollbar::-webkit-scrollbar {
-                height: 9px;
-                width: 9px;
-            }
+            .software-ui .register-table tbody tr:last-child td { border-bottom: 0; }
+            .software-ui .muted-strip { background: #f8fafc; }
+            .software-ui .status-dot { width: 7px; height: 7px; border-radius: 9999px; display: inline-block; }
 
-            .crm-scrollbar::-webkit-scrollbar-track {
-                background: #eef1f4;
-            }
-
-            .crm-scrollbar::-webkit-scrollbar-thumb {
-                background: #9ca3af;
-                border: 2px solid #eef1f4;
-                border-radius: 0;
-            }
-
-            .crm-scrollbar::-webkit-scrollbar-thumb:hover {
-                background: #6b7280;
+            @media (max-width: 767px) {
+                .software-ui { font-size: 11px; }
+                .software-ui .software-btn { min-height: 34px; }
             }
         </style>
     @endonce
-    <div class="software-ui mx-auto max-w-[1700px] space-y-3" x-data="{
+    <div class="software-ui mx-auto max-w-[1720px] space-y-3 px-1 pb-5" x-data="{
         selected: [],
         selectAllPage: false,
         showBulkModal: false,
@@ -351,22 +347,12 @@
 
         {{-- Quick Tabs --}}
         @php
-            $statusBaseQuery = request()->except([
-                'page',
-                'status',
-            ]);
-
             $dispositionBaseQuery = request()->except([
                 'page',
                 'call_disposition',
             ]);
 
-            $currentStatus = (string) request('status', '');
             $currentDisposition = (string) request('call_disposition', '');
-
-            $activeStatus = $statuses->first(
-                fn ($status) => (string) $status->id === $currentStatus
-            );
 
             $activeDisposition = $dispositions->first(
                 fn ($disposition) => (string) $disposition->id === $currentDisposition
@@ -380,79 +366,20 @@
                         <path d="M4 7h16M4 12h10M4 17h7" />
                     </svg>
 
-                    <span>Quick Lead Filters</span>
+                    <span>Call Disposition</span>
                 </div>
 
-                @if ($currentStatus !== '' || $currentDisposition !== '')
+                @if ($currentDisposition !== '')
                     <a
-                        href="{{ route('leads.index', request()->except(['page', 'status', 'call_disposition'])) }}"
+                        href="{{ route('leads.index', request()->except(['page', 'call_disposition'])) }}"
                         class="text-[10px] font-bold uppercase text-rose-600 hover:underline"
                     >
-                        Clear Quick Filters
+                        Clear Disposition Filter
                     </a>
                 @endif
             </div>
 
-            {{-- Status Strip --}}
-            <div class="border-b border-slate-300 bg-slate-50 px-3 pt-2">
-                <div class="mb-1 flex items-center justify-between gap-3">
-                    <div class="text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                        Lead Status
-                        @if ($activeStatus)
-                            <span class="ml-1 text-blue-700">: {{ $activeStatus->name }}</span>
-                        @endif
-                    </div>
-
-                    @if ($currentStatus !== '')
-                        <a
-                            href="{{ route('leads.index', $statusBaseQuery) }}"
-                            class="text-[10px] font-semibold text-slate-500 hover:text-blue-700"
-                        >
-                            Reset
-                        </a>
-                    @endif
-                </div>
-
-                <div class="crm-scrollbar overflow-x-auto">
-                    <div class="flex min-w-max items-end gap-1">
-                        <a
-                            href="{{ route('leads.index', $statusBaseQuery) }}"
-                            class="software-tab {{ $currentStatus === '' ? 'software-tab-active' : '' }}"
-                        >
-                            ALL STATUS
-                        </a>
-
-                        @foreach ($statuses as $status)
-                            @php
-                                $statusQuery = array_merge(
-                                    $statusBaseQuery,
-                                    ['status' => $status->id]
-                                );
-
-                                $isActiveStatusTab =
-                                    $currentStatus === (string) $status->id;
-                            @endphp
-
-                            <a
-                                href="{{ route('leads.index', $statusQuery) }}"
-                                class="software-tab {{ $isActiveStatusTab ? 'software-tab-active' : '' }}"
-                            >
-                                @if ($status->color)
-                                    <span
-                                        class="h-2 w-2 border border-white"
-                                        style="background-color: {{ $status->color }};"
-                                    ></span>
-                                @endif
-
-                                {{ strtoupper($status->name) }}
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-
-            {{-- Disposition Strip --}}
-            <div class="bg-white px-3 pt-2">
+            <div class="bg-slate-50/60 px-3 pt-2">
                 <div class="mb-1 flex items-center justify-between gap-3">
                     <div class="text-[10px] font-bold uppercase tracking-wide text-slate-600">
                         Latest Call Disposition
@@ -551,11 +478,6 @@
                     </label>
 
                     {{-- Keep Tab Filters --}}
-                    <input
-                        type="hidden"
-                        name="status"
-                        value="{{ request('status') }}"
-                    >
 
                     <input
                         type="hidden"
@@ -747,12 +669,12 @@
         {{-- Leads Table --}}
         <section class="software-panel overflow-hidden">
             <div
-                class="flex flex-col gap-2 border-b border-slate-300 bg-gradient-to-b from-white to-slate-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                class="flex flex-col gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-[13px] font-bold text-slate-900">Lead Register</h2>
 
-                        @if ($currentStatus !== '' || $currentDisposition !== '')
+                        @if ($currentDisposition !== '')
                             <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
                                 Filtered
                             </span>
@@ -808,8 +730,8 @@
                 </form>
             </div>
 
-            <div class="crm-scrollbar overflow-x-auto">
-                <table class="w-full min-w-[1180px] text-sm">
+            <div class="crm-scrollbar max-h-[68vh] overflow-auto">
+                <table class="register-table w-full min-w-[1180px] text-sm">
                     <thead class="bg-slate-50/90">
                         <tr
                             class="border-b border-slate-200 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -1005,7 +927,6 @@
                             </template>
 
                             <input type="hidden" name="search" value="{{ request('search') }}">
-                            <input type="hidden" name="status" value="{{ request('status') }}">
                             <input type="hidden" name="source" value="{{ request('source') }}">
                             <input type="hidden" name="filter_assigned_to" value="{{ request('assigned_to') }}">
                             <input type="hidden" name="team_id" value="{{ request('team_id') }}">
