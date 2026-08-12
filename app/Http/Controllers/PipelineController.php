@@ -16,122 +16,289 @@ class PipelineController extends Controller
     /**
      * Show company sales pipeline.
      */
-    public function index(Request $request): View
-    {
-        $companyId = (int) $request->user()->company_id;
+   public function index(Request $request): View
+{
+    $user = $request->user();
+    $companyId = (int) $user->company_id;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Get company pipeline
-        |--------------------------------------------------------------------------
-        |
-        | Default pipeline ko preference milegi.
-        | Agar default pipeline nahi hai to first available pipeline load hogi.
-        |
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | Get Company Pipeline
+    |--------------------------------------------------------------------------
+    */
 
-        $pipeline = Pipeline::query()
-            ->where('company_id', $companyId)
-            ->orderByDesc('is_default')
-            ->orderBy('id')
-            ->first();
+    $pipeline = Pipeline::query()
+        ->where('company_id', $companyId)
+        ->orderByDesc('is_default')
+        ->orderBy('id')
+        ->first();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pipeline nahi mili
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$pipeline) {
-            return view('pipeline.index', [
-                'pipeline' => null,
-                'leads' => collect(),
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Load pipeline stages
-        |--------------------------------------------------------------------------
-        |
-        | pipeline_stages table me bhi is_active column zaroori nahi hai,
-        | isliye yahan is_active condition nahi lagayi gayi.
-        |
-        */
-
-        $stages = PipelineStage::query()
-            ->where('pipeline_id', $pipeline->id)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-
-        $pipeline->setRelation('stages', $stages);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Pipeline stages nahi mili
-        |--------------------------------------------------------------------------
-        */
-
-        if ($stages->isEmpty()) {
-            return view('pipeline.index', [
-                'pipeline' => $pipeline,
-                'leads' => collect(),
-            ]);
-        }
-
-        $firstStage = $stages->first();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Existing null-stage leads ko first stage assign karein
-        |--------------------------------------------------------------------------
-        */
-
-        Lead::query()
-            ->where('company_id', $companyId)
-            ->whereNull('pipeline_stage_id')
-            ->update([
-                'pipeline_stage_id' => $firstStage->id,
-                'updated_at' => now(),
-            ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Current pipeline stage IDs
-        |--------------------------------------------------------------------------
-        */
-
-        $stageIds = $stages
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Load pipeline leads
-        |--------------------------------------------------------------------------
-        */
-
-        $leads = Lead::query()
-            ->with([
-                'assignedUser:id,name,employee_code',
-                'status:id,name,color',
-                'source:id,name',
-            ])
-            ->where('company_id', $companyId)
-            ->whereIn('pipeline_stage_id', $stageIds)
-            ->latest('id')
-            ->get()
-            ->groupBy(function (Lead $lead) {
-                return (int) $lead->pipeline_stage_id;
-            });
-
+    if (!$pipeline) {
         return view('pipeline.index', [
-            'pipeline' => $pipeline,
-            'leads' => $leads,
+            'pipeline' => null,
+            'leads' => collect(),
+            'paginatedLeads' => null,
+            'employees' => collect(),
+            'statuses' => collect(),
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load Pipeline Stages
+    |--------------------------------------------------------------------------
+    */
+
+    $stages = PipelineStage::query()
+        ->where('pipeline_id', $pipeline->id)
+        ->orderBy('sort_order')
+        ->orderBy('id')
+        ->get();
+
+    $pipeline->setRelation('stages', $stages);
+
+    if ($stages->isEmpty()) {
+        return view('pipeline.index', [
+            'pipeline' => $pipeline,
+            'leads' => collect(),
+            'paginatedLeads' => null,
+            'employees' => collect(),
+            'statuses' => collect(),
+        ]);
+    }
+
+    $firstStage = $stages->first();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assign Null Stage Leads To First Stage
+    |--------------------------------------------------------------------------
+    |
+    | NOTE:
+    | Ideally ye migration/seeder/import ke time hona chahiye.
+    | Har page load par UPDATE query avoid karna better hota hai.
+    |
+    */
+
+    Lead::query()
+        ->where('company_id', $companyId)
+        ->whereNull('pipeline_stage_id')
+        ->update([
+            'pipeline_stage_id' => $firstStage->id,
+            'updated_at' => now(),
+        ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current Pipeline Stage IDs
+    |--------------------------------------------------------------------------
+    */
+
+    $stageIds = $stages
+        ->pluck('id')
+        ->map(fn ($id) => (int) $id)
+        ->all();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Base Lead Query
+    |--------------------------------------------------------------------------
+    */
+
+    $leadQuery = Lead::query()
+        ->with([
+            'assignedUser:id,name,employee_code',
+            'status:id,name,color',
+            'source:id,name',
+        ])
+        ->where('company_id', $companyId)
+        ->whereIn('pipeline_stage_id', $stageIds);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('search')) {
+        $search = trim($request->search);
+
+        $leadQuery->where(function ($query) use ($search) {
+            $query->where('name', 'like', "%{$search}%")
+                ->orWhere('company_name', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%");
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stage Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('stage')) {
+        $stageId = (int) $request->stage;
+
+        if (in_array($stageId, $stageIds, true)) {
+            $leadQuery->where('pipeline_stage_id', $stageId);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assigned User Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('assigned_to')) {
+        if ($request->assigned_to === 'unassigned') {
+            $leadQuery->whereNull('assigned_to');
+        } else {
+            $leadQuery->where(
+                'assigned_to',
+                (int) $request->assigned_to
+            );
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Priority Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('priority')) {
+        $leadQuery->where('priority', $request->priority);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Status Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('status')) {
+        $leadQuery->where('status_id', (int) $request->status);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sorting
+    |--------------------------------------------------------------------------
+    */
+
+    switch ($request->get('sort')) {
+        case 'oldest':
+            $leadQuery->orderBy('id');
+            break;
+
+        case 'value_high':
+            $leadQuery
+                ->orderByDesc('expected_deal_value')
+                ->orderByDesc('id');
+            break;
+
+        case 'value_low':
+            $leadQuery
+                ->orderBy('expected_deal_value')
+                ->orderByDesc('id');
+            break;
+
+        case 'follow_up':
+            $leadQuery
+                ->orderByRaw('CASE WHEN next_follow_up_at IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('next_follow_up_at')
+                ->orderByDesc('id');
+            break;
+
+        default:
+            $leadQuery->orderByDesc('id');
+            break;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination - Maximum 100 Leads Per Page
+    |--------------------------------------------------------------------------
+    */
+
+    $paginatedLeads = $leadQuery
+        ->paginate(100)
+        ->withQueryString();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Group Current Page Leads By Stage
+    |--------------------------------------------------------------------------
+    */
+
+    $leads = $paginatedLeads
+        ->getCollection()
+        ->groupBy(function (Lead $lead) {
+            return (int) $lead->pipeline_stage_id;
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Employee Filter Data
+    |--------------------------------------------------------------------------
+    */
+
+    $employees = \App\Models\User::query()
+        ->where('company_id', $companyId)
+        ->whereHas('assignedLeads', function ($query) use ($companyId) {
+            $query->where('company_id', $companyId);
+        })
+        ->select('id', 'name', 'employee_code')
+        ->orderBy('name')
+        ->get();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Status Filter Data
+    |--------------------------------------------------------------------------
+    */
+
+    $statuses = \App\Models\LeadStatus::query()
+        ->where('company_id', $companyId)
+        ->orderBy('name')
+        ->get(['id', 'name', 'color']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pipeline Overall Stats
+    |--------------------------------------------------------------------------
+    |
+    | Ye pagination se independent hain.
+    |
+    */
+
+    $statsQuery = Lead::query()
+        ->where('company_id', $companyId)
+        ->whereIn('pipeline_stage_id', $stageIds);
+
+    $pipelineTotalLeads = (clone $statsQuery)->count();
+
+    $pipelineTotalValue = (clone $statsQuery)
+        ->sum('expected_deal_value');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Return View
+    |--------------------------------------------------------------------------
+    */
+
+    return view('pipeline.index', [
+        'pipeline' => $pipeline,
+        'leads' => $leads,
+        'paginatedLeads' => $paginatedLeads,
+        'employees' => $employees,
+        'statuses' => $statuses,
+        'pipelineTotalLeads' => $pipelineTotalLeads,
+        'pipelineTotalValue' => $pipelineTotalValue,
+    ]);
+}
 
     /**
      * Move lead from one stage to another.
