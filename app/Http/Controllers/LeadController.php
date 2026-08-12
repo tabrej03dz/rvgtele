@@ -351,9 +351,15 @@ class LeadController extends Controller
                 $request,
                 $companyId
             ) {
+                $category = $validated['category'] ?? null;
+                unset($validated['category']);
+
                 $lead = Lead::create(
                     $validated
                 );
+
+                $lead->category = $category;
+                $lead->save();
 
                 /*
                 |--------------------------------------------------------------------------
@@ -625,9 +631,15 @@ class LeadController extends Controller
                 $newAssignedUserId,
                 $request
             ) {
+                $category = $validated['category'] ?? null;
+                unset($validated['category']);
+
                 $lead->update(
                     $validated
                 );
+
+                $lead->category = $category;
+                $lead->save();
 
                 /*
                 |--------------------------------------------------------------------------
@@ -948,6 +960,12 @@ class LeadController extends Controller
                     'integer',
                 ],
 
+                'category' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
                 'filter_assigned_to' => [
                     'nullable',
                     'string',
@@ -1072,6 +1090,10 @@ class LeadController extends Controller
 
                     'source' =>
                     $validated['source']
+                        ?? null,
+
+                    'category' =>
+                    $validated['category']
                         ?? null,
 
                     'assigned_to' =>
@@ -1469,6 +1491,11 @@ class LeadController extends Controller
                             "%{$search}%"
                         )
                         ->orWhere(
+                            'category',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
                             'email',
                             'like',
                             "%{$search}%"
@@ -1505,6 +1532,20 @@ class LeadController extends Controller
             $query->where(
                 'lead_source_id',
                 $request->source
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Category
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('category')) {
+            $query->where(
+                'category',
+                'like',
+                '%' . trim((string) $request->category) . '%'
             );
         }
 
@@ -1914,6 +1955,12 @@ class LeadController extends Controller
             ],
 
             'company_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'category' => [
                 'nullable',
                 'string',
                 'max:255',

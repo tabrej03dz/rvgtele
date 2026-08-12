@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Exports\LeadImportTemplateExport;
 use App\Imports\LeadsImport;
-
 use App\Models\LeadSource;
 use App\Models\LeadStatus;
 use App\Models\Pipeline;
@@ -21,63 +20,112 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LeadImportController extends Controller
 {
-    /**
-     * Show Excel import form.
-     */
-    public function create(Request $request): View {
+    /*
+    |--------------------------------------------------------------------------
+    | Import Form
+    |--------------------------------------------------------------------------
+    */
 
+    public function create(Request $request): View
+    {
         $companyId = (int) $request->user()->company_id;
 
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Sources
+        |--------------------------------------------------------------------------
+        */
+
+        $sources = LeadSource::query()
+            ->where(function (Builder $query) use ($companyId) {
+                $query
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Statuses
+        |--------------------------------------------------------------------------
+        */
+
+        $statuses = LeadStatus::query()
+            ->where(function (Builder $query) use ($companyId) {
+                $query
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employees
+        |--------------------------------------------------------------------------
+        */
+
+        $users = User::query()
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'employee_code',
+                'email',
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Teams
+        |--------------------------------------------------------------------------
+        */
+
+        $teams = Team::query()
+            ->where('company_id', $companyId)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+            ]);
+
         return view('leads.import', [
-            'sources' => LeadSource::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->orderBy('name')
-                ->get(),
-
-            'statuses' => LeadStatus::query()
-                ->where(function (Builder $query) use ($companyId) {
-                    $query
-                        ->whereNull('company_id')
-                        ->orWhere('company_id', $companyId);
-                })
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(),
-
-            'users' => User::query()
-                ->where('company_id', $companyId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                    'employee_code',
-                    'email',
-                ]),
-
-            'teams' => Team::query()
-                ->where('company_id', $companyId)
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                ]),
+            'sources' => $sources,
+            'statuses' => $statuses,
+            'users' => $users,
+            'teams' => $teams,
         ]);
     }
 
-    /**
-     * Import leads.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Import Leads
+    |--------------------------------------------------------------------------
+    */
+
     public function store(
         Request $request
     ): RedirectResponse {
         $companyId = (int) $request->user()->company_id;
 
+        /*
+        |--------------------------------------------------------------------------
+        | Validation
+        |--------------------------------------------------------------------------
+        */
+
         $validated = $request->validate([
+            /*
+            |--------------------------------------------------------------------------
+            | File
+            |--------------------------------------------------------------------------
+            */
+
             'file' => [
                 'required',
                 'file',
@@ -85,20 +133,36 @@ class LeadImportController extends Controller
                 'max:10240',
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Duplicate Action
+            |--------------------------------------------------------------------------
+            */
+
             'duplicate_action' => [
                 'required',
+
                 Rule::in([
                     'skip',
                     'update',
                 ]),
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Default Source
+            |--------------------------------------------------------------------------
+            */
+
             'default_lead_source_id' => [
                 'required',
                 'integer',
 
-                Rule::exists('lead_sources', 'id')
-                    ->where(function ($query) use ($companyId) {
+                Rule::exists(
+                    'lead_sources',
+                    'id'
+                )->where(
+                    function ($query) use ($companyId) {
                         $query->where(
                             function ($subQuery) use ($companyId) {
                                 $subQuery
@@ -109,15 +173,25 @@ class LeadImportController extends Controller
                                     );
                             }
                         );
-                    }),
+                    }
+                ),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Default Status
+            |--------------------------------------------------------------------------
+            */
 
             'default_lead_status_id' => [
                 'required',
                 'integer',
 
-                Rule::exists('lead_statuses', 'id')
-                    ->where(function ($query) use ($companyId) {
+                Rule::exists(
+                    'lead_statuses',
+                    'id'
+                )->where(
+                    function ($query) use ($companyId) {
                         $query->where(
                             function ($subQuery) use ($companyId) {
                                 $subQuery
@@ -128,74 +202,144 @@ class LeadImportController extends Controller
                                     );
                             }
                         );
-                    }),
+                    }
+                ),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Default Employee
+            |--------------------------------------------------------------------------
+            */
 
             'default_assigned_to' => [
                 'nullable',
                 'integer',
 
-                Rule::exists('users', 'id')
-                    ->where(function ($query) use ($companyId) {
+                Rule::exists(
+                    'users',
+                    'id'
+                )->where(
+                    function ($query) use ($companyId) {
                         $query
-                            ->where('company_id', $companyId)
-                            ->where('is_active', true);
-                    }),
+                            ->where(
+                                'company_id',
+                                $companyId
+                            )
+                            ->where(
+                                'is_active',
+                                true
+                            );
+                    }
+                ),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Default Team
+            |--------------------------------------------------------------------------
+            */
 
             'default_team_id' => [
                 'nullable',
                 'integer',
 
-                Rule::exists('teams', 'id')
-                    ->where(
-                        fn ($query) =>
-                            $query->where(
-                                'company_id',
-                                $companyId
-                            )
-                    ),
+                Rule::exists(
+                    'teams',
+                    'id'
+                )->where(
+                    fn ($query) =>
+                        $query->where(
+                            'company_id',
+                            $companyId
+                        )
+                ),
             ],
         ]);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Default Pipeline Stage
+        |--------------------------------------------------------------------------
+        */
+
         $firstPipelineStageId =
-            $this->defaultPipelineStageId($companyId);
+            $this->defaultPipelineStageId(
+                $companyId
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Import Object
+        |--------------------------------------------------------------------------
+        */
 
         $import = new LeadsImport(
             companyId: $companyId,
-            importedBy: (int) $request->user()->id,
+
+            importedBy:
+                (int) $request->user()->id,
+
             defaultSourceId:
                 (int) $validated['default_lead_source_id'],
+
             defaultStatusId:
                 (int) $validated['default_lead_status_id'],
+
             defaultAssignedTo:
                 !empty($validated['default_assigned_to'])
                     ? (int) $validated['default_assigned_to']
                     : null,
+
             defaultTeamId:
                 !empty($validated['default_team_id'])
                     ? (int) $validated['default_team_id']
                     : null,
+
             defaultPipelineStageId:
                 $firstPipelineStageId,
+
             duplicateAction:
                 $validated['duplicate_action']
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Import
+        |--------------------------------------------------------------------------
+        */
 
         Excel::import(
             $import,
             $request->file('file')
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect
+        |--------------------------------------------------------------------------
+        */
+
         return redirect()
-            ->route('leads.import.create')
-            ->with('success', 'Lead import completed.')
-            ->with('import_result', $import->result());
+            ->route(
+                'leads.import.create'
+            )
+            ->with(
+                'success',
+                'Lead import completed.'
+            )
+            ->with(
+                'import_result',
+                $import->result()
+            );
     }
 
-    /**
-     * Download Excel import template.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Download Excel Template
+    |--------------------------------------------------------------------------
+    */
+
     public function downloadTemplate(): BinaryFileResponse
     {
         return Excel::download(
@@ -204,15 +348,29 @@ class LeadImportController extends Controller
         );
     }
 
-    /**
-     * Find first stage of default pipeline.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Default Pipeline Stage
+    |--------------------------------------------------------------------------
+    */
+
     private function defaultPipelineStageId(
         int $companyId
     ): ?int {
+        /*
+        |--------------------------------------------------------------------------
+        | Default Pipeline
+        |--------------------------------------------------------------------------
+        */
+
         $pipeline = Pipeline::query()
-            ->where('company_id', $companyId)
-            ->orderByDesc('is_default')
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->orderByDesc(
+                'is_default'
+            )
             ->orderBy('id')
             ->first();
 
@@ -220,9 +378,20 @@ class LeadImportController extends Controller
             return null;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | First Pipeline Stage
+        |--------------------------------------------------------------------------
+        */
+
         return PipelineStage::query()
-            ->where('pipeline_id', $pipeline->id)
-            ->orderBy('sort_order')
+            ->where(
+                'pipeline_id',
+                $pipeline->id
+            )
+            ->orderBy(
+                'sort_order'
+            )
             ->orderBy('id')
             ->value('id');
     }

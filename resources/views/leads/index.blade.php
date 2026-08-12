@@ -208,6 +208,7 @@
         showFilters: @js(request()->hasAny([
             'search',
             'source',
+            'category',
             'assigned_to',
             'team_id',
             'priority',
@@ -299,7 +300,7 @@
 
                         FILTERS
 
-                        @if (request()->hasAny(['search', 'source', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to']))
+                        @if (request()->hasAny(['search', 'source', 'category', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to']))
                             <span class="h-1.5 w-1.5 bg-blue-600"></span>
                         @endif
                     </button>
@@ -491,7 +492,7 @@
                         </span>
 
                         <input type="text" name="search" value="{{ request('search') }}"
-                            placeholder="Name, mobile, company, email or city"
+                            placeholder="Name, mobile, company, category, email or city"
                             class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500">
                     </label>
 
@@ -519,6 +520,21 @@
                                 </option>
                             @endforeach
                         </select>
+                    </label>
+
+                    {{-- Category --}}
+                    <label class="block">
+                        <span class="software-label">
+                            Category
+                        </span>
+
+                        <input
+                            type="text"
+                            name="category"
+                            value="{{ request('category') }}"
+                            placeholder="Enter category"
+                            class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
                     </label>
 
                     {{-- Assigned Employee --}}
@@ -778,6 +794,7 @@
                             <th class="px-3 py-2.5">Lead</th>
                             <th class="px-3 py-2.5">Mobile</th>
                             <th class="px-3 py-2.5">Source</th>
+                            <th class="px-3 py-2.5">Category</th>
                             <th class="px-3 py-2.5">Status</th>
                             <th class="px-3 py-2.5">Priority</th>
                             <th class="px-3 py-2.5">Temperature</th>
@@ -838,6 +855,16 @@
                                 </td>
 
                                 <td class="px-3 py-2.5">
+                                    @if ($lead->category)
+                                        <span class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                                            {{ $lead->category }}
+                                        </span>
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+                                </td>
+
+                                <td class="px-3 py-2.5">
                                     <span
                                         class="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                                         {{ $lead->status?->name ?? 'New' }}
@@ -891,7 +918,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $hasFullAccess ? 10 : 9 }}" class="px-5 py-14 text-center">
+                                <td colspan="{{ $hasFullAccess ? 11 : 10 }}" class="px-5 py-14 text-center">
                                     <div class="font-semibold text-slate-700">
                                         No leads found
                                     </div>
@@ -960,6 +987,7 @@
                         <input type="hidden" name="search" value="{{ request('search') }}">
                         <input type="hidden" name="status" value="{{ request('status') }}">
                         <input type="hidden" name="source" value="{{ request('source') }}">
+                        <input type="hidden" name="category" value="{{ request('category') }}">
                         <input type="hidden" name="filter_assigned_to" value="{{ request('assigned_to') }}">
                         <input type="hidden" name="team_id" value="{{ request('team_id') }}">
                         <input type="hidden" name="priority" value="{{ request('priority') }}">
