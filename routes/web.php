@@ -21,6 +21,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\SuperAdminBusinessController;
 
 Route::view('/', 'welcome')->name('home');
 
@@ -32,6 +33,11 @@ Route::middleware(['auth', 'verified', 'company.active',])->group(function () {
             'companies',
             CompanyController::class
         )->except('show');
+
+         Route::post(
+            '/companies/{company}/view-business',
+            [SuperAdminBusinessController::class, 'viewBusiness']
+        )->name('companies.view-business');
     });
 
 
