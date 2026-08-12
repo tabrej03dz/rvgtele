@@ -101,7 +101,17 @@ Route::middleware(['auth', 'verified', 'company.active',])->group(function () {
     Route::get('pipeline', [PipelineController::class, 'index'])->name('pipeline.index');
     Route::post('pipeline/{lead}/move', [PipelineController::class, 'move'])->name('pipeline.move');
 
-    Route::resource('employees', EmployeeController::class)->except('show');
+    Route::post(
+        '/employees/stop-impersonating',
+        [EmployeeController::class, 'stopImpersonating']
+    )->name('employees.stop-impersonating');
+
+    Route::post(
+        '/employees/{employee}/impersonate',
+        [EmployeeController::class, 'impersonate']
+    )->name('employees.impersonate');
+
+    Route::resource('employees', EmployeeController::class);
     Route::resource('branches', BranchController::class)->parameters(['branches' => 'item'])->except('show');
     Route::resource('teams', TeamController::class)->parameters(['teams' => 'item'])->except('show');
     Route::resource('campaigns', CampaignController::class)->parameters(['campaigns' => 'item'])->except('show');

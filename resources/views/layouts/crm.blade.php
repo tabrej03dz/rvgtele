@@ -239,6 +239,36 @@
 
         <nav class="space-y-5 p-4">
 
+            @if (session()->has('impersonator_id'))
+
+                <div class="sticky top-0 z-[9999] border-b border-amber-300 bg-amber-50">
+                    <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+
+                        <div class="text-sm text-amber-900">
+                            You are viewing
+                            <strong>{{ auth()->user()->name }}</strong>
+                            dashboard.
+                        </div>
+
+                        <form
+                            method="POST"
+                            action="{{ route('employees.stop-impersonating') }}"
+                        >
+                            @csrf
+
+                            <button
+                                type="submit"
+                                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                            >
+                                ← Back to My Account
+                            </button>
+                        </form>
+
+                    </div>
+                </div>
+
+            @endif
+
             @foreach($sections as $label => $links)
 
                 <div>
