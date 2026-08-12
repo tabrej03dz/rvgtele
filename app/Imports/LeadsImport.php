@@ -11,8 +11,6 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
@@ -26,6 +24,12 @@ class LeadsImport implements
     WithChunkReading,
     SkipsEmptyRows
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Counters
+    |--------------------------------------------------------------------------
+    */
+
     private int $imported = 0;
 
     private int $updated = 0;
@@ -34,126 +38,227 @@ class LeadsImport implements
 
     private int $failed = 0;
 
+    /*
+    |--------------------------------------------------------------------------
+    | Errors
+    |--------------------------------------------------------------------------
+    */
+
     private array $errors = [];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Constructor
+    |--------------------------------------------------------------------------
+    */
 
     public function __construct(
         private readonly int $companyId,
+
         private readonly int $importedBy,
+
         private readonly int $defaultSourceId,
+
         private readonly int $defaultStatusId,
-        private readonly ?int $defaultAssignedTo,
-        private readonly ?int $defaultTeamId,
-        private readonly ?int $defaultPipelineStageId,
-        private readonly string $duplicateAction = 'skip'
+
+        private readonly ?int $defaultAssignedTo = null,
+
+        private readonly ?int $defaultTeamId = null,
+
+        private readonly ?int $defaultPipelineStageId = null,
+
+        private readonly string $duplicateAction = 'skip',
     ) {
     }
 
-    /**
-     * Process imported rows.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Collection
+    |--------------------------------------------------------------------------
+    */
+
     public function collection(
         Collection $rows
     ): void {
         foreach ($rows as $index => $row) {
             /*
-            | Header row is row 1, so actual Excel row begins from 2.
+            |--------------------------------------------------------------------------
+            | Excel Row Number
+            |--------------------------------------------------------------------------
+            |
+            | Heading row = row 1
+            |
             */
 
-            $excelRowNumber = $index + 2;
+            $rowNumber = $index + 2;
 
             try {
-                $this->processRow(
-                    collect($row)->map(
-                        fn ($value) =>
-                            is_string($value)
-                                ? trim($value)
-                                : $value
-                    ),
-                    $excelRowNumber
+                $this->importRow(
+                    $row,
+                    $rowNumber
                 );
-            } catch (Throwable $exception) {
+            } catch (Throwable $e) {
                 $this->failed++;
 
-                $this->errors[] = [
-                    'row' => $excelRowNumber,
-                    'message' => $exception->getMessage(),
-                ];
+                $this->errors[] =
+                    "Row {$rowNumber}: {$e->getMessage()}";
             }
         }
     }
 
-    /**
-     * Process one Excel row.
-     */
-    private function processRow(
+    /*
+    |--------------------------------------------------------------------------
+    | Import Single Row
+    |--------------------------------------------------------------------------
+    */
+
+    private function importRow(
         Collection $row,
         int $rowNumber
     ): void {
-        $mobile = $this->normalizeMobile(
+        /*
+        |--------------------------------------------------------------------------
+        | Name
+        |--------------------------------------------------------------------------
+        */
+
+        $name = $this->clean(
+            $row->get('name')
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mobile
+        |--------------------------------------------------------------------------
+        */
+
+        $mobile = $this->cleanPhone(
             $row->get('mobile')
         );
 
-        $data = [
-            'name' => $this->nullableString(
-                $row->get('name')
-            ),
+        if (!$name) {
+            throw new \RuntimeException(
+                'Name is required.'
+            );
+        }
 
-            'mobile' => $mobile,
+        if (!$mobile) {
+            throw new \RuntimeException(
+                'Mobile is required.'
+            );
+        }
 
-            'alternate_mobile' => $this->normalizeMobile(
-                $row->get('alternate_mobile')
-            ),
+        /*
+        |--------------------------------------------------------------------------
+        | Existing Lead
+        |--------------------------------------------------------------------------
+        */
 
-            'whatsapp_number' => $this->normalizeMobile(
-                $row->get('whatsapp_number')
-            ),
+        $existingLead = Lead::query()
+            ->where(
+                'company_id',
+                $this->companyId
+            )
+            ->where(
+                'mobile',
+                $mobile
+            )
+            ->first();
 
-            'email' => $this->nullableString(
-                $row->get('email')
-            ),
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate Skip
+        |--------------------------------------------------------------------------
+        */
 
-            'company_name' => $this->nullableString(
-                $row->get('company_name')
-            ),
+        if (
+            $existingLead
+            &&
+            $this->duplicateAction === 'skip'
+        ) {
+            $this->duplicates++;
 
-            'city' => $this->nullableString(
-                $row->get('city')
-            ),
+            return;
+        }
 
-            'district' => $this->nullableString(
-                $row->get('district')
-            ),
+        /*
+        |--------------------------------------------------------------------------
+        | Category
+        |--------------------------------------------------------------------------
+        |
+        | Normal String
+        |
+        */
 
-            'state' => $this->nullableString(
-                $row->get('state')
-            ),
+        $category = $this->clean(
+            $row->get('category')
+        );
 
-            'pincode' => $this->nullableString(
-                $row->get('pincode')
-            ),
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Source
+        |--------------------------------------------------------------------------
+        */
 
-            'required_product' => $this->nullableString(
-                $row->get('required_product')
-            ),
+        $sourceId =
+            $this->resolveSourceId(
+                $row->get('lead_source')
+                    ?? $row->get('source')
+            );
 
-            'estimated_budget' => $this->nullableNumeric(
-                $row->get('estimated_budget')
-            ),
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Status
+        |--------------------------------------------------------------------------
+        */
 
-            'expected_deal_value' => $this->nullableNumeric(
-                $row->get('expected_deal_value')
-            ),
+        $statusId =
+            $this->resolveStatusId(
+                $row->get('lead_status')
+                    ?? $row->get('status')
+            );
 
-            'expected_closing_date' => $this->parseDate(
-                $row->get('expected_closing_date')
-            ),
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Employee
+        |--------------------------------------------------------------------------
+        */
 
-            'next_follow_up_at' => $this->parseDateTime(
-                $row->get('next_follow_up_at')
-            ),
+        $assignedTo =
+            $this->resolveAssignedTo(
+                $row->get('assigned_employee_email')
+                    ?? $row->get('assigned_to')
+                    ?? $row->get('employee_email')
+            );
 
-            'priority' => $this->normalizeOption(
-                $row->get('priority'),
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Team
+        |--------------------------------------------------------------------------
+        */
+
+        $teamId =
+            $this->resolveTeamId(
+                $row->get('team')
+                    ?? $row->get('team_name')
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Priority
+        |--------------------------------------------------------------------------
+        */
+
+        $priority =
+            strtolower(
+                $this->clean(
+                    $row->get('priority')
+                ) ?? 'normal'
+            );
+
+        if (
+            !in_array(
+                $priority,
                 [
                     'low',
                     'normal',
@@ -161,147 +266,253 @@ class LeadsImport implements
                     'urgent',
                     'hot',
                 ],
-                'normal'
-            ),
+                true
+            )
+        ) {
+            $priority = 'normal';
+        }
 
-            'temperature' => $this->normalizeOption(
-                $row->get('temperature'),
+        /*
+        |--------------------------------------------------------------------------
+        | Temperature
+        |--------------------------------------------------------------------------
+        */
+
+        $temperature =
+            strtolower(
+                $this->clean(
+                    $row->get('temperature')
+                ) ?? 'cold'
+            );
+
+        if (
+            !in_array(
+                $temperature,
                 [
                     'cold',
                     'warm',
                     'hot',
                 ],
-                'cold'
-            ),
-
-            'lead_source_id' => $this->resolveSourceId(
-                $row->get('lead_source')
-            ),
-
-            'lead_status_id' => $this->resolveStatusId(
-                $row->get('lead_status')
-            ),
-
-            'assigned_to' => $this->resolveUserId(
-                $row->get('assigned_employee_email')
-            ),
-
-            'team_id' => $this->resolveTeamId(
-                $row->get('team')
-            ),
-
-            'pipeline_stage_id' =>
-                $this->defaultPipelineStageId,
-        ];
-
-        $validator = Validator::make(
-            $data,
-            [
-                'name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'mobile' => [
-                    'required',
-                    'string',
-                    'min:7',
-                    'max:20',
-                ],
-
-                'email' => [
-                    'nullable',
-                    'email',
-                    'max:255',
-                ],
-
-                'priority' => [
-                    'required',
-                    'in:low,normal,high,urgent,hot',
-                ],
-
-                'temperature' => [
-                    'required',
-                    'in:cold,warm,hot',
-                ],
-
-                'estimated_budget' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-
-                'expected_deal_value' => [
-                    'nullable',
-                    'numeric',
-                    'min:0',
-                ],
-            ]
-        );
-
-        if ($validator->fails()) {
-            $this->failed++;
-
-            $this->errors[] = [
-                'row' => $rowNumber,
-                'message' => implode(
-                    ' ',
-                    $validator->errors()->all()
-                ),
-            ];
-
-            return;
+                true
+            )
+        ) {
+            $temperature = 'cold';
         }
-
-        $existingLead = Lead::withTrashed()
-            ->where('company_id', $this->companyId)
-            ->where('mobile', $mobile)
-            ->first();
 
         /*
         |--------------------------------------------------------------------------
-        | Duplicate handling
+        | Lead Data
         |--------------------------------------------------------------------------
         */
 
-        if ($existingLead) {
-            if ($this->duplicateAction === 'skip') {
-                $this->duplicates++;
+        $data = [
+            'company_id' =>
+                $this->companyId,
 
-                return;
-            }
+            'name' =>
+                $name,
 
-            DB::transaction(function () use (
-                $existingLead,
-                $data
-            ) {
-                if ($existingLead->trashed()) {
-                    $existingLead->restore();
-                }
+            'mobile' =>
+                $mobile,
 
-                $previousUserId =
-                    $existingLead->assigned_to;
+            'alternate_mobile' =>
+                $this->cleanPhone(
+                    $row->get(
+                        'alternate_mobile'
+                    )
+                ),
 
-                $existingLead->update($data);
+            'whatsapp_number' =>
+                $this->cleanPhone(
+                    $row->get(
+                        'whatsapp_number'
+                    )
+                ),
 
-                if (
-                    !empty($data['assigned_to'])
-                    && (int) $previousUserId !==
-                    (int) $data['assigned_to']
+            'email' =>
+                $this->clean(
+                    $row->get('email')
+                ),
+
+            'company_name' =>
+                $this->clean(
+                    $row->get(
+                        'company_name'
+                    )
+                ),
+
+            /*
+            |--------------------------------------------------------------------------
+            | CATEGORY
+            |--------------------------------------------------------------------------
+            */
+
+            'category' =>
+                $category,
+
+            'preferred_language' =>
+                $this->clean(
+                    $row->get(
+                        'preferred_language'
+                    )
+                ),
+
+            'address' =>
+                $this->clean(
+                    $row->get('address')
+                ),
+
+            'city' =>
+                $this->clean(
+                    $row->get('city')
+                ),
+
+            'district' =>
+                $this->clean(
+                    $row->get('district')
+                ),
+
+            'state' =>
+                $this->clean(
+                    $row->get('state')
+                ),
+
+            'pincode' =>
+                $this->clean(
+                    $row->get('pincode')
+                ),
+
+            'required_product' =>
+                $this->clean(
+                    $row->get(
+                        'required_product'
+                    )
+                ),
+
+            'estimated_budget' =>
+                $this->numericOrNull(
+                    $row->get(
+                        'estimated_budget'
+                    )
+                ),
+
+            'expected_deal_value' =>
+                $this->numericOrNull(
+                    $row->get(
+                        'expected_deal_value'
+                    )
+                ),
+
+            'expected_closing_date' =>
+                $this->dateOrNull(
+                    $row->get(
+                        'expected_closing_date'
+                    )
+                ),
+
+            'next_follow_up_at' =>
+                $this->dateTimeOrNull(
+                    $row->get(
+                        'next_follow_up_at'
+                    )
+                ),
+
+            'lead_source_id' =>
+                $sourceId,
+
+            'lead_status_id' =>
+                $statusId,
+
+            'assigned_to' =>
+                $assignedTo,
+
+            'team_id' =>
+                $teamId,
+
+            'pipeline_stage_id' =>
+                $this->defaultPipelineStageId,
+
+            'priority' =>
+                $priority,
+
+            'temperature' =>
+                $temperature,
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Existing Lead
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $existingLead
+            &&
+            $this->duplicateAction === 'update'
+        ) {
+            $oldAssignedTo =
+                $existingLead->assigned_to;
+
+            DB::transaction(
+                function () use (
+                    $existingLead,
+                    $data,
+                    $oldAssignedTo
                 ) {
-                    $this->saveAssignmentHistory(
-                        lead: $existingLead,
-                        previousUserId: $previousUserId
-                            ? (int) $previousUserId
-                            : null,
-                        newUserId:
-                            (int) $data['assigned_to'],
-                        reason:
-                            'Lead reassigned during Excel update'
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Fill + Save
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $existingLead->fill(
+                        $data
                     );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Category Explicitly Set
+                    |--------------------------------------------------------------------------
+                    |
+                    | Fillable me category miss ho tab bhi save ho.
+                    |
+                    */
+
+                    $existingLead->category =
+                        $data['category'];
+
+                    $existingLead->save();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Assignment History
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        !empty($data['assigned_to'])
+                        &&
+                        (int) $oldAssignedTo !==
+                            (int) $data['assigned_to']
+                    ) {
+                        $this->createAssignmentHistory(
+                            lead:
+                                $existingLead,
+
+                            previousUserId:
+                                $oldAssignedTo
+                                    ? (int) $oldAssignedTo
+                                    : null,
+
+                            newUserId:
+                                (int) $data['assigned_to'],
+
+                            reason:
+                                'Lead reassigned during import'
+                        );
+                    }
                 }
-            });
+            );
 
             $this->updated++;
 
@@ -310,339 +521,739 @@ class LeadsImport implements
 
         /*
         |--------------------------------------------------------------------------
-        | Create new lead
+        | Create New Lead
         |--------------------------------------------------------------------------
         */
 
-        DB::transaction(function () use ($data) {
-            $lead = Lead::create([
-                ...$data,
+        DB::transaction(
+            function () use ($data) {
+                /*
+                |--------------------------------------------------------------------------
+                | Avoid Fillable Problem For Category
+                |--------------------------------------------------------------------------
+                */
 
-                'company_id' => $this->companyId,
-                'created_by' => $this->importedBy,
-            ]);
+                $lead =
+                    new Lead();
 
-            if (!empty($data['assigned_to'])) {
-                $this->saveAssignmentHistory(
-                    lead: $lead,
-                    previousUserId: null,
-                    newUserId:
-                        (int) $data['assigned_to'],
-                    reason:
-                        'Lead assigned during Excel import'
-                );
+                /*
+                |--------------------------------------------------------------------------
+                | Core Fields
+                |--------------------------------------------------------------------------
+                */
+
+                $lead->company_id =
+                    $data['company_id'];
+
+                $lead->name =
+                    $data['name'];
+
+                $lead->mobile =
+                    $data['mobile'];
+
+                $lead->alternate_mobile =
+                    $data['alternate_mobile'];
+
+                $lead->whatsapp_number =
+                    $data['whatsapp_number'];
+
+                $lead->email =
+                    $data['email'];
+
+                $lead->company_name =
+                    $data['company_name'];
+
+                /*
+                |--------------------------------------------------------------------------
+                | CATEGORY
+                |--------------------------------------------------------------------------
+                */
+
+                $lead->category =
+                    $data['category'];
+
+                /*
+                |--------------------------------------------------------------------------
+                | Other Fields
+                |--------------------------------------------------------------------------
+                */
+
+                $lead->preferred_language =
+                    $data['preferred_language'];
+
+                $lead->address =
+                    $data['address'];
+
+                $lead->city =
+                    $data['city'];
+
+                $lead->district =
+                    $data['district'];
+
+                $lead->state =
+                    $data['state'];
+
+                $lead->pincode =
+                    $data['pincode'];
+
+                $lead->required_product =
+                    $data['required_product'];
+
+                $lead->estimated_budget =
+                    $data['estimated_budget'];
+
+                $lead->expected_deal_value =
+                    $data['expected_deal_value'];
+
+                $lead->expected_closing_date =
+                    $data['expected_closing_date'];
+
+                $lead->next_follow_up_at =
+                    $data['next_follow_up_at'];
+
+                $lead->lead_source_id =
+                    $data['lead_source_id'];
+
+                $lead->lead_status_id =
+                    $data['lead_status_id'];
+
+                $lead->assigned_to =
+                    $data['assigned_to'];
+
+                $lead->team_id =
+                    $data['team_id'];
+
+                $lead->pipeline_stage_id =
+                    $data['pipeline_stage_id'];
+
+                $lead->priority =
+                    $data['priority'];
+
+                $lead->temperature =
+                    $data['temperature'];
+
+                $lead->created_by =
+                    $this->importedBy;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Save
+                |--------------------------------------------------------------------------
+                */
+
+                $lead->save();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Assignment History
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    !empty(
+                        $data['assigned_to']
+                    )
+                ) {
+                    $this->createAssignmentHistory(
+                        lead:
+                            $lead,
+
+                        previousUserId:
+                            null,
+
+                        newUserId:
+                            (int) $data['assigned_to'],
+
+                        reason:
+                            'Lead assigned during import'
+                    );
+                }
             }
-        });
+        );
 
         $this->imported++;
     }
 
-    /**
-     * Resolve lead source from Excel text.
-     */
-    private function resolveSourceId(
-        mixed $sourceName
-    ): int {
-        $sourceName = $this->nullableString(
-            $sourceName
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Source
+    |--------------------------------------------------------------------------
+    */
 
-        if (!$sourceName) {
+    private function resolveSourceId(
+        mixed $value
+    ): int {
+        $value =
+            $this->clean($value);
+
+        if (!$value) {
             return $this->defaultSourceId;
         }
 
-        $source = LeadSource::query()
-            ->where(function ($query) {
-                $query
-                    ->whereNull('company_id')
-                    ->orWhere(
-                        'company_id',
-                        $this->companyId
-                    );
-            })
+        /*
+        |--------------------------------------------------------------------------
+        | Numeric ID
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ctype_digit(
+                (string) $value
+            )
+        ) {
+            $exists =
+                LeadSource::query()
+                ->whereKey(
+                    (int) $value
+                )
+                ->where(
+                    function ($query) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $this->companyId
+                            );
+                    }
+                )
+                ->exists();
+
+            if ($exists) {
+                return (int) $value;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Name
+        |--------------------------------------------------------------------------
+        */
+
+        $source =
+            LeadSource::query()
+            ->where(
+                function ($query) {
+                    $query
+                        ->whereNull(
+                            'company_id'
+                        )
+                        ->orWhere(
+                            'company_id',
+                            $this->companyId
+                        );
+                }
+            )
             ->whereRaw(
                 'LOWER(name) = ?',
-                [Str::lower($sourceName)]
+                [
+                    strtolower($value),
+                ]
             )
             ->first();
 
-        return $source?->id ??
-            $this->defaultSourceId;
+        return $source?->id
+            ? (int) $source->id
+            : $this->defaultSourceId;
     }
 
-    /**
-     * Resolve lead status from Excel text.
-     */
-    private function resolveStatusId(
-        mixed $statusName
-    ): int {
-        $statusName = $this->nullableString(
-            $statusName
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Status
+    |--------------------------------------------------------------------------
+    */
 
-        if (!$statusName) {
+    private function resolveStatusId(
+        mixed $value
+    ): int {
+        $value =
+            $this->clean($value);
+
+        if (!$value) {
             return $this->defaultStatusId;
         }
 
-        $status = LeadStatus::query()
-            ->where(function ($query) {
-                $query
-                    ->whereNull('company_id')
-                    ->orWhere(
-                        'company_id',
-                        $this->companyId
-                    );
-            })
+        /*
+        |--------------------------------------------------------------------------
+        | Numeric ID
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ctype_digit(
+                (string) $value
+            )
+        ) {
+            $exists =
+                LeadStatus::query()
+                ->whereKey(
+                    (int) $value
+                )
+                ->where(
+                    function ($query) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $this->companyId
+                            );
+                    }
+                )
+                ->exists();
+
+            if ($exists) {
+                return (int) $value;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Name
+        |--------------------------------------------------------------------------
+        */
+
+        $status =
+            LeadStatus::query()
+            ->where(
+                function ($query) {
+                    $query
+                        ->whereNull(
+                            'company_id'
+                        )
+                        ->orWhere(
+                            'company_id',
+                            $this->companyId
+                        );
+                }
+            )
             ->whereRaw(
                 'LOWER(name) = ?',
-                [Str::lower($statusName)]
+                [
+                    strtolower($value),
+                ]
             )
             ->first();
 
-        return $status?->id ??
-            $this->defaultStatusId;
+        return $status?->id
+            ? (int) $status->id
+            : $this->defaultStatusId;
     }
 
-    /**
-     * Resolve employee using email.
-     */
-    private function resolveUserId(
-        mixed $email
-    ): ?int {
-        $email = $this->nullableString($email);
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Employee
+    |--------------------------------------------------------------------------
+    */
 
-        if (!$email) {
+    private function resolveAssignedTo(
+        mixed $value
+    ): ?int {
+        $value =
+            $this->clean($value);
+
+        if (!$value) {
             return $this->defaultAssignedTo;
         }
 
-        return User::query()
-            ->where('company_id', $this->companyId)
-            ->where('is_active', true)
+        /*
+        |--------------------------------------------------------------------------
+        | Numeric User ID
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ctype_digit(
+                (string) $value
+            )
+        ) {
+            $user =
+                User::query()
+                ->whereKey(
+                    (int) $value
+                )
+                ->where(
+                    'company_id',
+                    $this->companyId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->first();
+
+            if ($user) {
+                return (int) $user->id;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email
+        |--------------------------------------------------------------------------
+        */
+
+        $user =
+            User::query()
+            ->where(
+                'company_id',
+                $this->companyId
+            )
+            ->where(
+                'is_active',
+                true
+            )
             ->whereRaw(
                 'LOWER(email) = ?',
-                [Str::lower($email)]
+                [
+                    strtolower($value),
+                ]
             )
-            ->value('id')
-            ?? $this->defaultAssignedTo;
+            ->first();
+
+        return $user
+            ? (int) $user->id
+            : $this->defaultAssignedTo;
     }
 
-    /**
-     * Resolve team using team name.
-     */
-    private function resolveTeamId(
-        mixed $teamName
-    ): ?int {
-        $teamName = $this->nullableString(
-            $teamName
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Team
+    |--------------------------------------------------------------------------
+    */
 
-        if (!$teamName) {
+    private function resolveTeamId(
+        mixed $value
+    ): ?int {
+        $value =
+            $this->clean($value);
+
+        if (!$value) {
             return $this->defaultTeamId;
         }
 
-        return Team::query()
-            ->where('company_id', $this->companyId)
+        /*
+        |--------------------------------------------------------------------------
+        | Numeric ID
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ctype_digit(
+                (string) $value
+            )
+        ) {
+            $team =
+                Team::query()
+                ->whereKey(
+                    (int) $value
+                )
+                ->where(
+                    'company_id',
+                    $this->companyId
+                )
+                ->first();
+
+            if ($team) {
+                return (int) $team->id;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Team Name
+        |--------------------------------------------------------------------------
+        */
+
+        $team =
+            Team::query()
+            ->where(
+                'company_id',
+                $this->companyId
+            )
             ->whereRaw(
                 'LOWER(name) = ?',
-                [Str::lower($teamName)]
+                [
+                    strtolower($value),
+                ]
             )
-            ->value('id')
-            ?? $this->defaultTeamId;
+            ->first();
+
+        return $team
+            ? (int) $team->id
+            : $this->defaultTeamId;
     }
 
-    /**
-     * Save assignment history.
-     */
-    private function saveAssignmentHistory(
+    /*
+    |--------------------------------------------------------------------------
+    | Assignment History
+    |--------------------------------------------------------------------------
+    */
+
+    private function createAssignmentHistory(
         Lead $lead,
         ?int $previousUserId,
         int $newUserId,
         string $reason
     ): void {
         LeadAssignment::create([
-            'company_id' => $this->companyId,
-            'lead_id' => $lead->id,
-            'previous_user_id' => $previousUserId,
-            'new_user_id' => $newUserId,
-            'assigned_by' => $this->importedBy,
-            'reason' => $reason,
-            'assigned_at' => now(),
+            'company_id' =>
+                $this->companyId,
+
+            'lead_id' =>
+                $lead->id,
+
+            'previous_user_id' =>
+                $previousUserId,
+
+            'new_user_id' =>
+                $newUserId,
+
+            'assigned_by' =>
+                $this->importedBy,
+
+            'reason' =>
+                $reason,
+
+            'assigned_at' =>
+                now(),
         ]);
     }
 
-    /**
-     * Normalize mobile number.
-     */
-    private function normalizeMobile(
+    /*
+    |--------------------------------------------------------------------------
+    | Clean Value
+    |--------------------------------------------------------------------------
+    */
+
+    private function clean(
         mixed $value
     ): ?string {
-        if ($value === null || $value === '') {
+        if (
+            $value === null
+            ||
+            $value === ''
+        ) {
             return null;
         }
 
-        $mobile = preg_replace(
-            '/[^0-9+]/',
-            '',
+        $value = trim(
             (string) $value
         );
 
+        return $value !== ''
+            ? $value
+            : null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Phone
+    |--------------------------------------------------------------------------
+    */
+
+    private function cleanPhone(
+        mixed $value
+    ): ?string {
+        $value =
+            $this->clean($value);
+
+        if (!$value) {
+            return null;
+        }
+
         /*
-        | Excel numeric cell 9.8765E+9 form me aaye to
-        | normal integer string banane ki कोशिश.
+        |--------------------------------------------------------------------------
+        | Excel Numeric Scientific Notation Safety
+        |--------------------------------------------------------------------------
         */
 
         if (
             is_numeric($value)
-            && str_contains(
-                strtolower((string) $value),
+            &&
+            str_contains(
+                strtolower($value),
                 'e'
             )
         ) {
-            $mobile = number_format(
-                (float) $value,
-                0,
+            $value =
+                sprintf(
+                    '%.0f',
+                    (float) $value
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove unnecessary characters
+        |--------------------------------------------------------------------------
+        */
+
+        $value =
+            preg_replace(
+                '/[^0-9+]/',
                 '',
-                ''
+                $value
             );
-        }
 
-        return $mobile ?: null;
+        return $value ?: null;
     }
 
-    /**
-     * Parse Excel date.
-     */
-    private function parseDate(
+    /*
+    |--------------------------------------------------------------------------
+    | Numeric
+    |--------------------------------------------------------------------------
+    */
+
+    private function numericOrNull(
         mixed $value
-    ): ?string {
-        if ($value === null || $value === '') {
+    ): ?float {
+        if (
+            $value === null
+            ||
+            $value === ''
+        ) {
             return null;
         }
 
-        try {
-            if (is_numeric($value)) {
-                return Carbon::instance(
-                    ExcelDate::excelToDateTimeObject(
-                        $value
-                    )
-                )->format('Y-m-d');
-            }
+        $cleaned =
+            str_replace(
+                [
+                    ',',
+                    '₹',
+                    'Rs.',
+                    'Rs',
+                ],
+                '',
+                (string) $value
+            );
 
-            return Carbon::parse($value)
-                ->format('Y-m-d');
-        } catch (Throwable) {
-            return null;
-        }
-    }
+        $cleaned =
+            trim($cleaned);
 
-    /**
-     * Parse Excel datetime.
-     */
-    private function parseDateTime(
-        mixed $value
-    ): ?string {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        try {
-            if (is_numeric($value)) {
-                return Carbon::instance(
-                    ExcelDate::excelToDateTimeObject(
-                        $value
-                    )
-                )->format('Y-m-d H:i:s');
-            }
-
-            return Carbon::parse($value)
-                ->format('Y-m-d H:i:s');
-        } catch (Throwable) {
-            return null;
-        }
-    }
-
-    /**
-     * Convert value to nullable string.
-     */
-    private function nullableString(
-        mixed $value
-    ): ?string {
-        if ($value === null) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value === ''
-            ? null
-            : $value;
-    }
-
-    /**
-     * Convert numeric value.
-     */
-    private function nullableNumeric(
-        mixed $value
-    ): int|float|null {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $clean = str_replace(
-            [',', '₹', 'Rs.', 'Rs'],
-            '',
-            (string) $value
-        );
-
-        return is_numeric($clean)
-            ? (float) $clean
+        return is_numeric(
+            $cleaned
+        )
+            ? (float) $cleaned
             : null;
     }
 
-    /**
-     * Normalize dropdown option.
-     */
-    private function normalizeOption(
-        mixed $value,
-        array $allowed,
-        string $default
-    ): string {
-        $value = Str::lower(
-            trim((string) $value)
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | Date
+    |--------------------------------------------------------------------------
+    */
 
-        return in_array(
-            $value,
-            $allowed,
-            true
-        )
-            ? $value
-            : $default;
+    private function dateOrNull(
+        mixed $value
+    ): ?string {
+        if (
+            $value === null
+            ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        try {
+            if (
+                is_numeric($value)
+            ) {
+                return ExcelDate::excelToDateTimeObject(
+                    $value
+                )->format(
+                    'Y-m-d'
+                );
+            }
+
+            return Carbon::parse(
+                $value
+            )->format(
+                'Y-m-d'
+            );
+        } catch (Throwable) {
+            return null;
+        }
     }
 
-    /**
-     * Import chunk size.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Date Time
+    |--------------------------------------------------------------------------
+    */
+
+    private function dateTimeOrNull(
+        mixed $value
+    ): ?string {
+        if (
+            $value === null
+            ||
+            $value === ''
+        ) {
+            return null;
+        }
+
+        try {
+            if (
+                is_numeric($value)
+            ) {
+                return ExcelDate::excelToDateTimeObject(
+                    $value
+                )->format(
+                    'Y-m-d H:i:s'
+                );
+            }
+
+            return Carbon::parse(
+                $value
+            )->format(
+                'Y-m-d H:i:s'
+            );
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Chunk Size
+    |--------------------------------------------------------------------------
+    */
+
     public function chunkSize(): int
     {
         return 500;
     }
 
-    /**
-     * Return import summary.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Import Result
+    |--------------------------------------------------------------------------
+    */
+
     public function result(): array
     {
         return [
-            'imported' => $this->imported,
-            'updated' => $this->updated,
-            'duplicates' => $this->duplicates,
-            'failed' => $this->failed,
-            'errors' => array_slice(
-                $this->errors,
-                0,
-                100
-            ),
+            'imported' =>
+                $this->imported,
+
+            'updated' =>
+                $this->updated,
+
+            'duplicates' =>
+                $this->duplicates,
+
+            'failed' =>
+                $this->failed,
+
+            'errors' =>
+                array_slice(
+                    $this->errors,
+                    0,
+                    100
+                ),
         ];
     }
 }
