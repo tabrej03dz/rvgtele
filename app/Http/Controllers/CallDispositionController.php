@@ -3,85 +3,566 @@
 namespace App\Http\Controllers;
 
 use App\Models\CallDisposition;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class CallDispositionController extends Controller
 {
-    public function index(Request $request)
+    /*
+    |--------------------------------------------------------------------------
+    | Index
+    |--------------------------------------------------------------------------
+    */
+
+    public function index(Request $request): View
     {
-        $companyId = Auth::user()->company_id;
-        $query = CallDisposition::query()->where('company_id', $companyId);
+        $companyId = $this->companyId();
+
+        $query = CallDisposition::query()
+            ->where('company_id', $companyId);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
+
         if ($request->filled('search')) {
-            $search = trim((string) $request->search);
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+            $search = trim(
+                (string) $request->input('search')
+            );
+
+            $query->where(function ($query) use ($search) {
+                $query
+                    ->where(
+                        'name',
+                        'like',
+                        "%{$search}%"
+                    )
+                    ->orWhere(
+                        'type',
+                        'like',
+                        "%{$search}%"
+                    );
             });
         }
-        $items = $query->latest()->paginate(20)->withQueryString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
+
+        $items = $query
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
         return view('modules.index', [
             'items' => $items,
+
             'title' => 'Call Dispositions',
+
             'routeName' => 'crm-settings.call-dispositions',
-            'columns' => ['name', 'type', 'requires_follow_up', 'requires_remarks', 'is_active'],
+
+            'columns' => [
+                'name',
+                'type',
+                'requires_follow_up',
+                'requires_remarks',
+                'is_active',
+            ],
+
+            'columnLabels' => [
+                'name' => 'Disposition Name',
+                'type' => 'Type',
+                'requires_follow_up' => 'Follow-up Required',
+                'requires_remarks' => 'Remarks Required',
+                'is_active' => 'Active',
+            ],
         ]);
     }
 
-    public function create()
+    /*
+    |--------------------------------------------------------------------------
+    | Create
+    |--------------------------------------------------------------------------
+    */
+
+    public function create(): View
     {
         return view('modules.form', [
             'item' => new CallDisposition(),
+
             'title' => 'Create Call Disposition',
+
             'routeName' => 'crm-settings.call-dispositions',
-            'fields' => ['name' => 'text', 'type' => 'text', 'requires_follow_up' => 'checkbox', 'requires_remarks' => 'checkbox', 'is_active' => 'checkbox'],
+
+            'fields' => $this->formFields(),
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $data = $this->validated($request);
-        $data['company_id'] = Auth::user()->company_id;
-        $this->normalizeBooleans($data);
-        CallDisposition::create($data);
-        return redirect()->route('crm-settings.call-dispositions.index')->with('success', 'Call Disposition created successfully.');
+    /*
+    |--------------------------------------------------------------------------
+    | Store
+    |--------------------------------------------------------------------------
+    */
+
+    public function store(
+        Request $request
+    ): RedirectResponse {
+        /*
+        |--------------------------------------------------------------------------
+        | Validate
+        |--------------------------------------------------------------------------
+        */
+
+        $data = $this->validated(
+            $request
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Company
+        |--------------------------------------------------------------------------
+        */
+
+        $data['company_id'] =
+            $this->companyId();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Boolean Fields
+        |--------------------------------------------------------------------------
+        */
+
+        $this->normalizeBooleans(
+            $request,
+            $data
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save
+        |--------------------------------------------------------------------------
+        */
+
+        CallDisposition::create(
+            $data
+        );
+
+        return redirect()
+            ->route(
+                'crm-settings.call-dispositions.index'
+            )
+            ->with(
+                'success',
+                'Call Disposition created successfully.'
+            );
     }
 
-    public function edit(CallDisposition $item)
-    {
-        abort_unless((int) $item->company_id === (int) Auth::user()->company_id, 403);
+    /*
+    |--------------------------------------------------------------------------
+    | Edit
+    |--------------------------------------------------------------------------
+    */
+
+    public function edit(
+        CallDisposition $item
+    ): View {
+        /*
+        |--------------------------------------------------------------------------
+        | Security
+        |--------------------------------------------------------------------------
+        */
+
+        $this->guardCompany(
+            $item
+        );
+
         return view('modules.form', [
             'item' => $item,
+
             'title' => 'Edit Call Disposition',
+
             'routeName' => 'crm-settings.call-dispositions',
-            'fields' => ['name' => 'text', 'type' => 'text', 'requires_follow_up' => 'checkbox', 'requires_remarks' => 'checkbox', 'is_active' => 'checkbox'],
+
+            'fields' => $this->formFields(),
         ]);
     }
 
-    public function update(Request $request, CallDisposition $item)
-    {
-        abort_unless((int) $item->company_id === (int) Auth::user()->company_id, 403);
-        $data = $this->validated($request);
-        $this->normalizeBooleans($data);
-        $item->update($data);
-        return redirect()->route('crm-settings.call-dispositions.index')->with('success', 'Call Disposition updated successfully.');
+    /*
+    |--------------------------------------------------------------------------
+    | Update
+    |--------------------------------------------------------------------------
+    */
+
+    public function update(
+        Request $request,
+        CallDisposition $item
+    ): RedirectResponse {
+        /*
+        |--------------------------------------------------------------------------
+        | Security
+        |--------------------------------------------------------------------------
+        */
+
+        $this->guardCompany(
+            $item
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate
+        |--------------------------------------------------------------------------
+        */
+
+        $data = $this->validated(
+            $request
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Boolean Fields
+        |--------------------------------------------------------------------------
+        */
+
+        $this->normalizeBooleans(
+            $request,
+            $data
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update
+        |--------------------------------------------------------------------------
+        */
+
+        $item->update(
+            $data
+        );
+
+        return redirect()
+            ->route(
+                'crm-settings.call-dispositions.index'
+            )
+            ->with(
+                'success',
+                'Call Disposition updated successfully.'
+            );
     }
 
-    public function destroy(CallDisposition $item)
-    {
-        abort_unless((int) $item->company_id === (int) Auth::user()->company_id, 403);
+    /*
+    |--------------------------------------------------------------------------
+    | Destroy
+    |--------------------------------------------------------------------------
+    */
+
+    public function destroy(
+        CallDisposition $item
+    ): RedirectResponse {
+        /*
+        |--------------------------------------------------------------------------
+        | Security
+        |--------------------------------------------------------------------------
+        */
+
+        $this->guardCompany(
+            $item
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Delete
+        |--------------------------------------------------------------------------
+        */
+
         $item->delete();
-        return back()->with('success', 'Call Disposition deleted successfully.');
+
+        return redirect()
+            ->route(
+                'crm-settings.call-dispositions.index'
+            )
+            ->with(
+                'success',
+                'Call Disposition deleted successfully.'
+            );
     }
 
-    private function validated(Request $request): array
+    /*
+    |--------------------------------------------------------------------------
+    | Form Fields
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | Yahan koi existing record load nahi ho raha.
+    | Koi predefined ENUM options nahi hain.
+    |
+    | Name aur Type completely manually create honge.
+    |
+    */
+
+    private function formFields(): array
     {
-        return $request->validate(['name' => ['nullable'], 'type' => ['nullable'], 'requires_follow_up' => ['nullable'], 'requires_remarks' => ['nullable'], 'is_active' => ['nullable']]);
+        return [
+            /*
+            |--------------------------------------------------------------------------
+            | Disposition Name
+            |--------------------------------------------------------------------------
+            */
+
+            'name' => [
+                'type' => 'text',
+
+                'label' =>
+                    'Disposition Name',
+
+                'required' =>
+                    true,
+
+                'placeholder' =>
+                    'Enter disposition name',
+
+                'help' =>
+                    'Example: Interested, No Answer, Call Later, Converted etc.',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Type
+            |--------------------------------------------------------------------------
+            |
+            | Completely independent custom field.
+            |
+            */
+
+            'type' => [
+                'type' => 'text',
+
+                'label' =>
+                    'Type',
+
+                'required' =>
+                    false,
+
+                'placeholder' =>
+                    'Enter type',
+
+                'help' =>
+                    'Optional custom type. Aap apne hisaab se koi bhi type enter kar sakte hain.',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Requires Follow Up
+            |--------------------------------------------------------------------------
+            */
+
+            'requires_follow_up' => [
+                'type' =>
+                    'checkbox',
+
+                'label' =>
+                    'Requires Follow-up',
+
+                'help' =>
+                    'Enable karein agar is disposition par follow-up required hona chahiye.',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Requires Remarks
+            |--------------------------------------------------------------------------
+            */
+
+            'requires_remarks' => [
+                'type' =>
+                    'checkbox',
+
+                'label' =>
+                    'Requires Remarks',
+
+                'help' =>
+                    'Enable karein agar is disposition par remarks required hone chahiye.',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Active
+            |--------------------------------------------------------------------------
+            */
+
+            'is_active' => [
+                'type' =>
+                    'checkbox',
+
+                'label' =>
+                    'Active',
+
+                'help' =>
+                    'Active hone par ye disposition calling screen par available rahegi.',
+            ],
+        ];
     }
 
-    private function normalizeBooleans(array &$data): void
+    /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    */
+
+    private function validated(
+        Request $request
+    ): array {
+        return $request->validate(
+            [
+                /*
+                |--------------------------------------------------------------------------
+                | Name
+                |--------------------------------------------------------------------------
+                */
+
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Type
+                |--------------------------------------------------------------------------
+                |
+                | Koi Rule::in() nahi hai.
+                |
+                | Isliye:
+                |
+                | connected
+                | not_connected
+                | interested
+                | callback
+                | sale
+                | xyz
+                |
+                | kuch bhi valid custom type ho sakta hai.
+                |
+                */
+
+                'type' => [
+                    'nullable',
+                    'string',
+                    'max:100',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Follow Up
+                |--------------------------------------------------------------------------
+                */
+
+                'requires_follow_up' => [
+                    'nullable',
+                    'boolean',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Remarks
+                |--------------------------------------------------------------------------
+                */
+
+                'requires_remarks' => [
+                    'nullable',
+                    'boolean',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Active
+                |--------------------------------------------------------------------------
+                */
+
+                'is_active' => [
+                    'nullable',
+                    'boolean',
+                ],
+            ],
+            [
+                /*
+                |--------------------------------------------------------------------------
+                | Messages
+                |--------------------------------------------------------------------------
+                */
+
+                'name.required' =>
+                    'Disposition name is required.',
+
+                'name.max' =>
+                    'Disposition name cannot be longer than 255 characters.',
+
+                'type.max' =>
+                    'Type cannot be longer than 100 characters.',
+            ]
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Boolean Fields
+    |--------------------------------------------------------------------------
+    */
+
+    private function normalizeBooleans(
+        Request $request,
+        array &$data
+    ): void {
+        $data['requires_follow_up'] =
+            $request->boolean(
+                'requires_follow_up'
+            );
+
+        $data['requires_remarks'] =
+            $request->boolean(
+                'requires_remarks'
+            );
+
+        $data['is_active'] =
+            $request->boolean(
+                'is_active'
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company ID
+    |--------------------------------------------------------------------------
+    */
+
+    private function companyId(): int
     {
-        foreach (['requires_follow_up', 'requires_remarks', 'is_active'] as $field) {
-            $data[$field] = request()->boolean($field);
-        }
+        return (int)
+            Auth::user()->company_id;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company Security
+    |--------------------------------------------------------------------------
+    */
+
+    private function guardCompany(
+        CallDisposition $item
+    ): void {
+        abort_unless(
+            (int) $item->company_id ===
+                $this->companyId(),
+
+            403,
+
+            'You are not authorized to manage this call disposition.'
+        );
     }
 }
