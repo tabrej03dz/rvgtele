@@ -622,6 +622,35 @@ class LeadController extends Controller
             $lead
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Demo Send Quick Update
+        |--------------------------------------------------------------------------
+        |
+        | Show page ke Demo Send button se sirf demo_send column update hoga.
+        | Normal edit validation is request me run nahi hogi.
+        |
+        */
+
+        if ($request->boolean('demo_send_only')) {
+            $demoValidated = $request->validate([
+                'demo_send' => [
+                    'required',
+                    'boolean',
+                ],
+            ]);
+
+            $lead->demo_send = (bool) $demoValidated['demo_send'];
+            $lead->save();
+
+            return back()->with(
+                'success',
+                $lead->demo_send
+                    ? 'Lead marked as Demo Send.'
+                    : 'Demo Send mark removed.'
+            );
+        }
+
         $validated = $this->validateData(
             $request,
             $lead
@@ -1179,6 +1208,11 @@ class LeadController extends Controller
                     },
                 ],
 
+                'demo_send' => [
+                    'nullable',
+                    'boolean',
+                ],
+
                 'per_page' => [
                     'nullable',
                     'integer',
@@ -1267,6 +1301,10 @@ class LeadController extends Controller
 
                     'call_disposition' =>
                     $validated['call_disposition']
+                        ?? null,
+
+                    'demo_send' =>
+                    $validated['demo_send']
                         ?? null,
 
                     'per_page' =>
@@ -1892,6 +1930,19 @@ class LeadController extends Controller
             } else {
                 $query->whereRaw('1 = 0');
             }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Demo Send Filter
+        |--------------------------------------------------------------------------
+        |
+        | demo_send=1 ka matlab sirf wahi leads jinko Demo Send mark kiya gaya hai.
+        |
+        */
+
+        if ($request->boolean('demo_send')) {
+            $query->where('demo_send', true);
         }
 
         /*

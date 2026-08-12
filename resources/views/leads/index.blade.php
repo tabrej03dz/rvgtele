@@ -154,7 +154,7 @@
     <div class="software-ui mx-auto max-w-[1720px] space-y-3 px-1 pb-5" x-data="{
         selected: [],
         selectAllPage: false,
-        showFilters: @js(request()->hasAny(['search', 'source', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to', 'label_id'])),
+        showFilters: @js(request()->hasAny(['source', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to'])),
         showBulkModal: false,
         bulkAction: 'assign',
         assignmentScope: 'selected',
@@ -224,6 +224,87 @@
             </div>
         </section>
 
+        {{-- Search - Always Visible --}}
+        <section class="software-panel">
+            <form method="GET" action="{{ route('leads.index') }}" class="p-3">
+                @foreach (request()->except(['page', 'search']) as $key => $value)
+                    @if (is_scalar($value) && $value !== '')
+                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                    @endif
+                @endforeach
+
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div class="relative flex-1">
+                        <svg
+                            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+
+                        <input
+                            type="text"
+                            name="search"
+                            value="{{ request('search') }}"
+                            class="w-full !pl-10"
+                            placeholder="Search by name, mobile, company, email or city..."
+                        >
+                    </div>
+
+                    <button type="submit" class="software-btn software-btn-primary">
+                        SEARCH
+                    </button>
+
+                    @if (request()->filled('search'))
+                        <a
+                            href="{{ route('leads.index', request()->except(['page', 'search'])) }}"
+                            class="software-btn"
+                        >
+                            CLEAR SEARCH
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </section>
+
+        {{-- Demo Send Tab --}}
+        @php
+            $demoBaseQuery = request()->except(['page', 'demo_send']);
+            $isDemoSendTab = request()->boolean('demo_send');
+        @endphp
+
+        <section class="software-panel">
+            <div class="software-panel-title">
+                <span>Lead Type</span>
+
+                @if ($isDemoSendTab)
+                    <span class="text-[10px] font-bold text-emerald-700">
+                        DEMO SEND LEADS
+                    </span>
+                @endif
+            </div>
+
+            <div class="crm-scrollbar flex gap-1 overflow-x-auto p-2">
+                <a
+                    href="{{ route('leads.index', $demoBaseQuery) }}"
+                    class="software-btn {{ !$isDemoSendTab ? 'border-slate-800 bg-slate-800 text-white' : '' }}"
+                >
+                    ALL LEADS
+                </a>
+
+                <a
+                    href="{{ route('leads.index', array_merge($demoBaseQuery, ['demo_send' => 1])) }}"
+                    class="software-btn {{ $isDemoSendTab ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : '' }}"
+                >
+                    DEMO SEND
+                </a>
+            </div>
+        </section>
+
         {{-- Labels --}}
         <section class="software-panel">
             <div class="software-panel-title">
@@ -289,10 +370,10 @@
                     class="text-[10px] font-bold text-rose-600">RESET ALL</a></div>
             <form method="GET" action="{{ route('leads.index') }}"
                 class="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                <input type="hidden" name="search" value="{{ request('search') }}">
+                <input type="hidden" name="demo_send" value="{{ request('demo_send') }}">
                 <input type="hidden" name="call_disposition" value="{{ request('call_disposition') }}">
                 <input type="hidden" name="label_id" value="{{ request('label_id') }}">
-                <div class="lg:col-span-2"><label class="software-label">Search</label><input type="text" name="search"
-                        value="{{ request('search') }}" class="w-full" placeholder="Name, mobile, company..."></div>
                 <div><label class="software-label">Source</label><select name="source" class="w-full">
                         <option value="">All Sources</option>
                         @foreach ($sources as $source)
@@ -381,7 +462,7 @@
                 </form>
             </div>
             <div class="crm-scrollbar max-h-[68vh] overflow-auto">
-                <table class="w-full min-w-[1350px] text-sm">
+                <table class="w-full min-w-[1450px] text-sm">
                     <thead>
                         <tr class="text-left uppercase">
                             <th class="w-10 px-3 py-2"><input type="checkbox" x-model="selectAllPage"
@@ -396,6 +477,7 @@
                             <th class="px-3 py-2">Temp.</th>
                             <th class="px-3 py-2">Team</th>
                             <th class="px-3 py-2">Owner</th>
+                            <th class="px-3 py-2">Demo Send</th>
                             <th class="px-3 py-2 text-right">Action</th>
                         </tr>
                     </thead>
@@ -451,7 +533,20 @@
                                 </td>
                                 <td class="px-3 py-2.5">{{ $lead->team?->name ?? '—' }}</td>
                                 <td class="px-3 py-2.5">{{ $lead->assignedUser?->name ?? 'Unassigned' }}</td>
-                                <td class="px-3 py-2.5 text-right"><a
+                                                                <td class="px-3 py-2">
+                                    @if ($lead->demo_send)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                            Sent
+                                        </span>
+                                    @else
+                                        <span class="text-xs font-medium text-slate-400">
+                                            Not Sent
+                                        </span>
+                                    @endif
+                                </td>
+
+<td class="px-3 py-2.5 text-right"><a
                                         href="{{ route('leads.show', array_merge(['lead' => $lead->id], request()->except('page'))) }}"
                                         class="software-btn !min-h-[26px] !px-2.5 text-blue-700">OPEN</a></td>
                             </tr>
@@ -559,7 +654,8 @@
                             value="{{ request('team_id') }}"><input type="hidden" name="priority"
                             value="{{ request('priority') }}"><input type="hidden" name="temperature"
                             value="{{ request('temperature') }}"><input type="hidden" name="call_disposition"
-                            value="{{ request('call_disposition') }}"><input type="hidden" name="per_page"
+                            value="{{ request('call_disposition') }}"><input type="hidden" name="demo_send"
+                            value="{{ request('demo_send') }}"><input type="hidden" name="per_page"
                             value="{{ request('per_page') }}"><input type="hidden" name="date_from"
                             value="{{ request('date_from') }}"><input type="hidden" name="date_to"
                             value="{{ request('date_to') }}"><input type="hidden" name="label_id_filter"

@@ -374,6 +374,52 @@
         {{-- Right Sidebar --}}
         <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
 
+            {{-- Demo Send --}}
+            <form
+                method="POST"
+                action="{{ route('leads.update', $lead) }}"
+                class="rounded-xl border {{ $lead->demo_send ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white' }} shadow-sm"
+            >
+                @csrf
+                @method('PATCH')
+
+                <input type="hidden" name="demo_send_only" value="1">
+                <input type="hidden" name="demo_send" value="{{ $lead->demo_send ? 0 : 1 }}">
+
+                <div class="border-b {{ $lead->demo_send ? 'border-emerald-200' : 'border-slate-200' }} px-5 py-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h3 class="font-bold {{ $lead->demo_send ? 'text-emerald-900' : 'text-slate-900' }}">
+                                Demo Send
+                            </h3>
+                            <p class="mt-0.5 text-xs {{ $lead->demo_send ? 'text-emerald-700' : 'text-slate-500' }}">
+                                Demo bhejne ke baad is lead ko mark karein.
+                            </p>
+                        </div>
+
+                        @if ($lead->demo_send)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                MARKED
+                            </span>
+                        @else
+                            <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                                NOT MARKED
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="p-5">
+                    <button
+                        type="submit"
+                        class="w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white {{ $lead->demo_send ? 'bg-slate-700 hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700' }}"
+                    >
+                        {{ $lead->demo_send ? 'Remove Demo Send Mark' : 'Mark as Demo Send' }}
+                    </button>
+                </div>
+            </form>
+
             {{-- Manage Labels --}}
             <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4">
