@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CallDispositionController;
 use App\Http\Controllers\CallLogController;
@@ -23,93 +24,307 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-
-
-
-    Route::get('/leads/import', [
-        LeadImportController::class,
-        'create',
-    ])->name('leads.import.create');
-
-    Route::post('/leads/import', [
-        LeadImportController::class,
-        'store',
-    ])->name('leads.import.store');
-
-    Route::get('/leads/import/template', [
-        LeadImportController::class,
-        'downloadTemplate',
-    ])->name('leads.import.template');
+Route::middleware([
+    'auth',
+    'verified',
+    'activitylog',
+])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Bulk Assignment
+    | Dashboard
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/leads/bulk-assign', [
-        LeadController::class,
-        'bulkAssign',
-    ])->name('leads.bulk-assign');
+    Route::get(
+        '/dashboard',
+        [DashboardController::class, 'index']
+    )->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
-    | Existing Lead Routes
+    | Activity Logs
     |--------------------------------------------------------------------------
     */
 
-    Route::resource('leads', LeadController::class);
+    Route::middleware(
+        'role:super_admin|owner|admin'
+    )->group(function () {
 
-    Route::post('/leads/{lead}/assign', [
-        LeadController::class,
-        'assign',
-    ])->name('leads.assign');
+        Route::get(
+            '/activity-logs',
+            [ActivityLogController::class, 'index']
+        )->name('activity-logs.index');
 
-    Route::post('/leads/{lead}/notes', [
-        LeadController::class,
-        'note',
-    ])->name('leads.notes');
-
-
-
-
-    Route::resource('leads', LeadController::class);
-    Route::post('leads/{lead}/assign', [LeadController::class, 'assign'])->name('leads.assign');
-    Route::post('leads/{lead}/notes', [LeadController::class, 'note'])->name('leads.notes');
-
-    
-
-
-    Route::get('calls', [CallLogController::class, 'index'])->name('calls.index');
-    Route::post('leads/{lead}/calls', [CallLogController::class, 'store'])->name('calls.store');
-
-    Route::get('follow-ups', [FollowUpController::class, 'index'])->name('followups.index');
-    Route::post('follow-ups/{followUp}/complete', [FollowUpController::class, 'complete'])->name('followups.complete');
-    Route::delete('follow-ups/{followUp}', [FollowUpController::class, 'destroy'])->name('followups.destroy');
-
-    Route::get('pipeline', [PipelineController::class, 'index'])->name('pipeline.index');
-    Route::post('pipeline/{lead}/move', [PipelineController::class, 'move'])->name('pipeline.move');
-
-    Route::resource('employees', EmployeeController::class)->except('show');
-    Route::resource('branches', BranchController::class)->parameters(['branches' => 'item'])->except('show');
-    Route::resource('teams', TeamController::class)->parameters(['teams' => 'item'])->except('show');
-    Route::resource('campaigns', CampaignController::class)->parameters(['campaigns' => 'item'])->except('show');
-    Route::resource('products', ProductController::class)->parameters(['products' => 'item'])->except('show');
-    Route::resource('customers', CustomerController::class)->parameters(['customers' => 'item'])->except('show');
-    Route::resource('tasks', TaskController::class)->parameters(['tasks' => 'item'])->except('show');
-    Route::resource('orders', OrderController::class)->parameters(['orders' => 'item'])->except('show');
-    Route::resource('payments', PaymentController::class)->parameters(['payments' => 'item'])->except('show');
-
-    Route::prefix('settings')->name('crm-settings.')->group(function () {
-        Route::resource('lead-sources', LeadSourceController::class)->parameters(['lead-sources' => 'item'])->except('show');
-        Route::resource('lead-statuses', LeadStatusController::class)->parameters(['lead-statuses' => 'item'])->except('show');
-        Route::resource('call-dispositions', CallDispositionController::class)->parameters(['call-dispositions' => 'item'])->except('show');
+        Route::get(
+            '/activity-logs/{activity}',
+            [ActivityLogController::class, 'show']
+        )->name('activity-logs.show');
     });
 
-    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Import
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/leads/import',
+        [LeadImportController::class, 'create']
+    )->name('leads.import.create');
+
+    Route::post(
+        '/leads/import',
+        [LeadImportController::class, 'store']
+    )->name('leads.import.store');
+
+    Route::get(
+        '/leads/import/template',
+        [LeadImportController::class, 'downloadTemplate']
+    )->name('leads.import.template');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Bulk Assignment
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        '/leads/bulk-assign',
+        [LeadController::class, 'bulkAssign']
+    )->name('leads.bulk-assign');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Leads
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'leads',
+        LeadController::class
+    );
+
+    Route::post(
+        '/leads/{lead}/assign',
+        [LeadController::class, 'assign']
+    )->name('leads.assign');
+
+    Route::post(
+        '/leads/{lead}/notes',
+        [LeadController::class, 'note']
+    )->name('leads.notes');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calls
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'calls',
+        [CallLogController::class, 'index']
+    )->name('calls.index');
+
+    Route::post(
+        'leads/{lead}/calls',
+        [CallLogController::class, 'store']
+    )->name('calls.store');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Follow Ups
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'follow-ups',
+        [FollowUpController::class, 'index']
+    )->name('followups.index');
+
+    Route::post(
+        'follow-ups/{followUp}/complete',
+        [FollowUpController::class, 'complete']
+    )->name('followups.complete');
+
+    Route::delete(
+        'follow-ups/{followUp}',
+        [FollowUpController::class, 'destroy']
+    )->name('followups.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pipeline
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'pipeline',
+        [PipelineController::class, 'index']
+    )->name('pipeline.index');
+
+    Route::post(
+        'pipeline/{lead}/move',
+        [PipelineController::class, 'move']
+    )->name('pipeline.move');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Employees
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'employees',
+        EmployeeController::class
+    )->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Branches
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'branches',
+        BranchController::class
+    )
+        ->parameters(['branches' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Teams
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'teams',
+        TeamController::class
+    )
+        ->parameters(['teams' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Campaigns
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'campaigns',
+        CampaignController::class
+    )
+        ->parameters(['campaigns' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Products
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'products',
+        ProductController::class
+    )
+        ->parameters(['products' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Customers
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'customers',
+        CustomerController::class
+    )
+        ->parameters(['customers' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tasks
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'tasks',
+        TaskController::class
+    )
+        ->parameters(['tasks' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Orders
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'orders',
+        OrderController::class
+    )
+        ->parameters(['orders' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payments
+    |--------------------------------------------------------------------------
+    */
+
+    Route::resource(
+        'payments',
+        PaymentController::class
+    )
+        ->parameters(['payments' => 'item'])
+        ->except('show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM Settings
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('settings')
+        ->name('crm-settings.')
+        ->group(function () {
+
+            Route::resource(
+                'lead-sources',
+                LeadSourceController::class
+            )
+                ->parameters(['lead-sources' => 'item'])
+                ->except('show');
+
+            Route::resource(
+                'lead-statuses',
+                LeadStatusController::class
+            )
+                ->parameters(['lead-statuses' => 'item'])
+                ->except('show');
+
+            Route::resource(
+                'call-dispositions',
+                CallDispositionController::class
+            )
+                ->parameters(['call-dispositions' => 'item'])
+                ->except('show');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reports
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'reports',
+        [ReportController::class, 'index']
+    )->name('reports.index');
 });
 
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';
