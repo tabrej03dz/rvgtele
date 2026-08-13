@@ -16,16 +16,24 @@ class EmployeeController extends Controller
     | Role Hierarchy
     |--------------------------------------------------------------------------
     |
-    | Higher number = Bigger / Senior role
+    | Higher number = Higher / Senior role
+    |
+    | super_admin   = 6
+    | owner         = 5
+    | admin         = 4
+    | sales_manager = 3
+    | team_leader   = 2
+    | employee      = 1
     |
     */
 
     private array $roleHierarchy = [
-        'employee'    => 1,
-        'team_leader' => 2,
-        'admin'       => 3,
-        'owner'       => 4,
-        'super_admin' => 5,
+        'employee'      => 1,
+        'team_leader'   => 2,
+        'sales_manager' => 3,
+        'admin'         => 4,
+        'owner'         => 5,
+        'super_admin'   => 6,
     ];
 
 
@@ -44,13 +52,18 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Logged user se higher roles
+        | Higher Roles
         |--------------------------------------------------------------------------
+        |
+        | Logged user se bade role list me nahi dikhenge.
         |
         | Example:
         |
-        | admin => owner + super_admin hide
-        | team_leader => admin + owner + super_admin hide
+        | sales_manager:
+        | admin, owner, super_admin hide
+        |
+        | team_leader:
+        | sales_manager, admin, owner, super_admin hide
         |
         */
 
@@ -89,9 +102,6 @@ class EmployeeController extends Controller
         |
         | User sirf apni branch ke users dekhega.
         |
-        | Agar logged user ki branch NULL hai,
-        | to sirf branch NULL users dikhenge.
-        |
         */
 
         if (!empty($loggedInUser->branch_id)) {
@@ -102,6 +112,12 @@ class EmployeeController extends Controller
             );
 
         } else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Agar logged user ki branch NULL hai
+            |--------------------------------------------------------------------------
+            */
 
             $employees->whereNull(
                 'branch_id'
@@ -160,10 +176,20 @@ class EmployeeController extends Controller
 
         $companyId = $loggedInUser->company_id;
 
+
         /*
         |--------------------------------------------------------------------------
-        | User apne se higher role ko create nahi kar sakta
+        | Allowed Roles
         |--------------------------------------------------------------------------
+        |
+        | Logged user apne level ya usse neeche ka role bana sakta hai.
+        |
+        | Sales Manager:
+        |
+        | sales_manager
+        | team_leader
+        | employee
+        |
         */
 
         $allowedRoles = $this->getAllowedRoleNames(
@@ -176,7 +202,7 @@ class EmployeeController extends Controller
         | Branches
         |--------------------------------------------------------------------------
         |
-        | Sirf logged-in user ki own branch form me aayegi.
+        | Sirf logged-in user's branch.
         |
         */
 
@@ -185,6 +211,7 @@ class EmployeeController extends Controller
                 'company_id',
                 $companyId
             );
+
 
         if (!empty($loggedInUser->branch_id)) {
 
@@ -197,7 +224,7 @@ class EmployeeController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | User ki branch hi nahi hai to koi branch select nahi kara sakta
+            | Branch assigned nahi hai to koi branch list nahi
             |--------------------------------------------------------------------------
             */
 
@@ -221,6 +248,12 @@ class EmployeeController extends Controller
                 ->orderBy('name')
                 ->get(),
 
+            /*
+            |--------------------------------------------------------------------------
+            | Roles
+            |--------------------------------------------------------------------------
+            */
+
             'roles' => Role::query()
                 ->whereIn(
                     'name',
@@ -231,9 +264,10 @@ class EmployeeController extends Controller
                         WHEN 'super_admin' THEN 1
                         WHEN 'owner' THEN 2
                         WHEN 'admin' THEN 3
-                        WHEN 'team_leader' THEN 4
-                        WHEN 'employee' THEN 5
-                        ELSE 6
+                        WHEN 'sales_manager' THEN 4
+                        WHEN 'team_leader' THEN 5
+                        WHEN 'employee' THEN 6
+                        ELSE 7
                     END
                 ")
                 ->get(),
@@ -251,6 +285,13 @@ class EmployeeController extends Controller
         $loggedInUser = $request->user();
 
         $companyId = $loggedInUser->company_id;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Allowed Roles
+        |--------------------------------------------------------------------------
+        */
 
         $allowedRoles = $this->getAllowedRoleNames(
             $loggedInUser
@@ -299,17 +340,23 @@ class EmployeeController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | Branch ID
+            | Branch
             |--------------------------------------------------------------------------
             |
-            | Request ki branch par trust nahi karenge.
-            | Neeche automatically logged user's branch assign hogi.
+            | Frontend branch value par trust nahi karenge.
+            | Neeche logged user ki branch force hogi.
             |
             */
 
             'branch_id' => [
                 'nullable',
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Team
+            |--------------------------------------------------------------------------
+            */
 
             'team_id' => [
                 'nullable',
@@ -328,7 +375,7 @@ class EmployeeController extends Controller
             | Role
             |--------------------------------------------------------------------------
             |
-            | Manually request modify karke higher role assign nahi ho sakta.
+            | Manually higher role request me bhejne par validation fail hogi.
             |
             */
 
@@ -342,7 +389,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Role
+        | Separate Role
         |--------------------------------------------------------------------------
         */
 
@@ -353,7 +400,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Force Company
+        | Company
         |--------------------------------------------------------------------------
         */
 
@@ -363,11 +410,10 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Force Logged User Branch
+        | Force Branch
         |--------------------------------------------------------------------------
         |
-        | Chahe frontend/request me koi doosri branch bhej de,
-        | employee logged-in user's branch me hi create hoga.
+        | Employee logged user ki branch me hi create hoga.
         |
         */
 
@@ -377,7 +423,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Password
+        | Password Hash
         |--------------------------------------------------------------------------
         */
 
@@ -433,12 +479,12 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Permission
+        | Access Check
         |--------------------------------------------------------------------------
         |
         | Same Company
         | Same Branch
-        | Higher role nahi
+        | Higher Role Block
         |
         */
 
@@ -465,7 +511,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Branch Query
+        | Branches
         |--------------------------------------------------------------------------
         */
 
@@ -474,6 +520,7 @@ class EmployeeController extends Controller
                 'company_id',
                 $companyId
             );
+
 
         if (!empty($loggedInUser->branch_id)) {
 
@@ -514,9 +561,10 @@ class EmployeeController extends Controller
                         WHEN 'super_admin' THEN 1
                         WHEN 'owner' THEN 2
                         WHEN 'admin' THEN 3
-                        WHEN 'team_leader' THEN 4
-                        WHEN 'employee' THEN 5
-                        ELSE 6
+                        WHEN 'sales_manager' THEN 4
+                        WHEN 'team_leader' THEN 5
+                        WHEN 'employee' THEN 6
+                        ELSE 7
                     END
                 ")
                 ->get(),
@@ -540,7 +588,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Permission
+        | Access Check
         |--------------------------------------------------------------------------
         */
 
@@ -621,14 +669,17 @@ class EmployeeController extends Controller
             |--------------------------------------------------------------------------
             | Branch
             |--------------------------------------------------------------------------
-            |
-            | Request value ignore hogi.
-            |
             */
 
             'branch_id' => [
                 'nullable',
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Team
+            |--------------------------------------------------------------------------
+            */
 
             'team_id' => [
                 'nullable',
@@ -642,11 +693,23 @@ class EmployeeController extends Controller
                 ),
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Role
+            |--------------------------------------------------------------------------
+            */
+
             'role' => [
                 'required',
                 'string',
                 Rule::in($allowedRoles),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Active
+            |--------------------------------------------------------------------------
+            */
 
             'is_active' => [
                 'nullable',
@@ -686,10 +749,10 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Force Same Branch
+        | Force Branch
         |--------------------------------------------------------------------------
         |
-        | Employee ko kisi doosri branch me move nahi kar sakta.
+        | User employee ko doosri branch me move nahi kar sakta.
         |
         */
 
@@ -722,7 +785,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Sync Role
+        | Role Update
         |--------------------------------------------------------------------------
         */
 
@@ -754,7 +817,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Permission
+        | Access Check
         |--------------------------------------------------------------------------
         */
 
@@ -770,7 +833,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Cannot Delete Yourself
+        | Self Delete Block
         |--------------------------------------------------------------------------
         */
 
@@ -801,7 +864,7 @@ class EmployeeController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Login / View Dashboard As Employee
+    | Login / Employee View
     |--------------------------------------------------------------------------
     */
     public function impersonate(
@@ -845,13 +908,15 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Permission
+        | Permission Check
         |--------------------------------------------------------------------------
         |
         | Same company
         | Same branch
-        | Lower role
-        | Team leader => same team employee only
+        | Target lower role
+        |
+        | Team Leader:
+        | same team employee only
         |
         */
 
@@ -867,7 +932,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Save Original User
+        | Save Original Account
         |--------------------------------------------------------------------------
         */
 
@@ -917,7 +982,7 @@ class EmployeeController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Exit Employee Dashboard
+    | Stop Impersonating
     |--------------------------------------------------------------------------
     */
     public function stopImpersonating(
@@ -990,7 +1055,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Login Back As Original User
+        | Login Back
         |--------------------------------------------------------------------------
         */
 
@@ -1037,7 +1102,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Same Branch Mandatory
+        | Same Branch
         |--------------------------------------------------------------------------
         */
 
@@ -1053,7 +1118,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Cannot Impersonate Yourself
+        | Self
         |--------------------------------------------------------------------------
         */
 
@@ -1067,7 +1132,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Levels
+        | Role Levels
         |--------------------------------------------------------------------------
         */
 
@@ -1087,7 +1152,7 @@ class EmployeeController extends Controller
         | Target Must Be Lower Role
         |--------------------------------------------------------------------------
         |
-        | Same level bhi impersonate nahi kar sakta.
+        | Same role ka dashboard bhi impersonate nahi hoga.
         |
         */
 
@@ -1101,7 +1166,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Employee Cannot Impersonate Anyone
+        | Employee Cannot Impersonate
         |--------------------------------------------------------------------------
         */
 
@@ -1119,12 +1184,11 @@ class EmployeeController extends Controller
         | Team Leader Special Restriction
         |--------------------------------------------------------------------------
         |
-        | Same branch already checked.
+        | Team Leader:
         |
-        | Ab:
-        |
-        | Same team hona chahiye
-        | Target role employee hona chahiye
+        | Same branch
+        | Same team
+        | Employee role only
         |
         */
 
@@ -1160,6 +1224,20 @@ class EmployeeController extends Controller
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Sales Manager
+        |--------------------------------------------------------------------------
+        |
+        | Generic hierarchy automatically allow karegi:
+        |
+        | sales_manager -> team_leader
+        | sales_manager -> employee
+        |
+        | Same branch already mandatory hai.
+        |
+        */
+
         return true;
     }
 
@@ -1169,11 +1247,9 @@ class EmployeeController extends Controller
     | Can Manage User
     |--------------------------------------------------------------------------
     |
-    | Requirements:
-    |
-    | 1. Same company
-    | 2. Same branch
-    | 3. Target role logged user se higher nahi hona chahiye
+    | Same company
+    | Same branch
+    | Target higher role nahi
     |
     */
     private function canManageUser(
@@ -1213,7 +1289,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Role Levels
+        | Levels
         |--------------------------------------------------------------------------
         */
 
@@ -1258,7 +1334,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Same Company
+        | Company
         |--------------------------------------------------------------------------
         */
 
@@ -1300,7 +1376,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Same Branch ID
+        | Compare Branch
         |--------------------------------------------------------------------------
         */
 
@@ -1312,7 +1388,7 @@ class EmployeeController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Get Highest Role Level
+    | Get User Highest Role Level
     |--------------------------------------------------------------------------
     */
     private function getUserRoleLevel(
@@ -1350,21 +1426,28 @@ class EmployeeController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Get Allowed Roles
+    | Get Allowed Role Names
     |--------------------------------------------------------------------------
-    |
-    | User apne role ke level ya usse lower role ko assign kar sakta hai.
     |
     | Example:
     |
+    | Super Admin:
+    | all roles
+    |
     | Owner:
-    | owner, admin, team_leader, employee
+    | owner, admin, sales_manager, team_leader, employee
     |
     | Admin:
-    | admin, team_leader, employee
+    | admin, sales_manager, team_leader, employee
+    |
+    | Sales Manager:
+    | sales_manager, team_leader, employee
     |
     | Team Leader:
     | team_leader, employee
+    |
+    | Employee:
+    | employee
     |
     */
     private function getAllowedRoleNames(

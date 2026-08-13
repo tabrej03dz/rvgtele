@@ -19,22 +19,24 @@
 
         $roleHierarchy = [
 
-            'employee'    => 1,
+            'employee'      => 1,
 
-            'team_leader' => 2,
+            'team_leader'   => 2,
 
-            'admin'       => 3,
+            'sales_manager' => 3,
 
-            'owner'       => 4,
+            'admin'         => 4,
 
-            'super_admin' => 5,
+            'owner'         => 5,
+
+            'super_admin'   => 6,
 
         ];
 
 
         /*
         |--------------------------------------------------------------------------
-        | Logged In User Highest Role Level
+        | Logged User Highest Role Level
         |--------------------------------------------------------------------------
         */
 
@@ -111,7 +113,7 @@
     </div>
 
 
-    {{-- Success Alert --}}
+    {{-- Success --}}
     @if (session('success'))
 
         <div class="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -140,7 +142,7 @@
     @endif
 
 
-    {{-- Error Alert --}}
+    {{-- Error --}}
     @if (session('error'))
 
         <div class="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -239,6 +241,25 @@
 
                 @endif
 
+
+                @if ($loggedInUser->getRoleNames()->isNotEmpty())
+
+                    <div>
+
+                        Role:
+
+                        <span class="font-semibold text-slate-600">
+
+                            {{ \Illuminate\Support\Str::headline(
+                                $loggedInUser->getRoleNames()->first()
+                            ) }}
+
+                        </span>
+
+                    </div>
+
+                @endif
+
             </div>
 
         </div>
@@ -250,7 +271,6 @@
             <table class="w-full min-w-[1050px] text-sm">
 
 
-                {{-- Table Head --}}
                 <thead class="bg-slate-50">
 
                     <tr class="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -301,7 +321,6 @@
                 </thead>
 
 
-                {{-- Table Body --}}
                 <tbody class="divide-y divide-slate-100">
 
 
@@ -321,7 +340,7 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Employee Highest Role Level
+                            | Target User Highest Role Level
                             |--------------------------------------------------------------------------
                             */
 
@@ -352,7 +371,7 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Employee Initials
+                            | Initials
                             |--------------------------------------------------------------------------
                             */
 
@@ -412,13 +431,12 @@
                             ) {
 
                                 $sameBranch = true;
-
                             }
 
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Dashboard Access
+                            | Can View Dashboard
                             |--------------------------------------------------------------------------
                             */
 
@@ -427,12 +445,12 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Basic Requirement
+                            | Common Conditions
                             |--------------------------------------------------------------------------
                             |
-                            | Same Branch
-                            | Different User
-                            | Target Lower Role
+                            | Same branch
+                            | Different account
+                            | Target lower role
                             |
                             */
 
@@ -448,7 +466,7 @@
 
                                 /*
                                 |--------------------------------------------------------------------------
-                                | Normal Employee
+                                | Employee
                                 |--------------------------------------------------------------------------
                                 */
 
@@ -504,8 +522,11 @@
 
                                 /*
                                 |--------------------------------------------------------------------------
-                                | Admin / Owner / Super Admin
+                                | Sales Manager / Admin / Owner / Super Admin
                                 |--------------------------------------------------------------------------
+                                |
+                                | Role hierarchy already target ko lower ensure kar rahi hai.
+                                |
                                 */
 
                                 else {
@@ -518,12 +539,8 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Edit Permission
+                            | Can Edit
                             |--------------------------------------------------------------------------
-                            |
-                            | Same branch
-                            | Same or lower role
-                            |
                             */
 
                             $canEdit =
@@ -555,7 +572,7 @@
                                     </div>
 
 
-                                    {{-- Employee Details --}}
+                                    {{-- Details --}}
                                     <div class="min-w-0">
 
 
@@ -646,6 +663,9 @@
 
                                                     'admin' =>
                                                         'bg-indigo-50 text-indigo-700 ring-indigo-200',
+
+                                                    'sales_manager' =>
+                                                        'bg-teal-50 text-teal-700 ring-teal-200',
 
                                                     'team_leader' =>
                                                         'bg-cyan-50 text-cyan-700 ring-cyan-200',
