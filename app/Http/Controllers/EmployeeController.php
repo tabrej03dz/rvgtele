@@ -16,13 +16,7 @@ class EmployeeController extends Controller
     | Role Hierarchy
     |--------------------------------------------------------------------------
     |
-    | Higher number = Higher role
-    |
-    | super_admin = 5
-    | owner       = 4
-    | admin       = 3
-    | team_leader = 2
-    | employee    = 1
+    | Higher number = Bigger / Senior role
     |
     */
 
@@ -34,6 +28,7 @@ class EmployeeController extends Controller
         'super_admin' => 5,
     ];
 
+
     /*
     |--------------------------------------------------------------------------
     | Employee List
@@ -43,25 +38,19 @@ class EmployeeController extends Controller
     {
         $loggedInUser = $request->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Logged In User Role Level
-        |--------------------------------------------------------------------------
-        */
-        $loggedInLevel = $this->getUserRoleLevel($loggedInUser);
+        $loggedInLevel = $this->getUserRoleLevel(
+            $loggedInUser
+        );
 
         /*
         |--------------------------------------------------------------------------
-        | Logged In User se higher roles
+        | Logged user se higher roles
         |--------------------------------------------------------------------------
         |
         | Example:
         |
-        | Admin login:
-        | blocked = owner, super_admin
-        |
-        | Team Leader:
-        | blocked = admin, owner, super_admin
+        | admin => owner + super_admin hide
+        | team_leader => admin + owner + super_admin hide
         |
         */
 
@@ -74,9 +63,10 @@ class EmployeeController extends Controller
             ->values()
             ->all();
 
+
         /*
         |--------------------------------------------------------------------------
-        | Employees Query
+        | Base Query
         |--------------------------------------------------------------------------
         */
 
@@ -91,11 +81,40 @@ class EmployeeController extends Controller
                 $loggedInUser->company_id
             );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Branch Restriction
+        |--------------------------------------------------------------------------
+        |
+        | User sirf apni branch ke users dekhega.
+        |
+        | Agar logged user ki branch NULL hai,
+        | to sirf branch NULL users dikhenge.
+        |
+        */
+
+        if (!empty($loggedInUser->branch_id)) {
+
+            $employees->where(
+                'branch_id',
+                $loggedInUser->branch_id
+            );
+
+        } else {
+
+            $employees->whereNull(
+                'branch_id'
+            );
+        }
+
+
         /*
         |--------------------------------------------------------------------------
         | Higher Role Users Hide
         |--------------------------------------------------------------------------
         */
+
         if (!empty($blockedRoles)) {
 
             $employees->whereDoesntHave(
@@ -110,16 +129,25 @@ class EmployeeController extends Controller
             );
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
+
         $employees = $employees
             ->latest()
             ->paginate(20)
             ->withQueryString();
+
 
         return view(
             'employees.index',
             compact('employees')
         );
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -134,7 +162,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | User apne se bada role create/select nahi kar sakta
+        | User apne se higher role ko create nahi kar sakta
         |--------------------------------------------------------------------------
         */
 
@@ -142,22 +170,62 @@ class EmployeeController extends Controller
             $loggedInUser
         );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Branches
+        |--------------------------------------------------------------------------
+        |
+        | Sirf logged-in user ki own branch form me aayegi.
+        |
+        */
+
+        $branches = Branch::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        if (!empty($loggedInUser->branch_id)) {
+
+            $branches->where(
+                'id',
+                $loggedInUser->branch_id
+            );
+
+        } else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | User ki branch hi nahi hai to koi branch select nahi kara sakta
+            |--------------------------------------------------------------------------
+            */
+
+            $branches->whereRaw('1 = 0');
+        }
+
+
         return view('employees.form', [
 
             'employee' => new User(),
 
-            'branches' => Branch::query()
-                ->where('company_id', $companyId)
+            'branches' => $branches
                 ->orderBy('name')
                 ->get(),
 
             'teams' => Team::query()
-                ->where('company_id', $companyId)
+                ->where(
+                    'company_id',
+                    $companyId
+                )
                 ->orderBy('name')
                 ->get(),
 
             'roles' => Role::query()
-                ->whereIn('name', $allowedRoles)
+                ->whereIn(
+                    'name',
+                    $allowedRoles
+                )
                 ->orderByRaw("
                     CASE name
                         WHEN 'super_admin' THEN 1
@@ -172,6 +240,7 @@ class EmployeeController extends Controller
         ]);
     }
 
+
     /*
     |--------------------------------------------------------------------------
     | Store Employee
@@ -183,15 +252,16 @@ class EmployeeController extends Controller
 
         $companyId = $loggedInUser->company_id;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Allowed Roles
-        |--------------------------------------------------------------------------
-        */
-
         $allowedRoles = $this->getAllowedRoleNames(
             $loggedInUser
         );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validation
+        |--------------------------------------------------------------------------
+        */
 
         $data = $request->validate([
 
@@ -227,53 +297,116 @@ class EmployeeController extends Controller
                 'min:8',
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Branch ID
+            |--------------------------------------------------------------------------
+            |
+            | Request ki branch par trust nahi karenge.
+            | Neeche automatically logged user's branch assign hogi.
+            |
+            */
+
             'branch_id' => [
                 'nullable',
-                Rule::exists('branches', 'id')
-                    ->where(
-                        'company_id',
-                        $companyId
-                    ),
             ],
 
             'team_id' => [
                 'nullable',
-                Rule::exists('teams', 'id')
-                    ->where(
-                        'company_id',
-                        $companyId
-                    ),
+
+                Rule::exists(
+                    'teams',
+                    'id'
+                )->where(
+                    'company_id',
+                    $companyId
+                ),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Role
+            |--------------------------------------------------------------------------
+            |
+            | Manually request modify karke higher role assign nahi ho sakta.
+            |
+            */
 
             'role' => [
                 'required',
                 'string',
-
-                /*
-                |--------------------------------------------------------------------------
-                | Important
-                |--------------------------------------------------------------------------
-                |
-                | Request modify karke bhi higher role assign nahi kar sakta.
-                |
-                */
                 Rule::in($allowedRoles),
             ],
         ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role
+        |--------------------------------------------------------------------------
+        */
 
         $role = $data['role'];
 
         unset($data['role']);
 
-        $data['company_id'] = $companyId;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Force Company
+        |--------------------------------------------------------------------------
+        */
+
+        $data['company_id'] =
+            $companyId;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Force Logged User Branch
+        |--------------------------------------------------------------------------
+        |
+        | Chahe frontend/request me koi doosri branch bhej de,
+        | employee logged-in user's branch me hi create hoga.
+        |
+        */
+
+        $data['branch_id'] =
+            $loggedInUser->branch_id;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Password
+        |--------------------------------------------------------------------------
+        */
 
         $data['password'] = Hash::make(
             $data['password']
         );
 
-        $employee = User::create($data);
 
-        $employee->assignRole($role);
+        /*
+        |--------------------------------------------------------------------------
+        | Create
+        |--------------------------------------------------------------------------
+        */
+
+        $employee = User::create(
+            $data
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Assign Role
+        |--------------------------------------------------------------------------
+        */
+
+        $employee->assignRole(
+            $role
+        );
+
 
         return redirect()
             ->route('employees.index')
@@ -282,6 +415,7 @@ class EmployeeController extends Controller
                 'Employee created successfully.'
             );
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -296,23 +430,16 @@ class EmployeeController extends Controller
 
         $companyId = $loggedInUser->company_id;
 
+
         /*
         |--------------------------------------------------------------------------
+        | Permission
+        |--------------------------------------------------------------------------
+        |
         | Same Company
-        |--------------------------------------------------------------------------
-        */
-
-        abort_unless(
-            (int) $employee->company_id ===
-            (int) $companyId,
-            403,
-            'You cannot access user of another company.'
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Higher Role Security
-        |--------------------------------------------------------------------------
+        | Same Branch
+        | Higher role nahi
+        |
         */
 
         abort_unless(
@@ -321,35 +448,67 @@ class EmployeeController extends Controller
                 $employee
             ),
             403,
-            'You cannot access a user with a higher role.'
+            'You are not allowed to access this employee.'
         );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Allowed Roles
+        |--------------------------------------------------------------------------
+        */
 
         $allowedRoles = $this->getAllowedRoleNames(
             $loggedInUser
         );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Branch Query
+        |--------------------------------------------------------------------------
+        */
+
+        $branches = Branch::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        if (!empty($loggedInUser->branch_id)) {
+
+            $branches->where(
+                'id',
+                $loggedInUser->branch_id
+            );
+
+        } else {
+
+            $branches->whereRaw('1 = 0');
+        }
+
+
         return view('employees.form', [
 
             'employee' => $employee,
 
-            'branches' => Branch::query()
-                ->where('company_id', $companyId)
+            'branches' => $branches
                 ->orderBy('name')
                 ->get(),
 
             'teams' => Team::query()
-                ->where('company_id', $companyId)
+                ->where(
+                    'company_id',
+                    $companyId
+                )
                 ->orderBy('name')
                 ->get(),
 
-            /*
-            |--------------------------------------------------------------------------
-            | Higher roles dropdown me bhi nahi aayenge
-            |--------------------------------------------------------------------------
-            */
-
             'roles' => Role::query()
-                ->whereIn('name', $allowedRoles)
+                ->whereIn(
+                    'name',
+                    $allowedRoles
+                )
                 ->orderByRaw("
                     CASE name
                         WHEN 'super_admin' THEN 1
@@ -364,6 +523,7 @@ class EmployeeController extends Controller
         ]);
     }
 
+
     /*
     |--------------------------------------------------------------------------
     | Update Employee
@@ -377,22 +537,10 @@ class EmployeeController extends Controller
 
         $companyId = $loggedInUser->company_id;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Same Company
-        |--------------------------------------------------------------------------
-        */
-
-        abort_unless(
-            (int) $employee->company_id ===
-            (int) $companyId,
-            403,
-            'You cannot access user of another company.'
-        );
 
         /*
         |--------------------------------------------------------------------------
-        | Higher Role Security
+        | Permission
         |--------------------------------------------------------------------------
         */
 
@@ -402,12 +550,26 @@ class EmployeeController extends Controller
                 $employee
             ),
             403,
-            'You cannot update a user with a higher role.'
+            'You are not allowed to update this employee.'
         );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Allowed Roles
+        |--------------------------------------------------------------------------
+        */
 
         $allowedRoles = $this->getAllowedRoleNames(
             $loggedInUser
         );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validation
+        |--------------------------------------------------------------------------
+        */
 
         $data = $request->validate([
 
@@ -425,7 +587,9 @@ class EmployeeController extends Controller
                 Rule::unique(
                     'users',
                     'email'
-                )->ignore($employee->id),
+                )->ignore(
+                    $employee->id
+                ),
             ],
 
             'phone' => [
@@ -442,7 +606,9 @@ class EmployeeController extends Controller
                 Rule::unique(
                     'users',
                     'employee_code'
-                )->ignore($employee->id),
+                )->ignore(
+                    $employee->id
+                ),
             ],
 
             'password' => [
@@ -451,16 +617,17 @@ class EmployeeController extends Controller
                 'min:8',
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Branch
+            |--------------------------------------------------------------------------
+            |
+            | Request value ignore hogi.
+            |
+            */
+
             'branch_id' => [
                 'nullable',
-
-                Rule::exists(
-                    'branches',
-                    'id'
-                )->where(
-                    'company_id',
-                    $companyId
-                ),
             ],
 
             'team_id' => [
@@ -478,13 +645,6 @@ class EmployeeController extends Controller
             'role' => [
                 'required',
                 'string',
-
-                /*
-                |--------------------------------------------------------------------------
-                | Higher role manually submit nahi ho sakta
-                |--------------------------------------------------------------------------
-                */
-
                 Rule::in($allowedRoles),
             ],
 
@@ -494,9 +654,17 @@ class EmployeeController extends Controller
             ],
         ]);
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role
+        |--------------------------------------------------------------------------
+        */
+
         $role = $data['role'];
 
         unset($data['role']);
+
 
         /*
         |--------------------------------------------------------------------------
@@ -515,6 +683,20 @@ class EmployeeController extends Controller
             );
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Force Same Branch
+        |--------------------------------------------------------------------------
+        |
+        | Employee ko kisi doosri branch me move nahi kar sakta.
+        |
+        */
+
+        $data['branch_id'] =
+            $loggedInUser->branch_id;
+
+
         /*
         |--------------------------------------------------------------------------
         | Active Status
@@ -522,19 +704,32 @@ class EmployeeController extends Controller
         */
 
         $data['is_active'] =
-            $request->boolean('is_active');
+            $request->boolean(
+                'is_active'
+            );
 
-        $employee->update($data);
 
         /*
         |--------------------------------------------------------------------------
-        | Role Update
+        | Update
+        |--------------------------------------------------------------------------
+        */
+
+        $employee->update(
+            $data
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sync Role
         |--------------------------------------------------------------------------
         */
 
         $employee->syncRoles([
             $role
         ]);
+
 
         return redirect()
             ->route('employees.index')
@@ -543,6 +738,7 @@ class EmployeeController extends Controller
                 'Employee updated successfully.'
             );
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -555,22 +751,10 @@ class EmployeeController extends Controller
     ) {
         $loggedInUser = $request->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Same Company
-        |--------------------------------------------------------------------------
-        */
-
-        abort_unless(
-            (int) $employee->company_id ===
-            (int) $loggedInUser->company_id,
-            403,
-            'You cannot access user of another company.'
-        );
 
         /*
         |--------------------------------------------------------------------------
-        | Higher Role Security
+        | Permission
         |--------------------------------------------------------------------------
         */
 
@@ -580,12 +764,13 @@ class EmployeeController extends Controller
                 $employee
             ),
             403,
-            'You cannot delete a user with a higher role.'
+            'You are not allowed to delete this employee.'
         );
+
 
         /*
         |--------------------------------------------------------------------------
-        | Self Delete Block
+        | Cannot Delete Yourself
         |--------------------------------------------------------------------------
         */
 
@@ -596,7 +781,15 @@ class EmployeeController extends Controller
             'You cannot delete yourself.'
         );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Delete
+        |--------------------------------------------------------------------------
+        */
+
         $employee->delete();
+
 
         return back()
             ->with(
@@ -604,6 +797,7 @@ class EmployeeController extends Controller
                 'Employee deleted successfully.'
             );
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -615,6 +809,7 @@ class EmployeeController extends Controller
         User $employee
     ) {
         $senior = $request->user();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -633,18 +828,6 @@ class EmployeeController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Same Company
-        |--------------------------------------------------------------------------
-        */
-
-        abort_unless(
-            (int) $senior->company_id ===
-            (int) $employee->company_id,
-            403,
-            'You cannot access employee of another company.'
-        );
 
         /*
         |--------------------------------------------------------------------------
@@ -659,10 +842,17 @@ class EmployeeController extends Controller
             'You are already logged in to this account.'
         );
 
+
         /*
         |--------------------------------------------------------------------------
-        | Permission Check
+        | Permission
         |--------------------------------------------------------------------------
+        |
+        | Same company
+        | Same branch
+        | Lower role
+        | Team leader => same team employee only
+        |
         */
 
         abort_unless(
@@ -673,6 +863,7 @@ class EmployeeController extends Controller
             403,
             'You are not allowed to view this employee dashboard.'
         );
+
 
         /*
         |--------------------------------------------------------------------------
@@ -698,15 +889,20 @@ class EmployeeController extends Controller
                 $employee->name,
         ]);
 
+
         /*
         |--------------------------------------------------------------------------
         | Login As Employee
         |--------------------------------------------------------------------------
         */
 
-        Auth::login($employee);
+        Auth::login(
+            $employee
+        );
 
-        $request->session()->regenerate();
+        $request->session()
+            ->regenerate();
+
 
         return redirect()
             ->route('dashboard')
@@ -718,6 +914,7 @@ class EmployeeController extends Controller
             );
     }
 
+
     /*
     |--------------------------------------------------------------------------
     | Exit Employee Dashboard
@@ -728,7 +925,10 @@ class EmployeeController extends Controller
     ) {
         $seniorId =
             $request->session()
-                ->get('impersonator_id');
+                ->get(
+                    'impersonator_id'
+                );
+
 
         abort_unless(
             $seniorId,
@@ -736,7 +936,17 @@ class EmployeeController extends Controller
             'You are not impersonating any employee.'
         );
 
-        $senior = User::find($seniorId);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find Original User
+        |--------------------------------------------------------------------------
+        */
+
+        $senior = User::find(
+            $seniorId
+        );
+
 
         if (!$senior) {
 
@@ -748,6 +958,7 @@ class EmployeeController extends Controller
             $request->session()
                 ->regenerateToken();
 
+
             return redirect()
                 ->route('login')
                 ->with(
@@ -756,9 +967,10 @@ class EmployeeController extends Controller
                 );
         }
 
+
         /*
         |--------------------------------------------------------------------------
-        | Remove Impersonation Session
+        | Clear Impersonation Session
         |--------------------------------------------------------------------------
         */
 
@@ -775,15 +987,20 @@ class EmployeeController extends Controller
             'impersonated_user_name',
         ]);
 
+
         /*
         |--------------------------------------------------------------------------
-        | Login Back
+        | Login Back As Original User
         |--------------------------------------------------------------------------
         */
 
-        Auth::login($senior);
+        Auth::login(
+            $senior
+        );
 
-        $request->session()->regenerate();
+        $request->session()
+            ->regenerate();
+
 
         return redirect()
             ->route('employees.index')
@@ -792,6 +1009,7 @@ class EmployeeController extends Controller
                 'You are back to your account.'
             );
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -816,9 +1034,26 @@ class EmployeeController extends Controller
             return false;
         }
 
+
         /*
         |--------------------------------------------------------------------------
-        | Self
+        | Same Branch Mandatory
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !$this->isSameBranch(
+                $senior,
+                $employee
+            )
+        ) {
+            return false;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cannot Impersonate Yourself
         |--------------------------------------------------------------------------
         */
 
@@ -829,45 +1064,83 @@ class EmployeeController extends Controller
             return false;
         }
 
-        $seniorLevel =
-            $this->getUserRoleLevel($senior);
-
-        $employeeLevel =
-            $this->getUserRoleLevel($employee);
 
         /*
         |--------------------------------------------------------------------------
-        | IMPORTANT
+        | Levels
+        |--------------------------------------------------------------------------
+        */
+
+        $seniorLevel =
+            $this->getUserRoleLevel(
+                $senior
+            );
+
+        $employeeLevel =
+            $this->getUserRoleLevel(
+                $employee
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Target Must Be Lower Role
         |--------------------------------------------------------------------------
         |
-        | Dashboard impersonation ke liye target role
-        | logged-in user se LOWER hona compulsory hai.
-        |
-        | Same level account me enter nahi kar sakta.
+        | Same level bhi impersonate nahi kar sakta.
         |
         */
 
-        if ($employeeLevel >= $seniorLevel) {
+        if (
+            $employeeLevel >=
+            $seniorLevel
+        ) {
             return false;
         }
 
+
         /*
         |--------------------------------------------------------------------------
-        | Team Leader Special Rule
+        | Employee Cannot Impersonate Anyone
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $senior->hasRole(
+                'employee'
+            )
+        ) {
+            return false;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Team Leader Special Restriction
         |--------------------------------------------------------------------------
         |
-        | Team leader sirf SAME TEAM ke employee ko open karega.
+        | Same branch already checked.
+        |
+        | Ab:
+        |
+        | Same team hona chahiye
+        | Target role employee hona chahiye
         |
         */
 
-        if ($senior->hasRole('team_leader')) {
+        if (
+            $senior->hasRole(
+                'team_leader'
+            )
+        ) {
 
             if (
-                !$senior->team_id ||
-                !$employee->team_id
+                empty($senior->team_id) ||
+                empty($employee->team_id)
             ) {
                 return false;
             }
+
 
             if (
                 (int) $senior->team_id !==
@@ -876,33 +1149,31 @@ class EmployeeController extends Controller
                 return false;
             }
 
+
             if (
-                !$employee->hasRole('employee')
+                !$employee->hasRole(
+                    'employee'
+                )
             ) {
                 return false;
             }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Employee kisi ka dashboard impersonate nahi karega
-        |--------------------------------------------------------------------------
-        */
-
-        if ($senior->hasRole('employee')) {
-            return false;
-        }
 
         return true;
     }
 
+
     /*
     |--------------------------------------------------------------------------
-    | Can Manage / See User
+    | Can Manage User
     |--------------------------------------------------------------------------
     |
-    | Same level allowed.
-    | Higher level NOT allowed.
+    | Requirements:
+    |
+    | 1. Same company
+    | 2. Same branch
+    | 3. Target role logged user se higher nahi hona chahiye
     |
     */
     private function canManageUser(
@@ -912,7 +1183,7 @@ class EmployeeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Company Check
+        | Same Company
         |--------------------------------------------------------------------------
         */
 
@@ -922,6 +1193,29 @@ class EmployeeController extends Controller
         ) {
             return false;
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Same Branch
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !$this->isSameBranch(
+                $loggedInUser,
+                $targetUser
+            )
+        ) {
+            return false;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role Levels
+        |--------------------------------------------------------------------------
+        */
 
         $loggedInLevel =
             $this->getUserRoleLevel(
@@ -933,22 +1227,92 @@ class EmployeeController extends Controller
                 $targetUser
             );
 
+
         /*
         |--------------------------------------------------------------------------
-        | Target bada role hai to deny
+        | Higher Role Block
         |--------------------------------------------------------------------------
         */
 
-        if ($targetLevel > $loggedInLevel) {
+        if (
+            $targetLevel >
+            $loggedInLevel
+        ) {
             return false;
         }
+
 
         return true;
     }
 
+
     /*
     |--------------------------------------------------------------------------
-    | Get User Highest Role Level
+    | Same Branch Check
+    |--------------------------------------------------------------------------
+    */
+    private function isSameBranch(
+        User $loggedInUser,
+        User $targetUser
+    ): bool {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Same Company
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            (int) $loggedInUser->company_id !==
+            (int) $targetUser->company_id
+        ) {
+            return false;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Both Branch NULL
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            empty($loggedInUser->branch_id) &&
+            empty($targetUser->branch_id)
+        ) {
+            return true;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | One Branch NULL
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            empty($loggedInUser->branch_id) ||
+            empty($targetUser->branch_id)
+        ) {
+            return false;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Same Branch ID
+        |--------------------------------------------------------------------------
+        */
+
+        return
+            (int) $loggedInUser->branch_id ===
+            (int) $targetUser->branch_id;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Get Highest Role Level
     |--------------------------------------------------------------------------
     */
     private function getUserRoleLevel(
@@ -956,6 +1320,7 @@ class EmployeeController extends Controller
     ): int {
 
         $highestLevel = 0;
+
 
         foreach (
             $user->getRoleNames()
@@ -967,21 +1332,39 @@ class EmployeeController extends Controller
                     $roleName
                 ] ?? 0;
 
-            if ($level > $highestLevel) {
-                $highestLevel = $level;
+
+            if (
+                $level >
+                $highestLevel
+            ) {
+
+                $highestLevel =
+                    $level;
             }
         }
+
 
         return $highestLevel;
     }
 
+
     /*
     |--------------------------------------------------------------------------
-    | Allowed Role Names
+    | Get Allowed Roles
     |--------------------------------------------------------------------------
     |
-    | Logged user apne role level ya usse niche ke roles
-    | select/create kar sakta hai.
+    | User apne role ke level ya usse lower role ko assign kar sakta hai.
+    |
+    | Example:
+    |
+    | Owner:
+    | owner, admin, team_leader, employee
+    |
+    | Admin:
+    | admin, team_leader, employee
+    |
+    | Team Leader:
+    | team_leader, employee
     |
     */
     private function getAllowedRoleNames(
@@ -989,14 +1372,18 @@ class EmployeeController extends Controller
     ): array {
 
         $loggedInLevel =
-            $this->getUserRoleLevel($user);
+            $this->getUserRoleLevel(
+                $user
+            );
+
 
         return collect(
             $this->roleHierarchy
         )
             ->filter(
                 fn ($level) =>
-                    $level <= $loggedInLevel
+                    $level <=
+                    $loggedInLevel
             )
             ->keys()
             ->values()
