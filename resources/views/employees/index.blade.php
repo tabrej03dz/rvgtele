@@ -7,7 +7,40 @@
 <div class="mx-auto max-w-7xl space-y-5">
 
     @php
+
         $loggedInUser = auth()->user();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role Hierarchy
+        |--------------------------------------------------------------------------
+        */
+
+        $roleHierarchy = [
+            'employee'    => 1,
+            'team_leader' => 2,
+            'admin'       => 3,
+            'owner'       => 4,
+            'super_admin' => 5,
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Logged In User Highest Level
+        |--------------------------------------------------------------------------
+        */
+
+        $loggedInLevel = 0;
+
+        foreach ($loggedInUser->getRoleNames() as $roleName) {
+
+            $level = $roleHierarchy[$roleName] ?? 0;
+
+            if ($level > $loggedInLevel) {
+                $loggedInLevel = $level;
+            }
+        }
+
     @endphp
 
 
@@ -15,6 +48,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
         <div>
+
             <h1 class="text-2xl font-bold text-slate-900">
                 Employees
             </h1>
@@ -22,6 +56,7 @@
             <p class="mt-1 text-sm text-slate-500">
                 Team members, roles, branches aur status manage karein.
             </p>
+
         </div>
 
 
@@ -29,6 +64,7 @@
             href="{{ route('employees.create') }}"
             class="inline-flex items-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:self-auto"
         >
+
             <svg
                 class="h-4 w-4"
                 viewBox="0 0 24 24"
@@ -40,12 +76,13 @@
             </svg>
 
             Add Employee
+
         </a>
 
     </div>
 
 
-    {{-- Success Alert --}}
+    {{-- Success --}}
     @if (session('success'))
 
         <div class="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -69,7 +106,7 @@
     @endif
 
 
-    {{-- Error Alert --}}
+    {{-- Error --}}
     @if (session('error'))
 
         <div class="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -97,6 +134,7 @@
     {{-- Employee Table --}}
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
 
+
         {{-- Table Header --}}
         <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
 
@@ -109,7 +147,9 @@
                 <p class="mt-0.5 text-sm text-slate-500">
 
                     {{ $employees->firstItem() ?? 0 }}
+
                     –
+
                     {{ $employees->lastItem() ?? 0 }}
 
                     of
@@ -180,7 +220,7 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Employee Role
+                            | Roles
                             |--------------------------------------------------------------------------
                             */
 
@@ -189,17 +229,45 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Employee Initials
+                            | Employee Highest Role Level
+                            |--------------------------------------------------------------------------
+                            */
+
+                            $employeeLevel = 0;
+
+                            foreach ($roles as $roleName) {
+
+                                $level =
+                                    $roleHierarchy[$roleName] ?? 0;
+
+                                if ($level > $employeeLevel) {
+
+                                    $employeeLevel = $level;
+
+                                }
+                            }
+
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Initials
                             |--------------------------------------------------------------------------
                             */
 
                             $initials = collect(
-                                explode(' ', trim($employee->name))
+                                explode(
+                                    ' ',
+                                    trim($employee->name)
+                                )
                             )
                                 ->filter()
                                 ->map(
                                     fn ($part) =>
-                                    mb_substr($part, 0, 1)
+                                        mb_substr(
+                                            $part,
+                                            0,
+                                            1
+                                        )
                                 )
                                 ->take(2)
                                 ->implode('');
@@ -207,86 +275,96 @@
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Dashboard Access Permission
+                            | Can View Dashboard
                             |--------------------------------------------------------------------------
+                            |
+                            | Dashboard me jane ke liye target role lower hona chahiye.
+                            |
                             */
 
                             $canViewDashboard = false;
 
 
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Super Admin / Owner
-                            |--------------------------------------------------------------------------
-                            |
-                            | Company ke kisi bhi dusre user ka dashboard dekh sakta hai.
-                            |
-                            */
-
                             if (
-                                $loggedInUser->hasAnyRole([
-                                    'super_admin',
-                                    'owner'
-                                ])
+                                (int) $loggedInUser->id !==
+                                (int) $employee->id
+                                &&
+                                $employeeLevel < $loggedInLevel
                             ) {
 
-                                $canViewDashboard =
-                                    (int) $loggedInUser->id !==
-                                    (int) $employee->id;
+                                /*
+                                |--------------------------------------------------------------------------
+                                | Employee
+                                |--------------------------------------------------------------------------
+                                */
+
+                                if (
+                                    $loggedInUser->hasRole(
+                                        'employee'
+                                    )
+                                ) {
+
+                                    $canViewDashboard = false;
+
+                                }
+
+                                /*
+                                |--------------------------------------------------------------------------
+                                | Team Leader
+                                |--------------------------------------------------------------------------
+                                */
+
+                                elseif (
+                                    $loggedInUser->hasRole(
+                                        'team_leader'
+                                    )
+                                ) {
+
+                                    $canViewDashboard =
+                                        !empty(
+                                            $loggedInUser->team_id
+                                        )
+                                        &&
+                                        !empty(
+                                            $employee->team_id
+                                        )
+                                        &&
+                                        (int) $loggedInUser->team_id ===
+                                        (int) $employee->team_id
+                                        &&
+                                        $employee->hasRole(
+                                            'employee'
+                                        );
+
+                                }
+
+                                /*
+                                |--------------------------------------------------------------------------
+                                | Admin / Owner / Super Admin
+                                |--------------------------------------------------------------------------
+                                */
+
+                                else {
+
+                                    $canViewDashboard = true;
+
+                                }
                             }
 
 
                             /*
                             |--------------------------------------------------------------------------
-                            | Admin
+                            | Can Edit
                             |--------------------------------------------------------------------------
                             |
-                            | Admin sirf team leader aur employee me enter kar sakta hai.
+                            | Backend already protects this.
+                            | Current page me higher role aayega hi nahi.
                             |
                             */
 
-                            elseif (
-                                $loggedInUser->hasRole('admin')
-                            ) {
-
-                                $canViewDashboard =
-                                    (int) $loggedInUser->id !==
-                                    (int) $employee->id
-                                    &&
-                                    !$employee->hasAnyRole([
-                                        'super_admin',
-                                        'owner',
-                                        'admin',
-                                    ]);
-                            }
-
-
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Team Leader
-                            |--------------------------------------------------------------------------
-                            |
-                            | Sirf same team ke employee ka dashboard.
-                            |
-                            */
-
-                            elseif (
-                                $loggedInUser->hasRole('team_leader')
-                            ) {
-
-                                $canViewDashboard =
-                                    (int) $loggedInUser->id !==
-                                    (int) $employee->id
-                                    &&
-                                    !empty($loggedInUser->team_id)
-                                    &&
-                                    !empty($employee->team_id)
-                                    &&
-                                    (int) $loggedInUser->team_id ===
-                                    (int) $employee->team_id
-                                    &&
-                                    $employee->hasRole('employee');
-                            }
+                            $canEdit =
+                                $employeeLevel <=
+                                $loggedInLevel;
 
                         @endphp
 
@@ -312,6 +390,7 @@
 
                                             {{ $employee->name }}
 
+
                                             @if (
                                                 (int) $loggedInUser->id ===
                                                 (int) $employee->id
@@ -336,9 +415,7 @@
                                         @if ($employee->phone)
 
                                             <div class="mt-0.5 truncate text-xs text-slate-400">
-
                                                 {{ $employee->phone }}
-
                                             </div>
 
                                         @endif
@@ -363,7 +440,6 @@
                                 </div>
 
                             </td>
-
 
 
                             {{-- Role --}}
@@ -424,7 +500,6 @@
                             </td>
 
 
-
                             {{-- Branch --}}
                             <td class="px-4 py-3">
 
@@ -459,7 +534,6 @@
                             </td>
 
 
-
                             {{-- Team --}}
                             <td class="px-4 py-3">
 
@@ -485,7 +559,9 @@
                                         </span>
 
                                         <span class="font-medium text-slate-700">
+
                                             {{ $employee->team->name }}
+
                                         </span>
 
                                     </div>
@@ -499,7 +575,6 @@
                                 @endif
 
                             </td>
-
 
 
                             {{-- Status --}}
@@ -530,14 +605,13 @@
                             </td>
 
 
-
                             {{-- Actions --}}
                             <td class="px-4 py-3 text-right">
 
                                 <div class="flex items-center justify-end gap-2">
 
 
-                                    {{-- View Employee Dashboard --}}
+                                    {{-- Employee View --}}
                                     @if ($canViewDashboard)
 
                                         <form
@@ -551,7 +625,7 @@
 
                                             <button
                                                 type="submit"
-                                                title="View employee dashboard"
+                                                title="Open employee account"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
                                             >
 
@@ -575,27 +649,30 @@
                                     @endif
 
 
-
                                     {{-- Edit --}}
-                                    <a
-                                        href="{{ route('employees.edit', $employee) }}"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
-                                    >
+                                    @if ($canEdit)
 
-                                        <svg
-                                            class="h-3.5 w-3.5"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
+                                        <a
+                                            href="{{ route('employees.edit', $employee) }}"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
                                         >
-                                            <path d="M12 20h9"/>
-                                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-                                        </svg>
 
-                                        Edit
+                                            <svg
+                                                class="h-3.5 w-3.5"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                            >
+                                                <path d="M12 20h9"/>
+                                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                            </svg>
 
-                                    </a>
+                                            Edit
+
+                                        </a>
+
+                                    @endif
 
                                 </div>
 
@@ -636,7 +713,7 @@
 
 
                                 <div class="mt-1 text-sm text-slate-500">
-                                    New employee add karke team setup karein.
+                                    Aapke role ke according koi user available nahi hai.
                                 </div>
 
 
