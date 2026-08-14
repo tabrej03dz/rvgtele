@@ -27,6 +27,7 @@ class RolePermissionSeeder extends Seeder
 
         $permissions = [
             'dashboard.view',
+            'access-control.manage',
 
             'leads.view',
             'leads.create',
@@ -113,6 +114,7 @@ class RolePermissionSeeder extends Seeder
                 Permission::where('guard_name', 'web')
                     ->whereNotIn('name', [
                         'settings.manage',
+                        'access-control.manage',
                     ])
                     ->get()
             );

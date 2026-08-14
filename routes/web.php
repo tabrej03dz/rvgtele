@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CallDispositionController;
@@ -263,6 +264,45 @@ Route::delete(
         '/pipeline/{lead}/move',
         [PipelineController::class, 'move']
     )->name('pipeline.move');
+
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role & Permission Management
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('access-control')
+        ->name('access-control.')
+        ->group(function () {
+
+            Route::get(
+                '/',
+                [AccessControlController::class, 'index']
+            )->name('index');
+
+            Route::post(
+                '/roles',
+                [AccessControlController::class, 'storeRole']
+            )->name('roles.store');
+
+            Route::post(
+                '/permissions',
+                [AccessControlController::class, 'storePermission']
+            )->name('permissions.store');
+
+            Route::put(
+                '/roles/{role}/permissions',
+                [AccessControlController::class, 'syncRolePermissions']
+            )->name('roles.permissions.sync');
+
+            Route::put(
+                '/users/{user}/access',
+                [AccessControlController::class, 'syncUserAccess']
+            )->name('users.access.sync');
+        });
 
 
     /*

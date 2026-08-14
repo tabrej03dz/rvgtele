@@ -148,6 +148,14 @@
 
             ];
 
+            if ($isSuperAdmin || $user->can('access-control.manage')) {
+                $sections['Organization'][] = [
+                    'Roles & Permissions',
+                    'access-control.index',
+                    'access-control.*'
+                ];
+            }
+
 
             /*
             |--------------------------------------------------------------------------
