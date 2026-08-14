@@ -100,8 +100,10 @@ class LeadsImport implements
             } catch (Throwable $e) {
                 $this->failed++;
 
-                $this->errors[] =
-                    "Row {$rowNumber}: {$e->getMessage()}";
+                $this->errors[] = [
+                    'row' => $rowNumber,
+                    'message' => $e->getMessage(),
+                ];
             }
         }
     }

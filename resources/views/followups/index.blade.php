@@ -1090,6 +1090,7 @@
 
                                     @if($followup->status === 'pending')
 
+                                        @can('followups.complete')
                                         <form
                                             method="POST"
                                             action="{{ route('followups.complete', $followup) }}"
@@ -1124,11 +1125,13 @@
                                             </button>
 
                                         </form>
+                                        @endcan
 
                                     @endif
 
 
 
+                                    @can('followups.delete')
                                     <form
                                         method="POST"
                                         action="{{ route('followups.destroy', $followup) }}"
@@ -1180,6 +1183,7 @@
                                         </button>
 
                                     </form>
+                                    @endcan
 
                                 </div>
 

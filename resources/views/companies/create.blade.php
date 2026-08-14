@@ -425,12 +425,14 @@
                 Cancel
             </a>
 
+            @can('companies.create')
             <button
                 type="submit"
                 class="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
             >
                 Create Company
             </button>
+            @endcan
 
         </div>
 

@@ -20,513 +20,139 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SuperAdminBusinessController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\SuperAdminBusinessController;
-
-
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-
 
 Route::view('/', 'welcome')->name('home');
 
+Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('permission:dashboard.view')
+        ->name('dashboard');
 
-/*
-|--------------------------------------------------------------------------
-| Authenticated CRM Routes
-|--------------------------------------------------------------------------
-|
-| activitylog     = user activity tracking
-| company.active  = inactive company ko CRM access se rokega
-|
-*/
+    // Companies
+    Route::get('/companies', [CompanyController::class, 'index'])->middleware('permission:companies.view')->name('companies.index');
+    Route::get('/companies/create', [CompanyController::class, 'create'])->middleware('permission:companies.create')->name('companies.create');
+    Route::post('/companies', [CompanyController::class, 'store'])->middleware('permission:companies.create')->name('companies.store');
+    Route::get('/companies/{company}/edit', [CompanyController::class, 'edit'])->middleware('permission:companies.update')->name('companies.edit');
+    Route::put('/companies/{company}', [CompanyController::class, 'update'])->middleware('permission:companies.update')->name('companies.update');
+    Route::patch('/companies/{company}', [CompanyController::class, 'update'])->middleware('permission:companies.update');
+    Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->middleware('permission:companies.delete')->name('companies.destroy');
+    Route::post('/companies/{company}/view-business', [SuperAdminBusinessController::class, 'viewBusiness'])
+        ->middleware('permission:companies.view-business')->name('companies.view-business');
 
-Route::middleware([
-    'auth',
-    'verified',
-    'company.active',
-    'activitylog',
-])->group(function () {
+    // Activity logs
+    Route::get('/activity-logs', [ActivityLogController::class, 'index'])->middleware('permission:activity-logs.view')->name('activity-logs.index');
+    Route::get('/activity-logs/{activity}', [ActivityLogController::class, 'show'])->middleware('permission:activity-logs.view')->name('activity-logs.show');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard
-    |--------------------------------------------------------------------------
-    */
+    // Lead import must stay before /leads/{lead}.
+    Route::get('/leads/import', [LeadImportController::class, 'create'])->middleware('permission:leads.import')->name('leads.import.create');
+    Route::post('/leads/import', [LeadImportController::class, 'store'])->middleware('permission:leads.import')->name('leads.import.store');
+    Route::get('/leads/import/template', [LeadImportController::class, 'downloadTemplate'])->middleware('permission:leads.import')->name('leads.import.template');
 
-    Route::get(
-        '/dashboard',
-        [DashboardController::class, 'index']
-    )->name('dashboard');
+    // Lead labels / assignment / notes
+    Route::post('/lead-labels', [LeadController::class, 'storeLabel'])->middleware('permission:leads.labels.manage')->name('lead-labels.store');
+    Route::delete('/lead-labels/{label}', [LeadController::class, 'destroyLabel'])->middleware('permission:leads.labels.manage')->name('lead-labels.destroy');
+    Route::post('/leads/bulk-label', [LeadController::class, 'bulkLabel'])->middleware('permission:leads.labels.manage')->name('leads.bulk-label');
+    Route::post('/leads/{lead}/labels', [LeadController::class, 'addLabel'])->middleware('permission:leads.labels.manage')->name('leads.labels.add');
+    Route::delete('/leads/{lead}/labels/{label}', [LeadController::class, 'removeLabel'])->middleware('permission:leads.labels.manage')->name('leads.labels.remove');
+    Route::post('/leads/bulk-assign', [LeadController::class, 'bulkAssign'])->middleware('permission:leads.assign')->name('leads.bulk-assign');
+    Route::post('/leads/{lead}/assign', [LeadController::class, 'assign'])->middleware('permission:leads.assign')->name('leads.assign');
+    Route::post('/leads/{lead}/notes', [LeadController::class, 'note'])->middleware('permission:leads.notes.create')->name('leads.notes');
 
+    // Leads CRUD
+    Route::get('/leads', [LeadController::class, 'index'])->middleware('permission:leads.view')->name('leads.index');
+    Route::get('/leads/create', [LeadController::class, 'create'])->middleware('permission:leads.create')->name('leads.create');
+    Route::post('/leads', [LeadController::class, 'store'])->middleware('permission:leads.create')->name('leads.store');
+    Route::get('/leads/{lead}', [LeadController::class, 'show'])->middleware('permission:leads.view')->name('leads.show');
+    Route::get('/leads/{lead}/edit', [LeadController::class, 'edit'])->middleware('permission:leads.update')->name('leads.edit');
+    Route::put('/leads/{lead}', [LeadController::class, 'update'])->middleware('permission:leads.update')->name('leads.update');
+    Route::patch('/leads/{lead}', [LeadController::class, 'update'])->middleware('permission:leads.update');
+    Route::delete('/leads/{lead}', [LeadController::class, 'destroy'])->middleware('permission:leads.delete')->name('leads.destroy');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Companies
-    |--------------------------------------------------------------------------
-    |
-    | Sirf super admin company management access karega.
-    |
-    */
+    // Calls
+    Route::get('/calls', [CallLogController::class, 'index'])->middleware('permission:calls.view')->name('calls.index');
+    Route::post('/leads/{lead}/calls', [CallLogController::class, 'store'])->middleware('permission:calls.create')->name('calls.store');
 
-    Route::middleware('role:super_admin')->group(function () {
+    // Follow ups
+    Route::get('/follow-ups', [FollowUpController::class, 'index'])->middleware('permission:followups.view')->name('followups.index');
+    Route::post('/follow-ups/{followUp}/complete', [FollowUpController::class, 'complete'])->middleware('permission:followups.complete')->name('followups.complete');
+    Route::delete('/follow-ups/{followUp}', [FollowUpController::class, 'destroy'])->middleware('permission:followups.delete')->name('followups.destroy');
 
-        Route::resource(
-            'companies',
-            CompanyController::class
-        )->except('show');
+    // Pipeline
+    Route::get('/pipeline', [PipelineController::class, 'index'])->middleware('permission:pipeline.view')->name('pipeline.index');
+    Route::post('/pipeline/{lead}/move', [PipelineController::class, 'move'])->middleware('permission:pipeline.move')->name('pipeline.move');
 
-         Route::post(
-            '/companies/{company}/view-business',
-            [SuperAdminBusinessController::class, 'viewBusiness']
-        )->name('companies.view-business');
-
+    // Access control
+    Route::prefix('access-control')->name('access-control.')->group(function () {
+        Route::get('/', [AccessControlController::class, 'index'])->middleware('permission:access-control.view')->name('index');
+        Route::post('/roles', [AccessControlController::class, 'storeRole'])->middleware('permission:access-control.roles.create')->name('roles.store');
+        Route::post('/permissions', [AccessControlController::class, 'storePermission'])->middleware('permission:access-control.permissions.create')->name('permissions.store');
+        Route::put('/assign', [AccessControlController::class, 'assignPermissions'])->middleware('permission:access-control.user-permissions.assign|access-control.role-permissions.assign')->name('assign');
+        Route::delete('/permissions/{permission}', [AccessControlController::class, 'destroyPermission'])->middleware('permission:access-control.permissions.delete')->name('permissions.destroy');
+        Route::delete('/roles/{role}', [AccessControlController::class, 'destroyRole'])->middleware('permission:access-control.roles.delete')->name('roles.destroy');
     });
 
+    // Employee impersonation
+    Route::post('/employees/stop-impersonating', [EmployeeController::class, 'stopImpersonating'])->name('employees.stop-impersonating');
+    Route::post('/employees/{employee}/impersonate', [EmployeeController::class, 'impersonate'])
+        ->middleware('permission:employees.impersonate')->name('employees.impersonate');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Activity Logs
-    |--------------------------------------------------------------------------
-    |
-    | Super Admin / Owner / Admin activity dekh sakte hain.
-    |
-    */
+    // Employees CRUD
+    Route::get('/employees', [EmployeeController::class, 'index'])->middleware('permission:employees.view')->name('employees.index');
+    Route::get('/employees/create', [EmployeeController::class, 'create'])->middleware('permission:employees.create')->name('employees.create');
+    Route::post('/employees', [EmployeeController::class, 'store'])->middleware('permission:employees.create')->name('employees.store');
+    Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])->middleware('permission:employees.update')->name('employees.edit');
+    Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update')->name('employees.update');
+    Route::patch('/employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update');
+    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.delete')->name('employees.destroy');
 
-    Route::middleware(
-        'role:super_admin|owner|admin'
-    )->group(function () {
+    // Generic CRUD registrar.
+    $crud = static function (string $uri, string $routeName, string $controller, string $permission, string $parameter = 'item'): void {
+        Route::get("/{$uri}", [$controller, 'index'])->middleware("permission:{$permission}.view")->name("{$routeName}.index");
+        Route::get("/{$uri}/create", [$controller, 'create'])->middleware("permission:{$permission}.create")->name("{$routeName}.create");
+        Route::post("/{$uri}", [$controller, 'store'])->middleware("permission:{$permission}.create")->name("{$routeName}.store");
+        Route::get("/{$uri}/{{$parameter}}/edit", [$controller, 'edit'])->middleware("permission:{$permission}.update")->name("{$routeName}.edit");
+        Route::put("/{$uri}/{{$parameter}}", [$controller, 'update'])->middleware("permission:{$permission}.update")->name("{$routeName}.update");
+        Route::patch("/{$uri}/{{$parameter}}", [$controller, 'update'])->middleware("permission:{$permission}.update");
+        Route::delete("/{$uri}/{{$parameter}}", [$controller, 'destroy'])->middleware("permission:{$permission}.delete")->name("{$routeName}.destroy");
+    };
 
-        Route::get(
-            '/activity-logs',
-            [ActivityLogController::class, 'index']
-        )->name('activity-logs.index');
+    $crud('branches', 'branches', BranchController::class, 'branches');
+    $crud('teams', 'teams', TeamController::class, 'teams');
+    $crud('campaigns', 'campaigns', CampaignController::class, 'campaigns');
+    $crud('products', 'products', ProductController::class, 'products');
+    $crud('customers', 'customers', CustomerController::class, 'customers');
+    $crud('tasks', 'tasks', TaskController::class, 'tasks');
+    $crud('orders', 'orders', OrderController::class, 'orders');
+    $crud('payments', 'payments', PaymentController::class, 'payments');
 
-        Route::get(
-            '/activity-logs/{activity}',
-            [ActivityLogController::class, 'show']
-        )->name('activity-logs.show');
+    Route::prefix('settings')->name('crm-settings.')->group(function () use ($crud) {
+        $crud(
+            'lead-sources',
+            'lead-sources',
+            LeadSourceController::class,
+            'lead-sources'
+        );
 
+        $crud(
+            'lead-statuses',
+            'lead-statuses',
+            LeadStatusController::class,
+            'lead-statuses'
+        );
+
+        $crud(
+            'call-dispositions',
+            'call-dispositions',
+            CallDispositionController::class,
+            'call-dispositions'
+        );
     });
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Import
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/leads/import',
-        [LeadImportController::class, 'create']
-    )->name('leads.import.create');
-
-
-    Route::post(
-        '/leads/import',
-        [LeadImportController::class, 'store']
-    )->name('leads.import.store');
-
-
-    Route::get(
-        '/leads/import/template',
-        [LeadImportController::class, 'downloadTemplate']
-    )->name('leads.import.template');
-
-
-
-
-
-
-    Route::post(
-    '/lead-labels',
-    [LeadController::class, 'storeLabel']
-)->name('lead-labels.store');
-
-Route::delete(
-    '/lead-labels/{label}',
-    [LeadController::class, 'destroyLabel']
-)->name('lead-labels.destroy');
-
-Route::post(
-    '/leads/bulk-label',
-    [LeadController::class, 'bulkLabel']
-)->name('leads.bulk-label');
-
-Route::post(
-    '/leads/{lead}/labels',
-    [LeadController::class, 'addLabel']
-)->name('leads.labels.add');
-
-Route::delete(
-    '/leads/{lead}/labels/{label}',
-    [LeadController::class, 'removeLabel']
-)->name('leads.labels.remove');
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Bulk Assignment
-    |--------------------------------------------------------------------------
-    */
-
-    Route::post(
-        '/leads/bulk-assign',
-        [LeadController::class, 'bulkAssign']
-    )->name('leads.bulk-assign');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Leads
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'leads',
-        LeadController::class
-    );
-
-
-    Route::post(
-        '/leads/{lead}/assign',
-        [LeadController::class, 'assign']
-    )->name('leads.assign');
-
-
-    Route::post(
-        '/leads/{lead}/notes',
-        [LeadController::class, 'note']
-    )->name('leads.notes');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Call Logs
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/calls',
-        [CallLogController::class, 'index']
-    )->name('calls.index');
-
-
-    Route::post(
-        '/leads/{lead}/calls',
-        [CallLogController::class, 'store']
-    )->name('calls.store');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Follow Ups
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/follow-ups',
-        [FollowUpController::class, 'index']
-    )->name('followups.index');
-
-
-    Route::post(
-        '/follow-ups/{followUp}/complete',
-        [FollowUpController::class, 'complete']
-    )->name('followups.complete');
-
-
-    Route::delete(
-        '/follow-ups/{followUp}',
-        [FollowUpController::class, 'destroy']
-    )->name('followups.destroy');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Pipeline
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/pipeline',
-        [PipelineController::class, 'index']
-    )->name('pipeline.index');
-
-
-    Route::post(
-        '/pipeline/{lead}/move',
-        [PipelineController::class, 'move']
-    )->name('pipeline.move');
-
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Role & Permission Management
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('access-control')
-        ->name('access-control.')
-        ->group(function () {
-
-            Route::get(
-                '/',
-                [AccessControlController::class, 'index']
-            )->name('index');
-
-            Route::post(
-                '/roles',
-                [AccessControlController::class, 'storeRole']
-            )->name('roles.store');
-
-            Route::post(
-                '/permissions',
-                [AccessControlController::class, 'storePermission']
-            )->name('permissions.store');
-
-            Route::put(
-                '/roles/{role}/permissions',
-                [AccessControlController::class, 'syncRolePermissions']
-            )->name('roles.permissions.sync');
-
-            Route::put(
-                '/users/{user}/access',
-                [AccessControlController::class, 'syncUserAccess']
-            )->name('users.access.sync');
-        });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Employee Impersonation
-    |--------------------------------------------------------------------------
-    |
-    | Important:
-    | Custom routes resource route se PEHLE rakhe gaye hain.
-    |
-    */
-
-    Route::post(
-        '/employees/stop-impersonating',
-        [EmployeeController::class, 'stopImpersonating']
-    )->name('employees.stop-impersonating');
-
-
-    Route::post(
-        '/employees/{employee}/impersonate',
-        [EmployeeController::class, 'impersonate']
-    )->name('employees.impersonate');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Employees
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'employees',
-        EmployeeController::class
-    )->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Branches
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'branches',
-        BranchController::class
-    )
-        ->parameters([
-            'branches' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Teams
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'teams',
-        TeamController::class
-    )
-        ->parameters([
-            'teams' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Campaigns
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'campaigns',
-        CampaignController::class
-    )
-        ->parameters([
-            'campaigns' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Products
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'products',
-        ProductController::class
-    )
-        ->parameters([
-            'products' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Customers
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'customers',
-        CustomerController::class
-    )
-        ->parameters([
-            'customers' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Tasks
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'tasks',
-        TaskController::class
-    )
-        ->parameters([
-            'tasks' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Orders
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'orders',
-        OrderController::class
-    )
-        ->parameters([
-            'orders' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Payments
-    |--------------------------------------------------------------------------
-    */
-
-    Route::resource(
-        'payments',
-        PaymentController::class
-    )
-        ->parameters([
-            'payments' => 'item',
-        ])
-        ->except('show');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CRM Settings
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('settings')
-        ->name('crm-settings.')
-        ->group(function () {
-
-            Route::resource(
-                'lead-sources',
-                LeadSourceController::class
-            )
-                ->parameters([
-                    'lead-sources' => 'item',
-                ])
-                ->except('show');
-
-
-            Route::resource(
-                'lead-statuses',
-                LeadStatusController::class
-            )
-                ->parameters([
-                    'lead-statuses' => 'item',
-                ])
-                ->except('show');
-
-
-            Route::resource(
-                'call-dispositions',
-                CallDispositionController::class
-            )
-                ->parameters([
-                    'call-dispositions' => 'item',
-                ])
-                ->except('show');
-
-        });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Reports
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/reports',
-        [ReportController::class, 'index']
-    )->name('reports.index');
-
+    Route::get('/reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
 });
-
-
-/*
-|--------------------------------------------------------------------------
-| Laravel Settings Routes
-|--------------------------------------------------------------------------
-*/
 
 require __DIR__.'/settings.php';

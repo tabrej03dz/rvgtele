@@ -4,6 +4,9 @@
 
 @section('content')
 @php
+    $permissionPrefix = str_starts_with($routeName, 'crm-settings.')
+        ? str($routeName)->after('crm-settings.')->toString()
+        : $routeName;
     $isEdit = $item->exists;
 
     $fieldClass = function (string $name) use ($errors) {
@@ -274,12 +277,14 @@
                 Cancel
             </a>
 
+            @can($permissionPrefix . ($isEdit ? '.update' : '.create'))
             <button
                 type="submit"
                 class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
                 {{ $isEdit ? 'Update' : 'Save' }}
             </button>
+            @endcan
         </div>
     </form>
 </div>

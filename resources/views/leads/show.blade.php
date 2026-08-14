@@ -88,6 +88,7 @@
                 Back
             </a>
 
+            @can('leads.update')
             <a
                 href="{{ route('leads.edit', array_merge(['lead' => $lead->id], $navigationParams)) }}"
                 class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
@@ -98,6 +99,7 @@
                 </svg>
                 Edit Lead
             </a>
+            @endcan
         </div>
     </div>
 
@@ -375,6 +377,7 @@
         <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
 
             {{-- Demo Send --}}
+            @can('leads.update')
             <form
                 method="POST"
                 action="{{ route('leads.update', $lead) }}"
@@ -419,6 +422,7 @@
                     </button>
                 </div>
             </form>
+            @endcan
 
             {{-- Manage Labels --}}
             <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -430,6 +434,7 @@
                     @if ($lead->labels->isNotEmpty())
                         <div class="flex flex-wrap gap-2">
                             @foreach ($lead->labels as $label)
+                                @can('leads.labels.manage')
                                 <form method="POST" action="{{ route('leads.labels.remove', ['lead' => $lead->id, 'label' => $label->id]) }}">
                                     @csrf
                                     @method('DELETE')
@@ -442,6 +447,7 @@
                                         <span class="ml-1">×</span>
                                     </button>
                                 </form>
+                                @endcan
                             @endforeach
                         </div>
                     @else
@@ -450,6 +456,7 @@
 
                     @php $availableLabels = $labels->whereNotIn('id', $lead->labels->pluck('id')); @endphp
                     @if ($availableLabels->isNotEmpty())
+                        @can('leads.labels.manage')
                         <form method="POST" action="{{ route('leads.labels.add', $lead) }}" class="space-y-3">
                             @csrf
                             <select name="label_id" required class="w-full rounded-lg border-slate-300 text-sm focus:border-violet-500 focus:ring-violet-500">
@@ -460,6 +467,7 @@
                             </select>
                             <button type="submit" class="w-full rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">Add Label</button>
                         </form>
+                        @endcan
                     @else
                         <div class="text-center text-xs text-slate-500">All available labels are already attached.</div>
                     @endif
@@ -467,6 +475,7 @@
             </section>
 
             {{-- Save Call --}}
+            @can('calls.create')
             <form
                 id="saveCallForm"
                 method="POST"
@@ -642,9 +651,11 @@
                     </button>
                 </div>
             </form>
+            @endcan
 
             {{-- Assign --}}
             @if ($hasFullAccess)
+                @can('leads.assign')
                 <form
                     method="POST"
                     action="{{ route('leads.assign', $lead) }}"
@@ -717,9 +728,11 @@
                         </button>
                     </div>
                 </form>
+                @endcan
             @endif
 
             {{-- Add Note --}}
+            @can('leads.notes.create')
             <form
                 method="POST"
                 action="{{ route('leads.notes', $lead) }}"
@@ -760,6 +773,7 @@
                     </button>
                 </div>
             </form>
+            @endcan
         </aside>
     </div>
 </div>

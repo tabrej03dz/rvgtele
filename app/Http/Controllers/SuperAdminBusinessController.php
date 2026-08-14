@@ -43,10 +43,9 @@ class SuperAdminBusinessController extends Controller
         */
 
         abort_unless(
-            $superAdmin &&
-            $superAdmin->hasRole('super_admin'),
+            $superAdmin && $superAdmin->can('companies.view-business'),
             403,
-            'Only Super Admin can view another business.'
+            'You do not have permission to view another business.'
         );
 
         /*

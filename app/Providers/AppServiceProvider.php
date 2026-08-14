@@ -11,45 +11,56 @@ use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         $this->configureDefaults();
 
-        Gate::before(function ($user, string $ability) {
-            return $user->hasRole('super_admin') ? true : null;
-        });
+        /*
+        |--------------------------------------------------------------------------
+        | Super Admin Full Access
+        |--------------------------------------------------------------------------
+        */
+
+        Gate::before(
+            function (
+                $user,
+                string $ability
+            ) {
+
+                return $user->hasRole(
+                    'super_admin'
+                )
+                    ? true
+                    : null;
+            }
+        );
     }
 
-    /**
-     * Configure default behaviors for production-ready applications.
-     */
     protected function configureDefaults(): void
     {
-        Date::use(CarbonImmutable::class);
+        Date::use(
+            CarbonImmutable::class
+        );
 
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
-            : null,
+        Password::defaults(
+            fn (): ?Password =>
+                app()->isProduction()
+                    ? Password::min(12)
+                        ->mixedCase()
+                        ->letters()
+                        ->numbers()
+                        ->symbols()
+                        ->uncompromised()
+                    : null,
         );
     }
 }

@@ -71,13 +71,16 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
+            @can('leads.import')
             <a
                 href="{{ route('leads.import.create') }}"
                 class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
                 Import Leads
             </a>
+            @endcan
 
+            @can('leads.create')
             <a
                 href="{{ route('leads.create') }}"
                 class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
@@ -87,6 +90,7 @@
                 </svg>
                 Add Lead
             </a>
+            @endcan
         </div>
     </div>
 
@@ -113,6 +117,7 @@
 
     {{-- Quick Links --}}
     <div class="grid gap-4 md:grid-cols-3">
+        @can('leads.view')
         <a
             href="{{ route('leads.index') }}"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:bg-blue-50/30"
@@ -125,7 +130,9 @@
                 Search, filter aur assign leads.
             </div>
         </a>
+        @endcan
 
+        @can('followups.view')
         <a
             href="{{ route('followups.index') }}"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-300 hover:bg-amber-50/30"
@@ -138,7 +145,9 @@
                 Pending aur overdue follow-ups dekhein.
             </div>
         </a>
+        @endcan
 
+        @can('calls.view')
         <a
             href="{{ route('calls.index') }}"
             class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/30"
@@ -151,6 +160,7 @@
                 Team ki call activity review karein.
             </div>
         </a>
+        @endcan
     </div>
 
     {{-- Recent Leads --}}
@@ -166,12 +176,14 @@
                 </p>
             </div>
 
+            @can('leads.view')
             <a
                 href="{{ route('leads.index') }}"
                 class="inline-flex self-start text-sm font-semibold text-blue-600 hover:text-blue-700 sm:self-auto"
             >
                 View All
             </a>
+            @endcan
         </div>
 
         <div class="overflow-x-auto">
@@ -241,12 +253,14 @@
                             </td>
 
                             <td class="px-4 py-3 text-right">
+                                @can('leads.view')
                                 <a
                                     href="{{ route('leads.show', $lead) }}"
                                     class="inline-flex rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                 >
                                     Open
                                 </a>
+                                @endcan
                             </td>
                         </tr>
                     @empty
@@ -260,12 +274,14 @@
                                     First lead add karke CRM use karna start karein.
                                 </div>
 
+                                @can('leads.create')
                                 <a
                                     href="{{ route('leads.create') }}"
                                     class="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                                 >
                                     Add Lead
                                 </a>
+                                @endcan
                             </td>
                         </tr>
                     @endforelse

@@ -5,6 +5,9 @@
 @section('content')
 @php
     $pageStart = $items->firstItem() ?? 0;
+    $permissionPrefix = str_starts_with($routeName, 'crm-settings.')
+        ? str($routeName)->after('crm-settings.')->toString()
+        : $routeName;
 
     $formatValue = function ($value, string $column) {
         $lastKey = last(explode('.', $column));
@@ -67,6 +70,7 @@
             </p>
         </div>
 
+        @can($permissionPrefix . '.create')
         <a
             href="{{ route($routeName . '.create') }}"
             class="inline-flex items-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 sm:self-auto"
@@ -76,6 +80,7 @@
             </svg>
             Add New
         </a>
+        @endcan
     </div>
 
     @if (session('success'))
@@ -223,13 +228,16 @@
 
                             <td class="px-4 py-3 text-right">
                                 <div class="flex justify-end gap-2">
+                                    @can($permissionPrefix . '.update')
                                     <a
                                         href="{{ route($routeName . '.edit', ['item' => $item]) }}"
                                         class="inline-flex rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                     >
                                         Edit
                                     </a>
+                                    @endcan
 
+                                    @can($permissionPrefix . '.delete')
                                     <form
                                         method="POST"
                                         action="{{ route($routeName . '.destroy', ['item' => $item]) }}"
@@ -245,6 +253,7 @@
                                             Delete
                                         </button>
                                     </form>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>
@@ -262,12 +271,14 @@
                                     Add New button se pehla record create karein.
                                 </div>
 
+                                @can($permissionPrefix . '.create')
                                 <a
                                     href="{{ route($routeName . '.create') }}"
                                     class="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                                 >
                                     Add New
                                 </a>
+                                @endcan
                             </td>
                         </tr>
                     @endforelse

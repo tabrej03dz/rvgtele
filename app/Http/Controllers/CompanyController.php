@@ -26,7 +26,7 @@ class CompanyController extends Controller
      */
     public function index(Request $request)
     {
-        $this->ensureSuperAdmin($request);
+        $this->authorizePermission($request, 'companies.view');
 
         $query = Company::query()
             ->withCount([
@@ -70,7 +70,7 @@ class CompanyController extends Controller
      */
     public function create(Request $request)
     {
-        $this->ensureSuperAdmin($request);
+        $this->authorizePermission($request, 'companies.create');
 
         return view('companies.create');
     }
@@ -80,7 +80,7 @@ class CompanyController extends Controller
      */
     public function store(Request $request)
     {
-        $this->ensureSuperAdmin($request);
+        $this->authorizePermission($request, 'companies.create');
 
         $data = $request->validate([
             /*
@@ -299,7 +299,7 @@ class CompanyController extends Controller
      */
     public function edit(Request $request, Company $company)
     {
-        $this->ensureSuperAdmin($request);
+        $this->authorizePermission($request, 'companies.update');
 
         $company->load([
             'branches',
@@ -319,7 +319,7 @@ class CompanyController extends Controller
         Request $request,
         Company $company
     ) {
-        $this->ensureSuperAdmin($request);
+        $this->authorizePermission($request, 'companies.update');
 
         $data = $request->validate([
             'name' => [
@@ -393,7 +393,7 @@ class CompanyController extends Controller
         Request $request,
         Company $company
     ) {
-        $this->ensureSuperAdmin($request);
+        $this->authorizePermission($request, 'companies.delete');
 
         /*
         |--------------------------------------------------------------------------
@@ -448,19 +448,14 @@ class CompanyController extends Controller
     }
 
     /**
-     * Super admin check
+     * Permission check. Super Admin is automatically allowed by Gate::before().
      */
-    private function ensureSuperAdmin(
-        Request $request
-    ): void {
+    private function authorizePermission(Request $request, string $permission): void
+    {
         abort_unless(
-            $request->user()
-                &&
-            $request->user()->hasRole(
-                'super_admin'
-            ),
+            $request->user() && $request->user()->can($permission),
             403,
-            'Only Super Admin can manage companies.'
+            'You do not have permission to perform this company action.'
         );
     }
 

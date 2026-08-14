@@ -207,19 +207,31 @@
                 <div class="flex flex-wrap items-center gap-1.5">
                     <button type="button" @click="showFilters=!showFilters" class="software-btn"
                         :class="showFilters ? 'border-blue-500 bg-blue-50 text-blue-700' : ''">FILTERS</button>
+                    @can('leads.labels.manage')
                     <button type="button" @click="showCreateLabelModal=true" class="software-btn">+ CREATE LABEL</button>
                     <button type="button"
                         @click="if(selected.length===0){alert('Please select at least one lead.')}else{labelAction='add';showLabelModal=true}"
                         class="software-btn border-violet-300 text-violet-700">LABEL SELECTED <span x-show="selected.length"
                             x-text="'('+selected.length+')'"></span></button>
-                    @if ($hasFullAccess)
+                    @endcan
+                    
+                        @can('leads.assign')
                         <button type="button" @click="bulkAction='assign';assignmentScope='selected';showBulkModal=true"
                             class="software-btn">BULK ASSIGN</button>
+                            
+                                
                         <button type="button" @click="bulkAction='unassign';assignmentScope='selected';showBulkModal=true"
                             class="software-btn border-rose-300 text-rose-700">BULK UNASSIGN</button>
-                        <a href="{{ route('leads.import.create') }}" class="software-btn">IMPORT</a>
-                    @endif
+                            @endcan
+
+                            @can('leads.import') 
+                                <a href="{{ route('leads.import.create') }}" class="software-btn">IMPORT</a>
+                            @endcan
+
+                    
+                    @can('leads.create')
                     <a href="{{ route('leads.create') }}" class="software-btn software-btn-primary">+ NEW LEAD</a>
+                    @endcan
                 </div>
             </div>
         </section>
@@ -325,12 +337,12 @@
                             <span class="h-2.5 w-2.5 rounded-full" style="background:{{ $label->color }}"></span>
                             {{ $label->name }} <span class="text-slate-400">{{ $label->leads_count }}</span>
                         </a>
-                        @if ($hasFullAccess)
+                        @can('leads.labels.manage')
                             <form method="POST" action="{{ route('lead-labels.destroy', $label) }}"
                                 onsubmit="return confirm('Delete this label? Leads will not be deleted.')"
                                 class="border-l border-slate-200">@csrf @method('DELETE')<button
                                     class="px-2 py-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600">×</button></form>
-                        @endif
+                        @endcan
                     </div>
                 @endforeach
                 @if ($labels->isEmpty())
@@ -568,6 +580,7 @@
             class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
             @keydown.escape.window="showCreateLabelModal=false">
             <div class="w-full max-w-md rounded-xl bg-white shadow-2xl" @click.outside="showCreateLabelModal=false">
+                @can('leads.labels.manage')
                 <form method="POST" action="{{ route('lead-labels.store') }}">@csrf
                     <div class="border-b border-slate-200 px-5 py-4">
                         <h2 class="text-lg font-bold">Create Lead Label</h2>
@@ -586,6 +599,7 @@
                             @click="showCreateLabelModal=false" class="software-btn">CANCEL</button><button
                             class="software-btn software-btn-primary">CREATE LABEL</button></div>
                 </form>
+                @endcan
             </div>
         </div>
 
@@ -594,6 +608,7 @@
             class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
             @keydown.escape.window="showLabelModal=false">
             <div class="w-full max-w-md rounded-xl bg-white shadow-2xl" @click.outside="showLabelModal=false">
+                @can('leads.labels.manage')
                 <form method="POST" action="{{ route('leads.bulk-label') }}"
                     @submit="if(selected.length===0){$event.preventDefault();alert('Please select at least one lead.');}">
                     @csrf
@@ -630,6 +645,7 @@
                             :class="labelAction === 'remove' ? '!border-rose-600 !bg-rose-600' : ''"
                             x-text="labelAction==='add'?'ADD TO LABEL':'REMOVE LABEL'"></button></div>
                 </form>
+                @endcan
             </div>
         </div>
 
@@ -640,6 +656,7 @@
                 @keydown.escape.window="showBulkModal=false">
                 <div class="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white shadow-2xl"
                     @click.outside="showBulkModal=false">
+                    @can('leads.assign')
                     <form method="POST" action="{{ route('leads.bulk-assign') }}"
                         @submit="if(assignmentScope==='selected'&&selected.length===0){$event.preventDefault();alert('Please select at least one lead.');return;} if(bulkAction==='unassign'&&!confirm('Selected scope ko unassign karna hai?')){$event.preventDefault();}">
                         @csrf
@@ -697,6 +714,7 @@
                                 :class="bulkAction === 'unassign' ? '!border-rose-600 !bg-rose-600' : ''"
                                 x-text="bulkAction==='unassign'?'UNASSIGN LEADS':'ASSIGN LEADS'"></button></div>
                     </form>
+                    @endcan
                 </div>
             </div>
         @endif

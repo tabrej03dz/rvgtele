@@ -200,12 +200,14 @@
 
         <div class="flex justify-end">
 
+            @can('companies.update')
             <button
                 type="submit"
                 class="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
             >
                 Update Company
             </button>
+            @endcan
 
         </div>
 

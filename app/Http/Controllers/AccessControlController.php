@@ -16,222 +16,600 @@ class AccessControlController extends Controller
     public function index(Request $request): View
     {
         $actor = $request->user();
-        $this->ensureCanManageAccess($actor);
+
+        $this->authorizePermission($actor, 'access-control.view');
+
+        $guard = (string) $request->get('guard', 'web');
+
+        if (! in_array($guard, ['web'], true)) {
+            $guard = 'web';
+        }
 
         $roles = Role::query()
-            ->where('guard_name', 'web')
-            ->with('permissions:id,name,guard_name')
+            ->where('guard_name', $guard)
+            ->with([
+                'permissions' => function ($query) {
+                    $query->select(
+                        'permissions.id',
+                        'permissions.name',
+                        'permissions.guard_name'
+                    );
+                },
+            ])
             ->orderBy('name')
             ->get();
 
-        $permissions = Permission::query()
-            ->where('guard_name', 'web')
+        $permissionsQuery = Permission::query()
+            ->where('guard_name', $guard);
+
+        if (! $actor->hasRole('super_admin')) {
+            $permissionsQuery->whereIn(
+                'id',
+                $actor->getAllPermissions()->pluck('id')
+            );
+        }
+
+        $permissions = $permissionsQuery
             ->orderBy('name')
             ->get();
 
         $usersQuery = User::query()
-            ->with(['roles:id,name,guard_name', 'permissions:id,name,guard_name'])
+            ->with([
+                'roles:id,name,guard_name',
+                'permissions:id,name,guard_name',
+                'company:id,name',
+            ])
             ->orderBy('name');
 
-        if (!$actor->hasRole('super_admin')) {
-            $usersQuery->where('company_id', $actor->company_id)
-                ->whereDoesntHave('roles', fn ($query) => $query->where('name', 'super_admin'));
+        /*
+        |--------------------------------------------------------------------------
+        | User Visibility
+        |--------------------------------------------------------------------------
+        |
+        | Super Admin = all users
+        | Other access-control managers = own company users only
+        |
+        */
+
+        if (! $actor->hasRole('super_admin')) {
+            $usersQuery
+                ->where('company_id', $actor->company_id)
+                ->whereDoesntHave('roles', function ($query) {
+                    $query->where('name', 'super_admin');
+                });
         }
 
-        if ($request->filled('search')) {
-            $search = trim((string) $request->search);
+        $users = $usersQuery->get();
 
-            $usersQuery->where(function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('employee_code', 'like', "%{$search}%");
-            });
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | Existing Role Permissions
+        |--------------------------------------------------------------------------
+        |
+        | Role select karte hi currently assigned permissions checked dikhenge.
+        |
+        */
 
-        $users = $usersQuery->paginate(15)->withQueryString();
+        $rolePermissionMap = $roles->mapWithKeys(function (Role $role) {
+            return [
+                (string) $role->id => $role->permissions
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
+            ];
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Existing Direct User Permissions
+        |--------------------------------------------------------------------------
+        |
+        | Sirf direct permissions yaha load hongi.
+        | Role se inherited permissions alag role ke through manage hongi.
+        |
+        */
+
+        $userPermissionMap = $users->mapWithKeys(function (User $user) {
+            return [
+                (string) $user->id => $user->permissions
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
+            ];
+        });
 
         return view('access-control.index', [
+            'guard' => $guard,
             'roles' => $roles,
             'permissions' => $permissions,
             'users' => $users,
-            'canManageDefinitions' => $actor->hasRole('super_admin'),
+            'rolePermissionMap' => $rolePermissionMap,
+            'userPermissionMap' => $userPermissionMap,
+            'canManageDefinitions' => $actor->can('access-control.roles.create') || $actor->can('access-control.permissions.create'),
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create Role
+    |--------------------------------------------------------------------------
+    */
 
     public function storeRole(Request $request): RedirectResponse
     {
         $actor = $request->user();
-        $this->ensureSuperAdmin($actor);
+
+        $this->authorizePermission($actor, 'access-control.roles.create');
 
         $data = $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:100',
-                'regex:/^[a-z0-9._-]+$/',
-                Rule::unique('roles', 'name')->where('guard_name', 'web'),
+                'regex:/^[a-zA-Z0-9._ -]+$/',
+                Rule::unique('roles', 'name')
+                    ->where('guard_name', 'web'),
+            ],
+
+            'guard_name' => [
+                'nullable',
+                Rule::in(['web']),
             ],
         ]);
 
+        $name = strtolower(trim($data['name']));
+
+        $name = preg_replace(
+            '/\s+/',
+            '_',
+            $name
+        );
+
         Role::create([
-            'name' => strtolower(trim($data['name'])),
+            'name' => $name,
             'guard_name' => 'web',
         ]);
 
         $this->forgetPermissionCache();
 
-        return back()->with('success', 'New role created successfully.');
+        return back()->with(
+            'success',
+            'Role created successfully.'
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create Permission
+    |--------------------------------------------------------------------------
+    */
 
     public function storePermission(Request $request): RedirectResponse
     {
         $actor = $request->user();
-        $this->ensureSuperAdmin($actor);
+
+        $this->authorizePermission($actor, 'access-control.permissions.create');
 
         $data = $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:150',
-                'regex:/^[a-z0-9._-]+$/',
-                Rule::unique('permissions', 'name')->where('guard_name', 'web'),
+                'regex:/^[a-zA-Z0-9._ -]+$/',
+
+                Rule::unique('permissions', 'name')
+                    ->where('guard_name', 'web'),
+            ],
+
+            'guard_name' => [
+                'nullable',
+                Rule::in(['web']),
             ],
         ]);
 
-        Permission::create([
-            'name' => strtolower(trim($data['name'])),
+        $name = strtolower(trim($data['name']));
+
+        $name = preg_replace(
+            '/\s+/',
+            '_',
+            $name
+        );
+
+        $permission = Permission::create([
+            'name' => $name,
             'guard_name' => 'web',
         ]);
 
-        $this->forgetPermissionCache();
+        /*
+        |--------------------------------------------------------------------------
+        | Always Give New Permission To Super Admin
+        |--------------------------------------------------------------------------
+        */
 
-        return back()->with('success', 'New permission created successfully.');
-    }
+        $superAdminRole = Role::query()
+            ->where('name', 'super_admin')
+            ->where('guard_name', 'web')
+            ->first();
 
-    public function syncRolePermissions(Request $request, Role $role): RedirectResponse
-    {
-        $actor = $request->user();
-        $this->ensureSuperAdmin($actor);
-
-        abort_unless($role->guard_name === 'web', 404);
-
-        $data = $request->validate([
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => [
-                'integer',
-                Rule::exists('permissions', 'id')->where('guard_name', 'web'),
-            ],
-        ]);
-
-        if ($role->name === 'super_admin') {
-            $role->syncPermissions(
-                Permission::query()->where('guard_name', 'web')->get()
-            );
-        } else {
-            $role->syncPermissions($data['permissions'] ?? []);
+        if ($superAdminRole) {
+            $superAdminRole->givePermissionTo($permission);
         }
 
         $this->forgetPermissionCache();
 
         return back()->with(
             'success',
-            $role->name === 'super_admin'
-                ? 'Super Admin has been kept with all permissions.'
-                : 'Role permissions updated successfully.'
+            'Permission created successfully.'
         );
     }
 
-    public function syncUserAccess(Request $request, User $user): RedirectResponse
+    /*
+    |--------------------------------------------------------------------------
+    | Assign / Sync Permissions
+    |--------------------------------------------------------------------------
+    |
+    | User select = direct permissions sync
+    |
+    | Role select = role permissions sync
+    |
+    | Dono select = dono par same selected permissions save
+    |
+    */
+
+    public function assignPermissions(Request $request): RedirectResponse
     {
         $actor = $request->user();
-        $this->ensureCanManageAccess($actor);
-        $this->ensureUserIsManageable($actor, $user);
 
         $data = $request->validate([
-            'roles' => ['nullable', 'array'],
-            'roles.*' => [
+            'user_id' => [
+                'nullable',
                 'integer',
-                Rule::exists('roles', 'id')->where('guard_name', 'web'),
+                'exists:users,id',
             ],
-            'permissions' => ['nullable', 'array'],
+
+            'role_id' => [
+                'nullable',
+                'integer',
+
+                Rule::exists('roles', 'id')
+                    ->where('guard_name', 'web'),
+            ],
+
+            'guard_name' => [
+                'required',
+                Rule::in(['web']),
+            ],
+
+            'permissions' => [
+                'nullable',
+                'array',
+            ],
+
             'permissions.*' => [
                 'integer',
-                Rule::exists('permissions', 'id')->where('guard_name', 'web'),
+
+                Rule::exists('permissions', 'id')
+                    ->where('guard_name', 'web'),
             ],
         ]);
 
-        $roleIds = collect($data['roles'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
-        $permissionIds = collect($data['permissions'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        /*
+        |--------------------------------------------------------------------------
+        | Target Required
+        |--------------------------------------------------------------------------
+        */
 
-        $roles = Role::query()
-            ->where('guard_name', 'web')
-            ->whereIn('id', $roleIds)
-            ->get();
-
-        if (!$actor->hasRole('super_admin') && $roles->contains('name', 'super_admin')) {
-            abort(403, 'Only Super Admin can assign the Super Admin role.');
+        if (
+            empty($data['user_id']) &&
+            empty($data['role_id'])
+        ) {
+            return back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'Please select a user or role first.'
+                );
         }
 
-        $permissions = Permission::query()
+        /*
+        |--------------------------------------------------------------------------
+        | Selected Permissions
+        |--------------------------------------------------------------------------
+        */
+
+        $permissionIds = collect(
+            $data['permissions'] ?? []
+        )
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $permissionModels = Permission::query()
             ->where('guard_name', 'web')
             ->whereIn('id', $permissionIds)
             ->get();
 
-        $user->syncRoles($roles);
-        $user->syncPermissions($permissions);
+        if (! $actor->hasRole('super_admin')) {
+            $actorPermissionIds = $actor->getAllPermissions()
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id);
 
-        if ($user->hasRole('super_admin')) {
-            $superAdminRole = Role::findByName('super_admin', 'web');
-            $superAdminRole->syncPermissions(
-                Permission::query()->where('guard_name', 'web')->get()
+            abort_if(
+                $permissionModels->pluck('id')->diff($actorPermissionIds)->isNotEmpty(),
+                403,
+                'You can only assign permissions that you already have.'
             );
+        }
+
+        $messages = [];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Direct User Permission
+        |--------------------------------------------------------------------------
+        */
+
+        if (! empty($data['user_id'])) {
+
+            $this->authorizePermission(
+                $actor,
+                'access-control.user-permissions.assign'
+            );
+
+            $targetUser = User::query()
+                ->findOrFail(
+                    (int) $data['user_id']
+                );
+
+            $this->ensureUserIsManageable(
+                $actor,
+                $targetUser
+            );
+
+            $targetUser->syncPermissions(
+                $permissionModels
+            );
+
+            $messages[] = "user {$targetUser->name}";
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role Permission
+        |--------------------------------------------------------------------------
+        |
+        | Current Spatie roles global hain.
+        | Isliye role definition sirf Super Admin change karega.
+        |
+        */
+
+        if (! empty($data['role_id'])) {
+
+            $this->authorizePermission(
+                $actor,
+                'access-control.role-permissions.assign'
+            );
+
+            $role = Role::query()
+                ->where(
+                    'guard_name',
+                    'web'
+                )
+                ->findOrFail(
+                    (int) $data['role_id']
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Super Admin Cannot Lose Permissions
+            |--------------------------------------------------------------------------
+            */
+
+            if ($role->name === 'super_admin') {
+
+                $role->syncPermissions(
+                    Permission::query()
+                        ->where(
+                            'guard_name',
+                            'web'
+                        )
+                        ->get()
+                );
+
+            } else {
+
+                $role->syncPermissions(
+                    $permissionModels
+                );
+            }
+
+            $messages[] = "role {$role->name}";
         }
 
         $this->forgetPermissionCache();
 
-        return back()->with('success', "Access updated for {$user->name}.");
-    }
-
-    private function ensureCanManageAccess(User $user): void
-    {
-        abort_unless(
-            $user->hasRole('super_admin') || $user->can('access-control.manage'),
-            403,
-            'You do not have permission to manage roles and permissions.'
+        return back()->with(
+            'success',
+            'Permissions updated successfully for '
+            .implode(' and ', $messages)
+            .'.'
         );
     }
 
-    private function ensureSuperAdmin(User $user): void
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Permission
+    |--------------------------------------------------------------------------
+    */
+
+    public function destroyPermission(
+        Request $request,
+        Permission $permission
+    ): RedirectResponse {
+
+        $actor = $request->user();
+
+        $this->authorizePermission($actor, 'access-control.permissions.delete');
+
         abort_unless(
-            $user->hasRole('super_admin'),
-            403,
-            'Only Super Admin can create roles/permissions or change role definitions.'
+            $permission->guard_name === 'web',
+            404
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Protected Permission
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $permission->name ===
+            'access-control.view'
+        ) {
+            return back()->with(
+                'error',
+                'access-control.view is a protected permission and cannot be deleted.'
+            );
+        }
+
+        $permissionName =
+            $permission->name;
+
+        $permission->delete();
+
+        $this->forgetPermissionCache();
+
+        return back()->with(
+            'success',
+            "Permission {$permissionName} deleted successfully."
         );
     }
 
-    private function ensureUserIsManageable(User $actor, User $target): void
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Role
+    |--------------------------------------------------------------------------
+    */
+
+    public function destroyRole(
+        Request $request,
+        Role $role
+    ): RedirectResponse {
+
+        $actor = $request->user();
+
+        $this->authorizePermission($actor, 'access-control.roles.delete');
+
+        abort_unless(
+            $role->guard_name === 'web',
+            404
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Core Roles Protected
+        |--------------------------------------------------------------------------
+        */
+
+        $protectedRoles = [
+            'super_admin',
+            'company_owner',
+            'owner',
+            'admin',
+            'team_leader',
+            'employee',
+        ];
+
+        if (
+            in_array(
+                $role->name,
+                $protectedRoles,
+                true
+            )
+        ) {
+            return back()->with(
+                'error',
+                "{$role->name} is a protected system role and cannot be deleted."
+            );
+        }
+
+        $roleName = $role->name;
+
+        $role->delete();
+
+        $this->forgetPermissionCache();
+
+        return back()->with(
+            'success',
+            "Role {$roleName} deleted successfully."
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization
+    |--------------------------------------------------------------------------
+    */
+
+    private function authorizePermission(User $user, string $permission): void
     {
-        if ($actor->hasRole('super_admin')) {
+        abort_unless(
+            $user->can($permission),
+            403,
+            'You do not have permission to perform this action.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Manageable User
+    |--------------------------------------------------------------------------
+    */
+
+    private function ensureUserIsManageable(
+        User $actor,
+        User $target
+    ): void {
+
+        if (
+            $actor->hasRole(
+                'super_admin'
+            )
+        ) {
             return;
         }
 
         abort_if(
-            !$actor->company_id || (int) $actor->company_id !== (int) $target->company_id,
+            ! $actor->company_id
+            ||
+            (int) $actor->company_id
+            !==
+            (int) $target->company_id,
             403,
             'You can manage users of your own company only.'
         );
 
         abort_if(
-            $target->hasRole('super_admin'),
+            $target->hasRole(
+                'super_admin'
+            ),
             403,
-            'Super Admin access can be managed by Super Admin only.'
+            'Super Admin access can only be managed by Super Admin.'
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Permission Cache
+    |--------------------------------------------------------------------------
+    */
+
     private function forgetPermissionCache(): void
     {
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        app(
+            PermissionRegistrar::class
+        )->forgetCachedPermissions();
     }
 }

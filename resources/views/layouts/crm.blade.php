@@ -55,187 +55,37 @@
             |--------------------------------------------------------------------------
             */
 
-            $sections = [];
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | PLATFORM
-            | Sirf Super Admin ko dikhega
-            |--------------------------------------------------------------------------
-            */
-
-            if ($isSuperAdmin) {
-
-                $sections['Platform'] = [
-
-                    [
-                        'Companies',
-                        'companies.index',
-                        'companies.*'
-                    ],
-
-                ];
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | WORKSPACE
-            |--------------------------------------------------------------------------
-            */
-
-            $sections['Workspace'] = [
-
-                [
-                    'Dashboard',
-                    'dashboard',
-                    'dashboard'
+            $sections = [
+                'Platform' => [
+                    ['Companies', 'companies.index', 'companies.*', 'companies.view'],
                 ],
-
-                [
-                    'Leads',
-                    'leads.index',
-                    'leads.*'
+                'Workspace' => [
+                    ['Dashboard', 'dashboard', 'dashboard', 'dashboard.view'],
+                    ['Leads', 'leads.index', 'leads.*', 'leads.view'],
+                    ['Pipeline', 'pipeline.index', 'pipeline.*', 'pipeline.view'],
+                    ['Follow-ups', 'followups.index', 'followups.*', 'followups.view'],
+                    ['Call Logs', 'calls.index', 'calls.*', 'calls.view'],
                 ],
-
-                [
-                    'Pipeline',
-                    'pipeline.index',
-                    'pipeline.*'
+                'Organization' => [
+                    ['Employees', 'employees.index', 'employees.*', 'employees.view'],
+                    ['Branches', 'branches.index', 'branches.*', 'branches.view'],
+                    ['Teams', 'teams.index', 'teams.*', 'teams.view'],
+                    ['Roles & Permissions', 'access-control.index', 'access-control.*', 'access-control.view'],
                 ],
-
-                [
-                    'Follow-ups',
-                    'followups.index',
-                    'followups.*'
+                'Sales' => [
+                    ['Campaigns', 'campaigns.index', 'campaigns.*', 'campaigns.view'],
+                    ['Products', 'products.index', 'products.*', 'products.view'],
+                    ['Customers', 'customers.index', 'customers.*', 'customers.view'],
+                    ['Tasks', 'tasks.index', 'tasks.*', 'tasks.view'],
+                    ['Orders', 'orders.index', 'orders.*', 'orders.view'],
+                    ['Payments', 'payments.index', 'payments.*', 'payments.view'],
+                    ['Reports', 'reports.index', 'reports.*', 'reports.view'],
                 ],
-
-                [
-                    'Call Logs',
-                    'calls.index',
-                    'calls.*'
+                'CRM Settings' => [
+                    ['Lead Sources', 'crm-settings.lead-sources.index', 'crm-settings.lead-sources.*', 'lead-sources.view'],
+                    ['Lead Statuses', 'crm-settings.lead-statuses.index', 'crm-settings.lead-statuses.*', 'lead-statuses.view'],
+                    ['Call Dispositions', 'crm-settings.call-dispositions.index', 'crm-settings.call-dispositions.*', 'call-dispositions.view'],
                 ],
-
-            ];
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | ORGANIZATION
-            |--------------------------------------------------------------------------
-            */
-
-            $sections['Organization'] = [
-
-                [
-                    'Employees',
-                    'employees.index',
-                    'employees.*'
-                ],
-
-                [
-                    'Branches',
-                    'branches.index',
-                    'branches.*'
-                ],
-
-                [
-                    'Teams',
-                    'teams.index',
-                    'teams.*'
-                ],
-
-            ];
-
-            if ($isSuperAdmin || $user->can('access-control.manage')) {
-                $sections['Organization'][] = [
-                    'Roles & Permissions',
-                    'access-control.index',
-                    'access-control.*'
-                ];
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | SALES
-            |--------------------------------------------------------------------------
-            */
-
-            $sections['Sales'] = [
-
-                [
-                    'Campaigns',
-                    'campaigns.index',
-                    'campaigns.*'
-                ],
-
-                [
-                    'Products',
-                    'products.index',
-                    'products.*'
-                ],
-
-                [
-                    'Customers',
-                    'customers.index',
-                    'customers.*'
-                ],
-
-                [
-                    'Tasks',
-                    'tasks.index',
-                    'tasks.*'
-                ],
-
-                [
-                    'Orders',
-                    'orders.index',
-                    'orders.*'
-                ],
-
-                [
-                    'Payments',
-                    'payments.index',
-                    'payments.*'
-                ],
-
-                [
-                    'Reports',
-                    'reports.index',
-                    'reports.*'
-                ],
-
-            ];
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | CRM SETTINGS
-            |--------------------------------------------------------------------------
-            */
-
-            $sections['CRM Settings'] = [
-
-                [
-                    'Lead Sources',
-                    'crm-settings.lead-sources.index',
-                    'crm-settings.lead-sources.*'
-                ],
-
-                [
-                    'Lead Statuses',
-                    'crm-settings.lead-statuses.index',
-                    'crm-settings.lead-statuses.*'
-                ],
-
-                [
-                    'Call Dispositions',
-                    'crm-settings.call-dispositions.index',
-                    'crm-settings.call-dispositions.*'
-                ],
-
             ];
 
         @endphp
@@ -289,7 +139,8 @@
 
                     <div class="space-y-1">
 
-                        @foreach($links as [$text, $route, $pattern])
+                        @foreach($links as [$text, $route, $pattern, $permission])
+                            @can($permission)
 
                             <a
                                 href="{{ route($route) }}"
@@ -310,6 +161,7 @@
                             >
                                 {{ $text }}
                             </a>
+                            @endcan
 
                         @endforeach
 

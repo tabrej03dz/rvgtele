@@ -99,6 +99,7 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
+            @can('leads.import')
             <a
                 href="{{ route('leads.import.template') }}"
                 class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -110,6 +111,7 @@
                 </svg>
                 Download Template
             </a>
+            @endcan
 
             <a
                 href="{{ route('leads.index') }}"
@@ -235,12 +237,31 @@
 
                             <tbody class="divide-y divide-slate-100 bg-white">
                                 @foreach ($result['errors'] as $error)
+                                    @php
+                                        $rowNumber = '-';
+                                        $errorMessage = 'Unknown import error.';
+
+                                        if (is_array($error)) {
+                                            $rowNumber = $error['row'] ?? '-';
+                                            $errorMessage = $error['message'] ?? 'Unknown import error.';
+                                        } else {
+                                            $errorString = (string) $error;
+
+                                            if (preg_match('/^Row\s+(\d+):\s*(.*)$/s', $errorString, $matches)) {
+                                                $rowNumber = $matches[1] ?? '-';
+                                                $errorMessage = $matches[2] ?? $errorString;
+                                            } else {
+                                                $errorMessage = $errorString;
+                                            }
+                                        }
+                                    @endphp
+
                                     <tr>
                                         <td class="px-4 py-3 font-semibold text-slate-800">
-                                            {{ $error['row'] }}
+                                            {{ $rowNumber }}
                                         </td>
                                         <td class="px-4 py-3 text-rose-600">
-                                            {{ $error['message'] }}
+                                            {{ $errorMessage }}
                                         </td>
                                     </tr>
                                 @endforeach
@@ -516,6 +537,7 @@
                     Cancel
                 </a>
 
+                @can('leads.import')
                 <button
                     type="submit"
                     class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -527,6 +549,7 @@
                     </svg>
                     Import Leads
                 </button>
+                @endcan
             </div>
         </form>
 

@@ -27,6 +27,7 @@
         </div>
 
 
+        @can('companies.create')
         <a
             href="{{ route('companies.create') }}"
             class="
@@ -45,6 +46,7 @@
         >
             + Add Company
         </a>
+        @endcan
 
     </div>
 
@@ -518,6 +520,7 @@
                                     {{-- View Complete Business --}}
                                     {{-- ===================================================== --}}
 
+                                    @can('companies.view-business')
                                     <form
                                         method="POST"
                                         action="{{ route('companies.view-business', $company) }}"
@@ -571,10 +574,12 @@
                                         </button>
 
                                     </form>
+                                    @endcan
 
 
                                     {{-- Edit --}}
 
+                                    @can('companies.update')
                                     <a
                                         href="{{ route('companies.edit', $company) }}"
                                         class="
@@ -592,6 +597,7 @@
                                     >
                                         Edit
                                     </a>
+                                    @endcan
 
 
                                     {{-- Delete --}}
@@ -602,6 +608,7 @@
                                         (int) $company->id
                                     )
 
+                                    @can('companies.delete')
                                         <form
                                             method="POST"
                                             action="{{ route('companies.destroy', $company) }}"
@@ -636,6 +643,7 @@
                                             </button>
 
                                         </form>
+                                    @endcan
 
                                     @endif
 
