@@ -236,6 +236,16 @@
                         @endforeach
                     </select>
 
+                    @if ($roles->isEmpty())
+                        <p class="mt-1 text-xs font-medium text-amber-600">
+                            Aapke role ke niche koi role available nahi hai.
+                        </p>
+                    @else
+                        <p class="mt-1 text-xs text-slate-500">
+                            Super Admin ko database ke saare roles dikhte hain. Baaki users ko sirf apne se chhote roles dikhte hain.
+                        </p>
+                    @endif
+
                     @error('role')
                         <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
                     @enderror

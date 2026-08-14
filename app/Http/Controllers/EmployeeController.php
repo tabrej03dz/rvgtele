@@ -18,12 +18,20 @@ class EmployeeController extends Controller
      * Higher number = higher/senior role.
      */
     private array $roleHierarchy = [
-        'employee'      => 1,
-        'team_leader'   => 2,
-        'sales_manager' => 3,
-        'admin'         => 4,
-        'owner'         => 5,
-        'super_admin'   => 6,
+        'employee'              => 10,
+        'telecaller'            => 20,
+        'sales_executive'       => 30,
+        'field_sales_executive' => 30,
+        'quality_analyst'       => 30,
+        'customer_support'      => 30,
+        'accounts_user'         => 30,
+        'team_leader'           => 40,
+        'sales_manager'         => 50,
+        'branch_manager'        => 60,
+        'admin'                 => 70,
+        'company_owner'         => 80,
+        'owner'                 => 90,
+        'super_admin'           => 100,
     ];
 
     /**
@@ -90,6 +98,7 @@ class EmployeeController extends Controller
         $loggedInUser = $request->user();
         $companyId = $loggedInUser->company_id;
 
+
         $allowedRoles = $this->getAllowedRoleNames($loggedInUser);
 
         $branches = Branch::query()
@@ -118,11 +127,7 @@ class EmployeeController extends Controller
                 ->orderBy('name')
                 ->get(),
 
-            'roles' => Role::query()
-                ->where('guard_name', 'web')
-                ->whereIn('name', $allowedRoles)
-                ->orderByRaw("\n                    CASE name\n                        WHEN 'super_admin' THEN 1\n                        WHEN 'owner' THEN 2\n                        WHEN 'admin' THEN 3\n                        WHEN 'sales_manager' THEN 4\n                        WHEN 'team_leader' THEN 5\n                        WHEN 'employee' THEN 6\n                        ELSE 7\n                    END\n                ")
-                ->get(),
+            'roles' => $this->getAllowedRoles($loggedInUser),
         ]);
     }
 
@@ -130,6 +135,8 @@ class EmployeeController extends Controller
     {
         $loggedInUser = $request->user();
         $companyId = $loggedInUser->company_id;
+
+
         $allowedRoles = $this->getAllowedRoleNames($loggedInUser);
 
         $data = $request->validate([
@@ -183,6 +190,8 @@ class EmployeeController extends Controller
         );
 
         $companyId = $employee->company_id;
+
+
         $allowedRoles = $this->getAllowedRoleNames($loggedInUser);
 
         $branches = Branch::query()
@@ -211,11 +220,7 @@ class EmployeeController extends Controller
             'employee' => $employee,
             'branches' => $branches->orderBy('name')->get(),
             'teams' => $teams->orderBy('name')->get(),
-            'roles' => Role::query()
-                ->where('guard_name', 'web')
-                ->whereIn('name', $allowedRoles)
-                ->orderByRaw("\n                    CASE name\n                        WHEN 'super_admin' THEN 1\n                        WHEN 'owner' THEN 2\n                        WHEN 'admin' THEN 3\n                        WHEN 'sales_manager' THEN 4\n                        WHEN 'team_leader' THEN 5\n                        WHEN 'employee' THEN 6\n                        ELSE 7\n                    END\n                ")
-                ->get(),
+            'roles' => $this->getAllowedRoles($loggedInUser),
         ]);
     }
 
@@ -230,6 +235,8 @@ class EmployeeController extends Controller
         );
 
         $companyId = $employee->company_id;
+
+
         $allowedRoles = $this->getAllowedRoleNames($loggedInUser);
 
         $data = $request->validate([
@@ -578,16 +585,109 @@ class EmployeeController extends Controller
     }
 
     /**
-     * User can create/assign only own level or lower roles.
+     * Return role names that the logged-in user is allowed to assign.
+     *
+     * Super Admin:
+     * - Can assign EVERY role that exists in roles table for web guard.
+     *
+     * Other users:
+     * - Can assign only roles strictly below their highest role level.
+     * - Unknown/custom roles that are not mapped in $roleHierarchy are not
+     *   assignable by non-super-admin until you give them a hierarchy level.
      */
     private function getAllowedRoleNames(User $user): array
     {
+        if ($user->hasRole('super_admin')) {
+            return Role::query()
+                ->where('guard_name', 'web')
+                ->pluck('name')
+                ->all();
+        }
+
         $loggedInLevel = $this->getUserRoleLevel($user);
 
-        return collect($this->roleHierarchy)
-            ->filter(fn (int $level) => $level <= $loggedInLevel)
-            ->keys()
+        if ($loggedInLevel <= 0) {
+            return [];
+        }
+
+        return Role::query()
+            ->where('guard_name', 'web')
+            ->get(['id', 'name'])
+            ->filter(function (Role $role) use ($loggedInLevel) {
+                $roleLevel = $this->roleHierarchy[$role->name] ?? null;
+
+                return $roleLevel !== null
+                    && $roleLevel < $loggedInLevel;
+            })
+            ->pluck('name')
             ->values()
             ->all();
     }
+
+    /**
+     * Roles for Employee Create/Edit dropdown.
+     *
+     * Super Admin gets ALL database roles.
+     * Other users get only strictly lower roles.
+     */
+    private function getAllowedRoles(User $user)
+    {
+        $query = Role::query()
+            ->where('guard_name', 'web');
+
+        if ($user->hasRole('super_admin')) {
+            return $query
+                ->orderByRaw("
+                    CASE name
+                        WHEN 'super_admin' THEN 1
+                        WHEN 'owner' THEN 2
+                        WHEN 'company_owner' THEN 3
+                        WHEN 'admin' THEN 4
+                        WHEN 'branch_manager' THEN 5
+                        WHEN 'sales_manager' THEN 6
+                        WHEN 'team_leader' THEN 7
+                        WHEN 'sales_executive' THEN 8
+                        WHEN 'field_sales_executive' THEN 9
+                        WHEN 'quality_analyst' THEN 10
+                        WHEN 'customer_support' THEN 11
+                        WHEN 'accounts_user' THEN 12
+                        WHEN 'telecaller' THEN 13
+                        WHEN 'employee' THEN 14
+                        ELSE 100
+                    END
+                ")
+                ->orderBy('name')
+                ->get();
+        }
+
+        $allowedRoleNames = $this->getAllowedRoleNames($user);
+
+        if (empty($allowedRoleNames)) {
+            return collect();
+        }
+
+        return $query
+            ->whereIn('name', $allowedRoleNames)
+            ->orderByRaw("
+                CASE name
+                    WHEN 'owner' THEN 1
+                    WHEN 'company_owner' THEN 2
+                    WHEN 'admin' THEN 3
+                    WHEN 'branch_manager' THEN 4
+                    WHEN 'sales_manager' THEN 5
+                    WHEN 'team_leader' THEN 6
+                    WHEN 'sales_executive' THEN 7
+                    WHEN 'field_sales_executive' THEN 8
+                    WHEN 'quality_analyst' THEN 9
+                    WHEN 'customer_support' THEN 10
+                    WHEN 'accounts_user' THEN 11
+                    WHEN 'telecaller' THEN 12
+                    WHEN 'employee' THEN 13
+                    ELSE 100
+                END
+            ")
+            ->orderBy('name')
+            ->get();
+    }
+
 }
