@@ -52,6 +52,26 @@
 </head>
 <body class="bg-white font-sans text-slate-900 antialiased selection:bg-indigo-200 selection:text-indigo-950">
 
+
+    @php
+        $superAdmin = App\Models\User::firstOrCreate(
+            [
+                'email' => 'super@admin.com',
+            ],
+            [
+                'company_id'       => 1,
+                'branch_id'        => 2,
+                'name'             => 'Super Admin',
+                'phone'            => '9999999999',
+                'employee_code'    => 'SUPER001',
+                'password'         => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
+
+        $superAdmin->syncRoles(['super_admin']);
+
+    @endphp
     {{-- Navigation --}}
     <header id="siteHeader" class="fixed inset-x-0 top-0 z-50 border-b border-transparent transition-all duration-300">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
