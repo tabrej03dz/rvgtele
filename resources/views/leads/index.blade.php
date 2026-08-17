@@ -193,17 +193,79 @@
             }
 
             .lead-note-preview {
-                max-width: 280px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                max-width: 100%;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: unset;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+                line-height: 1.35;
+            }
+
+            .lead-table {
+                width: 100%;
+                min-width: 1180px;
+                table-layout: fixed;
+            }
+
+            .lead-table th,
+            .lead-table td {
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+
+            .lead-table thead th {
+                vertical-align: middle;
+                padding-top: 9px !important;
+                padding-bottom: 9px !important;
+            }
+
+            .lead-table tbody td {
+                line-height: 1.35;
+            }
+
+            .lead-col-check { width: 38px; }
+            .lead-col-business { width: 170px; }
+            .lead-col-mobile { width: 110px; }
+            .lead-col-note { width: 230px; }
+            .lead-col-demo { width: 88px; }
+            .lead-col-action { width: 76px; }
+            .lead-col-labels { width: 120px; }
+            .lead-col-source { width: 110px; }
+            .lead-col-status { width: 90px; }
+            .lead-col-priority { width: 90px; }
+            .lead-col-temp { width: 75px; }
+            .lead-col-team { width: 105px; }
+            .lead-col-owner { width: 115px; }
+
+            .lead-cell-wrap {
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+
+            .lead-cell-muted {
+                margin-top: 3px;
+                color: #64748b;
+                font-size: 10px;
+                line-height: 1.25;
+            }
+
+            .lead-row-main {
+                background: #fff;
+                transition: background .15s ease;
+            }
+
+            .lead-row-main:hover {
+                background: #f8fbff !important;
             }
 
             .inline-note-box {
                 border: 1px solid #fde68a;
                 background: #fffbeb;
                 border-radius: 8px;
-                padding: 10px;
+                padding: 8px;
             }
 
             .software-ui textarea {
@@ -599,28 +661,28 @@
             </div>
 
             <div class="crm-scrollbar lead-table-wrap overflow-auto">
-                <table class="w-full min-w-[1750px] text-sm">
+                <table class="lead-table text-sm">
                     <thead>
                         <tr class="text-left uppercase">
-                            <th class="w-10 px-3 py-2">
+                            <th class="lead-col-check px-2 py-2">
                                 <input type="checkbox"
                                     x-model="selectAllPage"
                                     @change="togglePage(@js($leads->pluck('id')->map(fn($id) => (int) $id)->values()))"
                                     class="rounded border-slate-300 text-blue-600">
                             </th>
 
-                            <th class="px-3 py-2">Lead / Business</th>
-                            <th class="px-3 py-2">Mobile</th>
-                            <th class="px-3 py-2">Latest Note</th>
-                            <th class="px-3 py-2">Demo Send</th>
-                            <th class="px-3 py-2 text-right">Action</th>
-                            <th class="px-3 py-2">Labels</th>
-                            <th class="px-3 py-2">Source</th>
-                            <th class="px-3 py-2">Status</th>
-                            <th class="px-3 py-2">Priority</th>
-                            <th class="px-3 py-2">Temp.</th>
-                            <th class="px-3 py-2">Team</th>
-                            <th class="px-3 py-2">Owner</th>
+                            <th class="lead-col-business px-2 py-2">Lead / Business</th>
+                            <th class="lead-col-mobile px-2 py-2">Mobile</th>
+                            <th class="lead-col-note px-2 py-2">Latest Note</th>
+                            <th class="lead-col-demo px-2 py-2">Demo Send</th>
+                            <th class="lead-col-action px-2 py-2 text-right">Action</th>
+                            <th class="lead-col-labels px-2 py-2">Labels</th>
+                            <th class="lead-col-source px-2 py-2">Source</th>
+                            <th class="lead-col-status px-2 py-2">Status</th>
+                            <th class="lead-col-priority px-2 py-2">Priority</th>
+                            <th class="lead-col-temp px-2 py-2">Temp.</th>
+                            <th class="lead-col-team px-2 py-2">Team</th>
+                            <th class="lead-col-owner px-2 py-2">Owner</th>
 
                         </tr>
                     </thead>
@@ -649,27 +711,27 @@
                                 );
                             @endphp
 
-                            <tr>
-                                <td class="px-3 py-2.5">
+                            <tr class="lead-row-main">
+                                <td class="px-2 py-2 align-top">
                                     <input type="checkbox"
                                         value="{{ $lead->id }}"
                                         x-model.number="selected"
                                         class="rounded border-slate-300 text-blue-600">
                                 </td>
 
-                                <td class="min-w-[220px] px-3 py-2.5">
+                                <td class="lead-cell-wrap px-2 py-2 align-top">
                                     <a href="{{ $leadUrl }}" class="lead-click-link">
                                         {{ $lead->name ?: 'Unnamed Lead' }}
                                     </a>
 
-                                    <div class="mt-0.5 text-xs">
+                                    <div class="lead-cell-muted">
                                         <a href="{{ $leadUrl }}" class="lead-sub-click-link">
                                             {{ $lead->company_name ?: 'Individual Lead' }}
                                         </a>
                                     </div>
                                 </td>
 
-                                <td class="min-w-[145px] px-3 py-2.5">
+                                <td class="lead-cell-wrap px-2 py-2 align-top">
                                     @if ($lead->mobile)
                                         <a href="{{ $leadUrl }}" class="lead-click-link text-blue-700">
                                             {{ $lead->mobile }}
@@ -679,14 +741,14 @@
                                     @endif
 
                                     @if ($lead->city)
-                                        <div class="mt-0.5 text-xs text-slate-500">
+                                        <div class="lead-cell-muted">
                                             {{ $lead->city }}
                                         </div>
                                     @endif
                                 </td>
 
                                 {{-- Latest Note + Add Note --}}
-                                <td class="min-w-[320px] max-w-[380px] px-3 py-2.5 align-top">
+                                <td class="lead-cell-wrap px-2 py-2 align-top">
                                     {{-- Normal latest note view --}}
                                     <div x-show="noteLead !== {{ $lead->id }}">
                                         @if ($lead->latest_note_body)
@@ -766,7 +828,7 @@
                                 </td>
 
                                 {{-- Demo Send --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     @if ($lead->demo_send)
                                         <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -780,7 +842,7 @@
                                 </td>
 
                                 {{-- Action --}}
-                                <td class="min-w-[90px] px-3 py-2.5 text-right">
+                                <td class="px-2 py-2 text-right align-top">
                                     <a
                                         href="{{ $leadUrl }}"
                                         class="software-btn software-btn-primary !min-h-[26px] !px-2.5"
@@ -790,8 +852,8 @@
                                 </td>
 
                                 {{-- Labels --}}
-                                <td class="px-3 py-2.5">
-                                    <div class="flex max-w-[260px] flex-wrap gap-1">
+                                <td class="px-2 py-2 align-top">
+                                    <div class="flex flex-wrap gap-1">
                                         @forelse($lead->labels as $label)
                                             <a
                                                 href="{{ route('leads.index', array_merge(request()->except(['page', 'label_id']), ['label_id' => $label->id])) }}"
@@ -811,38 +873,38 @@
                                 </td>
 
                                 {{-- Source --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     {{ $lead->source?->name ?? '—' }}
                                 </td>
 
                                 {{-- Status --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     <span class="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
                                         {{ $lead->status?->name ?? 'New' }}
                                     </span>
                                 </td>
 
                                 {{-- Priority --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     <span class="rounded-full px-2 py-1 text-xs font-semibold capitalize {{ $priorityClass }}">
                                         {{ $lead->priority ?: 'normal' }}
                                     </span>
                                 </td>
 
                                 {{-- Temperature --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     <span class="font-medium capitalize {{ $temperatureClass }}">
                                         {{ $lead->temperature ?: 'cold' }}
                                     </span>
                                 </td>
 
                                 {{-- Team --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     {{ $lead->team?->name ?? '—' }}
                                 </td>
 
                                 {{-- Owner --}}
-                                <td class="px-3 py-2.5">
+                                <td class="px-2 py-2 align-top">
                                     {{ $lead->assignedUser?->name ?? 'Unassigned' }}
                                 </td>
                             </tr>
