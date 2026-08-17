@@ -148,23 +148,133 @@
                 background: #b8c2cf;
                 border-radius: 8px
             }
+
+            .software-ui {
+                max-width: none !important;
+            }
+
+            .software-ui:fullscreen {
+                width: 100%;
+                height: 100%;
+                max-width: none !important;
+                overflow: auto;
+                padding: 14px;
+                background: #f5f7fb;
+            }
+
+            .software-ui:-webkit-full-screen {
+                width: 100%;
+                height: 100%;
+                max-width: none !important;
+                overflow: auto;
+                padding: 14px;
+                background: #f5f7fb;
+            }
+
+            .lead-click-link {
+                color: #0f172a;
+                font-weight: 700;
+                text-decoration: none;
+            }
+
+            .lead-click-link:hover {
+                color: #2563eb;
+                text-decoration: underline;
+            }
+
+            .lead-sub-click-link {
+                color: #64748b;
+                text-decoration: none;
+            }
+
+            .lead-sub-click-link:hover {
+                color: #2563eb;
+                text-decoration: underline;
+            }
+
+            .lead-note-preview {
+                max-width: 280px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .inline-note-box {
+                border: 1px solid #fde68a;
+                background: #fffbeb;
+                border-radius: 8px;
+                padding: 10px;
+            }
+
+            .software-ui textarea {
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 6px !important;
+                background: #fff;
+                font-size: 11px !important;
+                color: #0f172a;
+            }
+
+            .software-ui input:focus,
+            .software-ui select:focus,
+            .software-ui textarea:focus {
+                border-color: #3b82f6 !important;
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, .10);
+            }
+
+            .lead-table-wrap {
+                max-height: calc(100vh - 230px);
+                min-height: 320px;
+            }
+
+            @media (max-width: 768px) {
+                .lead-table-wrap {
+                    max-height: 65vh;
+                }
+            }
         </style>
     @endonce
 
-    <div class="software-ui mx-auto max-w-[1720px] space-y-3 px-1 pb-5" x-data="{
-        selected: [],
-        selectAllPage: false,
-        showFilters: @js(request()->hasAny(['source', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to'])),
-        showBulkModal: false,
-        bulkAction: 'assign',
-        assignmentScope: 'selected',
-        showLabelModal: false,
-        showCreateLabelModal: false,
-        labelAction: 'add',
-        togglePage(ids) {
-            if (this.selectAllPage) { this.selected = [...new Set([...this.selected, ...ids])]; } else { this.selected = this.selected.filter(id => !ids.includes(id)); }
-        }
-    }">
+    <div id="leadWorkspace"
+        class="software-ui mx-auto w-full max-w-none space-y-3 px-1 pb-5"
+        x-data="{
+            selected: [],
+            selectAllPage: false,
+            showFilters: @js(request()->hasAny(['source', 'assigned_to', 'team_id', 'priority', 'temperature', 'date_from', 'date_to'])),
+            showBulkModal: false,
+            bulkAction: 'assign',
+            assignmentScope: 'selected',
+            showLabelModal: false,
+            showCreateLabelModal: false,
+            labelAction: 'add',
+            noteLead: null,
+            isFullscreen: false,
+            togglePage(ids) {
+                if (this.selectAllPage) {
+                    this.selected = [...new Set([...this.selected, ...ids])];
+                } else {
+                    this.selected = this.selected.filter(id => !ids.includes(id));
+                }
+            },
+            async toggleFullscreen() {
+                const el = document.getElementById('leadWorkspace');
+
+                try {
+                    if (!document.fullscreenElement) {
+                        await el.requestFullscreen();
+                    } else {
+                        await document.exitFullscreen();
+                    }
+                } catch (e) {
+                    console.error('Fullscreen failed', e);
+                }
+            }
+        }"
+        x-init="
+            document.addEventListener('fullscreenchange', () => {
+                isFullscreen = !!document.fullscreenElement;
+            });
+        ">
 
         @if (session('success'))
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -184,57 +294,6 @@
                 </ul>
             </div>
         @endif
-
-        <section class="software-toolbar">
-            <div class="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="text-[18px] font-bold uppercase text-slate-900">Lead Management</h1>
-                        <span
-                            class="border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{{ number_format($leads->total()) }}
-                            RECORDS</span>
-                    </div>
-                    <p class="mt-1 text-[11px] text-slate-500">
-                        @if ($hasFullAccess)
-                            Company CRM leads — search, label, assign and manage.
-                        @elseif($isTeamLeader)
-                            Your leads and your team employees' leads.
-                        @else
-                            Leads assigned to your account.
-                        @endif
-                    </p>
-                </div>
-                <div class="flex flex-wrap items-center gap-1.5">
-                    <button type="button" @click="showFilters=!showFilters" class="software-btn"
-                        :class="showFilters ? 'border-blue-500 bg-blue-50 text-blue-700' : ''">FILTERS</button>
-                    @can('leads.labels.manage')
-                    <button type="button" @click="showCreateLabelModal=true" class="software-btn">+ CREATE LABEL</button>
-                    <button type="button"
-                        @click="if(selected.length===0){alert('Please select at least one lead.')}else{labelAction='add';showLabelModal=true}"
-                        class="software-btn border-violet-300 text-violet-700">LABEL SELECTED <span x-show="selected.length"
-                            x-text="'('+selected.length+')'"></span></button>
-                    @endcan
-                    
-                        @can('leads.assign')
-                        <button type="button" @click="bulkAction='assign';assignmentScope='selected';showBulkModal=true"
-                            class="software-btn">BULK ASSIGN</button>
-                            
-                                
-                        <button type="button" @click="bulkAction='unassign';assignmentScope='selected';showBulkModal=true"
-                            class="software-btn border-rose-300 text-rose-700">BULK UNASSIGN</button>
-                            @endcan
-
-                            @can('leads.import') 
-                                <a href="{{ route('leads.import.create') }}" class="software-btn">IMPORT</a>
-                            @endcan
-
-                    
-                    @can('leads.create')
-                    <a href="{{ route('leads.create') }}" class="software-btn software-btn-primary">+ NEW LEAD</a>
-                    @endcan
-                </div>
-            </div>
-        </section>
 
         {{-- Search - Always Visible --}}
         <section class="software-panel">
@@ -351,6 +410,61 @@
             </div>
         </section>
 
+        <section class="software-toolbar">
+            <div class="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-[18px] font-bold uppercase text-slate-900">Lead Management</h1>
+                        <span
+                            class="border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{{ number_format($leads->total()) }}
+                            RECORDS</span>
+                    </div>
+                    <p class="mt-1 text-[11px] text-slate-500">
+                        @if ($hasFullAccess)
+                            Company CRM leads — search, label, assign and manage.
+                        @elseif($isTeamLeader)
+                            Your leads and your team employees' leads.
+                        @else
+                            Leads assigned to your account.
+                        @endif
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <button type="button" @click="toggleFullscreen()"
+                        class="software-btn border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white">
+                        <span x-text="isFullscreen ? 'EXIT FULL SCREEN' : 'FULL SCREEN'"></span>
+                    </button>
+                    <button type="button" @click="showFilters=!showFilters" class="software-btn"
+                        :class="showFilters ? 'border-blue-500 bg-blue-50 text-blue-700' : ''">FILTERS</button>
+                    @can('leads.labels.manage')
+                    <button type="button" @click="showCreateLabelModal=true" class="software-btn">+ CREATE LABEL</button>
+                    <button type="button"
+                        @click="if(selected.length===0){alert('Please select at least one lead.')}else{labelAction='add';showLabelModal=true}"
+                        class="software-btn border-violet-300 text-violet-700">LABEL SELECTED <span x-show="selected.length"
+                            x-text="'('+selected.length+')'"></span></button>
+                    @endcan
+                    
+                        @can('leads.assign')
+                        <button type="button" @click="bulkAction='assign';assignmentScope='selected';showBulkModal=true"
+                            class="software-btn">BULK ASSIGN</button>
+                            
+                                
+                        <button type="button" @click="bulkAction='unassign';assignmentScope='selected';showBulkModal=true"
+                            class="software-btn border-rose-300 text-rose-700">BULK UNASSIGN</button>
+                            @endcan
+
+                            @can('leads.import') 
+                                <a href="{{ route('leads.import.create') }}" class="software-btn">IMPORT</a>
+                            @endcan
+
+                    
+                    @can('leads.create')
+                    <a href="{{ route('leads.create') }}" class="software-btn software-btn-primary">+ NEW LEAD</a>
+                    @endcan
+                </div>
+            </div>
+        </section>
+
         {{-- Call Disposition tabs --}}
         @php
             $dispositionBaseQuery = request()->except(['page', 'call_disposition']);
@@ -458,30 +572,48 @@
         {{-- Table --}}
         <section class="software-panel overflow-hidden">
             <div class="software-panel-title">
-                <span>Lead Register</span>
+                <div class="flex items-center gap-2">
+                    <span>Lead Register</span>
+                    <span class="rounded bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-600">
+                        {{ $leads->count() }} SHOWING
+                    </span>
+                </div>
+
                 <form method="GET" action="{{ route('leads.index') }}" class="flex items-center gap-2">
                     @foreach (request()->except(['page', 'per_page']) as $key => $value)
                         @if (!is_array($value))
                             <input type="hidden" name="{{ $key }}" value="{{ $value }}">
                         @endif
                     @endforeach
-                    <span class="text-[10px] text-slate-500">Per page</span><select name="per_page"
-                        onchange="this.form.submit()" class="!min-h-[28px] !py-1">
+
+                    <span class="text-[10px] text-slate-500">Per page</span>
+
+                    <select name="per_page" onchange="this.form.submit()" class="!min-h-[28px] !py-1">
                         @foreach ([25, 50, 100, 200] as $size)
-                            <option value="{{ $size }}" @selected((int) $perPage === $size)>{{ $size }}</option>
+                            <option value="{{ $size }}" @selected((int) $perPage === $size)>
+                                {{ $size }}
+                            </option>
                         @endforeach
                     </select>
                 </form>
             </div>
-            <div class="crm-scrollbar max-h-[68vh] overflow-auto">
-                <table class="w-full min-w-[1450px] text-sm">
+
+            <div class="crm-scrollbar lead-table-wrap overflow-auto">
+                <table class="w-full min-w-[1750px] text-sm">
                     <thead>
                         <tr class="text-left uppercase">
-                            <th class="w-10 px-3 py-2"><input type="checkbox" x-model="selectAllPage"
+                            <th class="w-10 px-3 py-2">
+                                <input type="checkbox"
+                                    x-model="selectAllPage"
                                     @change="togglePage(@js($leads->pluck('id')->map(fn($id) => (int) $id)->values()))"
-                                    class="rounded border-slate-300 text-blue-600"></th>
-                            <th class="px-3 py-2">Lead</th>
+                                    class="rounded border-slate-300 text-blue-600">
+                            </th>
+
+                            <th class="px-3 py-2">Lead / Business</th>
                             <th class="px-3 py-2">Mobile</th>
+                            <th class="px-3 py-2">Latest Note</th>
+                            <th class="px-3 py-2">Demo Send</th>
+                            <th class="px-3 py-2 text-right">Action</th>
                             <th class="px-3 py-2">Labels</th>
                             <th class="px-3 py-2">Source</th>
                             <th class="px-3 py-2">Status</th>
@@ -489,10 +621,10 @@
                             <th class="px-3 py-2">Temp.</th>
                             <th class="px-3 py-2">Team</th>
                             <th class="px-3 py-2">Owner</th>
-                            <th class="px-3 py-2">Demo Send</th>
-                            <th class="px-3 py-2 text-right">Action</th>
+
                         </tr>
                     </thead>
+
                     <tbody class="bg-white">
                         @forelse($leads as $lead)
                             @php
@@ -501,51 +633,140 @@
                                     'high' => 'bg-amber-50 text-amber-700',
                                     default => 'bg-slate-100 text-slate-700',
                                 };
+
                                 $temperatureClass = match ($lead->temperature) {
                                     'hot' => 'text-rose-700',
                                     'warm' => 'text-amber-700',
                                     default => 'text-blue-700',
                                 };
+
+                                $leadUrl = route(
+                                    'leads.show',
+                                    array_merge(
+                                        ['lead' => $lead->id],
+                                        request()->except('page')
+                                    )
+                                );
                             @endphp
+
                             <tr>
-                                <td class="px-3 py-2.5"><input type="checkbox" value="{{ $lead->id }}"
-                                        x-model.number="selected" class="rounded border-slate-300 text-blue-600"></td>
                                 <td class="px-3 py-2.5">
-                                    <div class="font-semibold text-slate-900">{{ $lead->name }}</div>
-                                    <div class="text-xs text-slate-500">{{ $lead->company_name ?: 'Individual Lead' }}
+                                    <input type="checkbox"
+                                        value="{{ $lead->id }}"
+                                        x-model.number="selected"
+                                        class="rounded border-slate-300 text-blue-600">
+                                </td>
+
+                                <td class="min-w-[220px] px-3 py-2.5">
+                                    <a href="{{ $leadUrl }}" class="lead-click-link">
+                                        {{ $lead->name ?: 'Unnamed Lead' }}
+                                    </a>
+
+                                    <div class="mt-0.5 text-xs">
+                                        <a href="{{ $leadUrl }}" class="lead-sub-click-link">
+                                            {{ $lead->company_name ?: 'Individual Lead' }}
+                                        </a>
                                     </div>
                                 </td>
-                                <td class="px-3 py-2.5">
-                                    <div class="font-semibold text-slate-800">{{ $lead->mobile }}</div>
+
+                                <td class="min-w-[145px] px-3 py-2.5">
+                                    @if ($lead->mobile)
+                                        <a href="{{ $leadUrl }}" class="lead-click-link text-blue-700">
+                                            {{ $lead->mobile }}
+                                        </a>
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+
                                     @if ($lead->city)
-                                        <div class="text-xs text-slate-500">{{ $lead->city }}</div>
+                                        <div class="mt-0.5 text-xs text-slate-500">
+                                            {{ $lead->city }}
+                                        </div>
                                     @endif
                                 </td>
-                                <td class="px-3 py-2.5">
-                                    <div class="flex max-w-[260px] flex-wrap gap-1">
-                                        @forelse($lead->labels as $label)
-                                            <a href="{{ route('leads.index', array_merge(request()->except(['page', 'label_id']), ['label_id' => $label->id])) }}"
-                                                class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
-                                                style="border-color:{{ $label->color }}55;background:{{ $label->color }}12;color:{{ $label->color }}"><span
-                                                    class="h-1.5 w-1.5 rounded-full"
-                                                style="background:{{ $label->color }}"></span>{{ $label->name }}</a>@empty<span
-                                                class="text-xs text-slate-400">—</span>
-                                        @endforelse
+
+                                {{-- Latest Note + Add Note --}}
+                                <td class="min-w-[320px] max-w-[380px] px-3 py-2.5 align-top">
+                                    {{-- Normal latest note view --}}
+                                    <div x-show="noteLead !== {{ $lead->id }}">
+                                        @if ($lead->latest_note_body)
+                                            <div class="lead-note-preview text-[11px] font-medium text-slate-700"
+                                                title="{{ $lead->latest_note_body }}">
+                                                {{ $lead->latest_note_body }}
+                                            </div>
+
+                                            <div class="mt-1 text-[9px] text-slate-400">
+                                                {{ $lead->latest_note_user_name ?: 'User' }}
+
+                                                @if ($lead->latest_note_created_at)
+                                                    ·
+                                                    {{ \Illuminate\Support\Carbon::parse($lead->latest_note_created_at)->format('d M, h:i A') }}
+                                                @endif
+                                            </div>
+                                        @else
+                                            <div class="text-[11px] text-slate-400">
+                                                No note yet
+                                            </div>
+                                        @endif
+
+                                        <button
+                                            type="button"
+                                            @click="noteLead = {{ $lead->id }}"
+                                            class="software-btn mt-2 !min-h-[26px] !px-2.5 border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-400 hover:bg-amber-100 hover:text-amber-800"
+                                        >
+                                            + ADD NOTE
+                                        </button>
+                                    </div>
+
+                                    {{-- Note form opens inside this same Latest Note cell --}}
+                                    <div
+                                        x-show="noteLead === {{ $lead->id }}"
+                                        x-cloak
+                                        class="inline-note-box"
+                                    >
+                                        <form
+                                            method="POST"
+                                            action="{{ route('leads.notes', $lead) }}"
+                                            @submit="noteLead = null"
+                                            class="space-y-2"
+                                        >
+                                            @csrf
+
+                                            <div class="flex items-center justify-between gap-2">
+                                                <div class="text-[10px] font-bold text-slate-800">
+                                                    Add Note
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    @click="noteLead = null"
+                                                    class="text-[10px] font-bold text-slate-400 hover:text-rose-600"
+                                                >
+                                                    CANCEL
+                                                </button>
+                                            </div>
+
+                                            <textarea
+                                                name="body"
+                                                rows="3"
+                                                maxlength="3000"
+                                                required
+                                                class="w-full resize-y px-2.5 py-2"
+                                                placeholder="Customer discussion, follow-up, requirement ya important note..."
+                                            ></textarea>
+
+                                            <button
+                                                type="submit"
+                                                class="software-btn software-btn-primary w-full !min-h-[28px]"
+                                            >
+                                                SAVE NOTE
+                                            </button>
+                                        </form>
                                     </div>
                                 </td>
-                                <td class="px-3 py-2.5">{{ $lead->source?->name ?? '—' }}</td>
-                                <td class="px-3 py-2.5"><span
-                                        class="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{{ $lead->status?->name ?? 'New' }}</span>
-                                </td>
-                                <td class="px-3 py-2.5"><span
-                                        class="rounded-full px-2 py-1 text-xs font-semibold capitalize {{ $priorityClass }}">{{ $lead->priority }}</span>
-                                </td>
-                                <td class="px-3 py-2.5"><span
-                                        class="font-medium capitalize {{ $temperatureClass }}">{{ $lead->temperature }}</span>
-                                </td>
-                                <td class="px-3 py-2.5">{{ $lead->team?->name ?? '—' }}</td>
-                                <td class="px-3 py-2.5">{{ $lead->assignedUser?->name ?? 'Unassigned' }}</td>
-                                                                <td class="px-3 py-2">
+
+                                {{-- Demo Send --}}
+                                <td class="px-3 py-2.5">
                                     @if ($lead->demo_send)
                                         <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -558,20 +779,89 @@
                                     @endif
                                 </td>
 
-<td class="px-3 py-2.5 text-right"><a
-                                        href="{{ route('leads.show', array_merge(['lead' => $lead->id], request()->except('page'))) }}"
-                                        class="software-btn !min-h-[26px] !px-2.5 text-blue-700">OPEN</a></td>
+                                {{-- Action --}}
+                                <td class="min-w-[90px] px-3 py-2.5 text-right">
+                                    <a
+                                        href="{{ $leadUrl }}"
+                                        class="software-btn software-btn-primary !min-h-[26px] !px-2.5"
+                                    >
+                                        OPEN
+                                    </a>
+                                </td>
+
+                                {{-- Labels --}}
+                                <td class="px-3 py-2.5">
+                                    <div class="flex max-w-[260px] flex-wrap gap-1">
+                                        @forelse($lead->labels as $label)
+                                            <a
+                                                href="{{ route('leads.index', array_merge(request()->except(['page', 'label_id']), ['label_id' => $label->id])) }}"
+                                                class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
+                                                style="border-color:{{ $label->color }}55;background:{{ $label->color }}12;color:{{ $label->color }}"
+                                            >
+                                                <span
+                                                    class="h-1.5 w-1.5 rounded-full"
+                                                    style="background:{{ $label->color }}"
+                                                ></span>
+                                                {{ $label->name }}
+                                            </a>
+                                        @empty
+                                            <span class="text-xs text-slate-400">—</span>
+                                        @endforelse
+                                    </div>
+                                </td>
+
+                                {{-- Source --}}
+                                <td class="px-3 py-2.5">
+                                    {{ $lead->source?->name ?? '—' }}
+                                </td>
+
+                                {{-- Status --}}
+                                <td class="px-3 py-2.5">
+                                    <span class="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                                        {{ $lead->status?->name ?? 'New' }}
+                                    </span>
+                                </td>
+
+                                {{-- Priority --}}
+                                <td class="px-3 py-2.5">
+                                    <span class="rounded-full px-2 py-1 text-xs font-semibold capitalize {{ $priorityClass }}">
+                                        {{ $lead->priority ?: 'normal' }}
+                                    </span>
+                                </td>
+
+                                {{-- Temperature --}}
+                                <td class="px-3 py-2.5">
+                                    <span class="font-medium capitalize {{ $temperatureClass }}">
+                                        {{ $lead->temperature ?: 'cold' }}
+                                    </span>
+                                </td>
+
+                                {{-- Team --}}
+                                <td class="px-3 py-2.5">
+                                    {{ $lead->team?->name ?? '—' }}
+                                </td>
+
+                                {{-- Owner --}}
+                                <td class="px-3 py-2.5">
+                                    {{ $lead->assignedUser?->name ?? 'Unassigned' }}
+                                </td>
                             </tr>
+
                         @empty
                             <tr>
-                                <td colspan="11" class="px-5 py-14 text-center text-slate-500">No leads found.</td>
+                                <td colspan="13" class="px-5 py-14 text-center text-slate-500">
+                                    No leads found.
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
+
             @if ($leads->hasPages())
-                <div class="border-t border-slate-200 bg-slate-50 px-3 py-2">{{ $leads->links() }}</div>
+                <div class="border-t border-slate-200 bg-slate-50 px-3 py-2">
+                    {{ $leads->links() }}
+                </div>
             @endif
         </section>
 
