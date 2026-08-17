@@ -327,6 +327,39 @@
                                         </a>
                                         @endcan
                                     @endif
+
+                                    @if ((int) $loggedInUser->id !== (int) $employee->id)
+                                        @can('employees.delete')
+                                            <form
+                                                method="POST"
+                                                action="{{ route('employees.destroy', $employee) }}"
+                                                onsubmit="return confirm('Are you sure you want to delete {{ addslashes($employee->name) }}? This action cannot be undone.')"
+                                            >
+                                                @csrf
+                                                @method('DELETE')
+
+                                                <button
+                                                    type="submit"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-100"
+                                                >
+                                                    <svg
+                                                        class="h-3.5 w-3.5"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        stroke-width="2"
+                                                    >
+                                                        <path d="M3 6h18"/>
+                                                        <path d="M8 6V4h8v2"/>
+                                                        <path d="M19 6l-1 14H6L5 6"/>
+                                                        <path d="M10 11v5M14 11v5"/>
+                                                    </svg>
+
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        @endcan
+                                    @endif
                                 </div>
                             </td>
                         </tr>
