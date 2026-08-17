@@ -554,69 +554,334 @@
 
         {{-- Filters --}}
         <section x-show="showFilters" x-cloak class="software-panel">
-            <div class="software-panel-title"><span>Filters</span><a href="{{ route('leads.index') }}"
-                    class="text-[10px] font-bold text-rose-600">RESET ALL</a></div>
-            <form method="GET" action="{{ route('leads.index') }}"
-                class="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                <input type="hidden" name="search" value="{{ request('search') }}">
-                <input type="hidden" name="demo_send" value="{{ request('demo_send') }}">
-                <input type="hidden" name="call_disposition" value="{{ request('call_disposition') }}">
-                <input type="hidden" name="label_id" value="{{ request('label_id') }}">
-                <div><label class="software-label">Source</label><select name="source" class="w-full">
-                        <option value="">All Sources</option>
+
+            <div class="software-panel-title">
+                <span>Filters</span>
+
+                <a
+                    href="{{ route('leads.index') }}"
+                    class="text-[10px] font-bold text-rose-600"
+                >
+                    RESET ALL
+                </a>
+            </div>
+
+            <form
+                method="GET"
+                action="{{ route('leads.index') }}"
+                class="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+            >
+
+                {{-- Preserve existing filters/tabs --}}
+                <input
+                    type="hidden"
+                    name="search"
+                    value="{{ request('search') }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="demo_send"
+                    value="{{ request('demo_send') }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="call_disposition"
+                    value="{{ request('call_disposition') }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="label_id"
+                    value="{{ request('label_id') }}"
+                >
+
+
+                {{-- Source --}}
+                <div>
+                    <label class="software-label">
+                        Source
+                    </label>
+
+                    <select
+                        name="source"
+                        class="w-full"
+                    >
+                        <option value="">
+                            All Sources
+                        </option>
+
                         @foreach ($sources as $source)
-                            <option value="{{ $source->id }}" @selected((string) request('source') === (string) $source->id)>{{ $source->name }}</option>
+                            <option
+                                value="{{ $source->id }}"
+                                @selected(
+                                    (string) request('source')
+                                    ===
+                                    (string) $source->id
+                                )
+                            >
+                                {{ $source->name }}
+                            </option>
+                        @endforeach
+
+                    </select>
+                </div>
+
+
+                {{-- Category --}}
+                <div>
+                    <label class="software-label">
+                        Category
+                    </label>
+
+                    <select
+                        name="category"
+                        class="w-full"
+                    >
+                        <option value="">
+                            All Categories
+                        </option>
+
+                        @foreach ($categories as $category)
+                            <option
+                                value="{{ $category }}"
+                                @selected(
+                                    (string) request('category')
+                                    ===
+                                    (string) $category
+                                )
+                            >
+                                {{ $category }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
+
+
+                {{-- Employee --}}
                 @if ($canFilterByEmployee)
-                    <div><label class="software-label">Employee</label><select name="assigned_to" class="w-full">
-                            <option value="">All Employees</option>
+
+                    <div>
+                        <label class="software-label">
+                            Employee
+                        </label>
+
+                        <select
+                            name="assigned_to"
+                            class="w-full"
+                        >
+                            <option value="">
+                                All Employees
+                            </option>
+
                             @if ($hasFullAccess)
-                                <option value="unassigned" @selected(request('assigned_to') === 'unassigned')>Unassigned</option>
-                                @endif @foreach ($users as $user)
-                                    <option value="{{ $user->id }}" @selected((string) request('assigned_to') === (string) $user->id)>{{ $user->name }}
-                                    </option>
-                                @endforeach
-                        </select>
-                    </div>
-                @endif
-                @if ($canFilterByTeam)
-                    <div><label class="software-label">Team</label><select name="team_id" class="w-full">
-                            <option value="">All Teams</option>
-                            @foreach ($teams as $team)
-                                <option value="{{ $team->id }}" @selected((string) request('team_id') === (string) $team->id)>{{ $team->name }}
+                                <option
+                                    value="unassigned"
+                                    @selected(
+                                        request('assigned_to')
+                                        ===
+                                        'unassigned'
+                                    )
+                                >
+                                    Unassigned
+                                </option>
+                            @endif
+
+                            @foreach ($users as $user)
+                                <option
+                                    value="{{ $user->id }}"
+                                    @selected(
+                                        (string) request('assigned_to')
+                                        ===
+                                        (string) $user->id
+                                    )
+                                >
+                                    {{ $user->name }}
+
+                                    @if ($user->employee_code)
+                                        ({{ $user->employee_code }})
+                                    @endif
                                 </option>
                             @endforeach
+
                         </select>
                     </div>
+
                 @endif
-                <div><label class="software-label">Priority</label><select name="priority" class="w-full">
-                        <option value="">All</option>
-                        @foreach (['low', 'normal', 'high', 'urgent', 'hot'] as $p)
-                            <option value="{{ $p }}" @selected(request('priority') === $p)>{{ ucfirst($p) }}</option>
+
+
+                {{-- Team --}}
+                @if ($canFilterByTeam)
+
+                    <div>
+                        <label class="software-label">
+                            Team
+                        </label>
+
+                        <select
+                            name="team_id"
+                            class="w-full"
+                        >
+                            <option value="">
+                                All Teams
+                            </option>
+
+                            @foreach ($teams as $team)
+                                <option
+                                    value="{{ $team->id }}"
+                                    @selected(
+                                        (string) request('team_id')
+                                        ===
+                                        (string) $team->id
+                                    )
+                                >
+                                    {{ $team->name }}
+                                </option>
+                            @endforeach
+
+                        </select>
+                    </div>
+
+                @endif
+
+
+                {{-- Priority --}}
+                <div>
+                    <label class="software-label">
+                        Priority
+                    </label>
+
+                    <select
+                        name="priority"
+                        class="w-full"
+                    >
+                        <option value="">
+                            All
+                        </option>
+
+                        @foreach ([
+                            'low',
+                            'normal',
+                            'high',
+                            'urgent',
+                            'hot'
+                        ] as $p)
+
+                            <option
+                                value="{{ $p }}"
+                                @selected(
+                                    request('priority') === $p
+                                )
+                            >
+                                {{ ucfirst($p) }}
+                            </option>
+
                         @endforeach
                     </select>
                 </div>
-                <div><label class="software-label">Temperature</label><select name="temperature" class="w-full">
-                        <option value="">All</option>
-                        @foreach (['cold', 'warm', 'hot'] as $t)
-                            <option value="{{ $t }}" @selected(request('temperature') === $t)>{{ ucfirst($t) }}</option>
+
+
+                {{-- Temperature --}}
+                <div>
+                    <label class="software-label">
+                        Temperature
+                    </label>
+
+                    <select
+                        name="temperature"
+                        class="w-full"
+                    >
+                        <option value="">
+                            All
+                        </option>
+
+                        @foreach ([
+                            'cold',
+                            'warm',
+                            'hot'
+                        ] as $t)
+
+                            <option
+                                value="{{ $t }}"
+                                @selected(
+                                    request('temperature') === $t
+                                )
+                            >
+                                {{ ucfirst($t) }}
+                            </option>
+
                         @endforeach
                     </select>
                 </div>
-                <div><label class="software-label">From Date</label><input type="date" name="date_from"
-                        value="{{ request('date_from') }}" class="w-full"></div>
-                <div><label class="software-label">To Date</label><input type="date" name="date_to"
-                        value="{{ request('date_to') }}" class="w-full"></div>
-                <div><label class="software-label">Per Page</label><select name="per_page" class="w-full">
+
+
+                {{-- From Date --}}
+                <div>
+                    <label class="software-label">
+                        From Date
+                    </label>
+
+                    <input
+                        type="date"
+                        name="date_from"
+                        value="{{ request('date_from') }}"
+                        class="w-full"
+                    >
+                </div>
+
+
+                {{-- To Date --}}
+                <div>
+                    <label class="software-label">
+                        To Date
+                    </label>
+
+                    <input
+                        type="date"
+                        name="date_to"
+                        value="{{ request('date_to') }}"
+                        class="w-full"
+                    >
+                </div>
+
+
+                {{-- Per Page --}}
+                <div>
+                    <label class="software-label">
+                        Per Page
+                    </label>
+
+                    <select
+                        name="per_page"
+                        class="w-full"
+                    >
                         @foreach ([25, 50, 100, 200] as $size)
-                            <option value="{{ $size }}" @selected((int) $perPage === $size)>{{ $size }}</option>
+
+                            <option
+                                value="{{ $size }}"
+                                @selected(
+                                    (int) $perPage === $size
+                                )
+                            >
+                                {{ $size }}
+                            </option>
+
                         @endforeach
                     </select>
                 </div>
-                <div class="flex items-end"><button class="software-btn software-btn-primary w-full">APPLY
-                        FILTERS</button></div>
+
+
+                {{-- Apply --}}
+                <div class="flex items-end">
+                    <button
+                        type="submit"
+                        class="software-btn software-btn-primary w-full"
+                    >
+                        APPLY FILTERS
+                    </button>
+                </div>
+
             </form>
         </section>
 
