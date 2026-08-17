@@ -300,6 +300,50 @@
                         <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
                     @enderror
                 </label>
+
+
+                {{-- Employee Status --}}
+                <label class="block sm:col-span-2 lg:col-span-3">
+                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                        Employee Status
+                    </span>
+
+                    <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                        <input
+                            type="hidden"
+                            name="is_active"
+                            value="0"
+                        >
+
+                        <input
+                            type="checkbox"
+                            name="is_active"
+                            id="is_active"
+                            value="1"
+                            @checked(
+                                old(
+                                    'is_active',
+                                    $isEdit ? (bool) $employee->is_active : true
+                                )
+                            )
+                            class="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <label for="is_active" class="cursor-pointer">
+                            <span class="block text-sm font-semibold text-slate-800">
+                                Active Employee
+                            </span>
+
+                            <span class="block text-xs text-slate-500">
+                                Active hone par employee apna account use kar sakega.
+                            </span>
+                        </label>
+                    </div>
+
+                    @error('is_active')
+                        <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                    @enderror
+                </label>
             </div>
         </section>
 
