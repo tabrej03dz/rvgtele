@@ -19,6 +19,8 @@ class Lead extends Model
             'last_contact_at'      => 'datetime',
             'custom_data'          => 'array',
             'do_not_call'          => 'boolean',
+            'demo_send' => 'boolean',
+            'demo_sent_at' => 'datetime',
         ];
     }
 

@@ -3,7 +3,7 @@
 ])
 
 @section('content')
-@php
+{{-- @php
     $stats = [
         [
             'label' => 'Total Leads',
@@ -54,6 +54,114 @@
             'bg' => 'bg-indigo-50',
         ],
     ];
+@endphp --}}
+
+@php
+    $stats = [
+        [
+            'label' => 'Total Leads',
+            'value' => number_format($totalLeads),
+            'accent' => 'text-blue-700',
+            'bg' => 'bg-blue-50',
+            'url' => route('leads.index'),
+        ],
+
+        [
+            'label' => 'New Today',
+            'value' => number_format($newToday),
+            'accent' => 'text-violet-700',
+            'bg' => 'bg-violet-50',
+            'url' => route('leads.index', [
+                'created_filter' => 'today',
+            ]),
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Today Lead Send
+        |--------------------------------------------------------------------------
+        */
+
+        [
+            'label' => 'Today Lead Send',
+            'value' => number_format($todayLeadSend),
+            'accent' => 'text-green-700',
+            'bg' => 'bg-green-50',
+
+            'url' => route('leads.index', [
+                'lead_send' => 'today',
+            ]),
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Total Lead Send
+        |--------------------------------------------------------------------------
+        */
+
+        [
+            'label' => 'Total Lead Send',
+            'value' => number_format($totalLeadSend),
+            'accent' => 'text-teal-700',
+            'bg' => 'bg-teal-50',
+
+            'url' => route('leads.index', [
+                'lead_send' => 'all',
+            ]),
+        ],
+
+        [
+            'label' => 'Calls Today',
+            'value' => number_format($callsToday),
+            'accent' => 'text-sky-700',
+            'bg' => 'bg-sky-50',
+            'url' => route('calls.index'),
+        ],
+
+        [
+            'label' => 'Connected',
+            'value' => number_format($connectedToday),
+            'accent' => 'text-emerald-700',
+            'bg' => 'bg-emerald-50',
+            'url' => route('calls.index'),
+        ],
+
+        [
+            'label' => 'Due Follow-ups',
+            'value' => number_format($followUpsDue),
+            'accent' => 'text-amber-700',
+            'bg' => 'bg-amber-50',
+            'url' => route('followups.index', [
+                'status' => 'due_today',
+            ]),
+        ],
+
+        [
+            'label' => 'Overdue',
+            'value' => number_format($overdue),
+            'accent' => 'text-rose-700',
+            'bg' => 'bg-rose-50',
+            'url' => route('followups.index', [
+                'status' => 'overdue',
+            ]),
+        ],
+
+        [
+            'label' => 'Active Employees',
+            'value' => number_format($activeUsers),
+            'accent' => 'text-slate-700',
+            'bg' => 'bg-slate-100',
+            'url' => null,
+        ],
+
+        [
+            'label' => 'Sales Value',
+            'value' => '₹' . number_format($sales, 2),
+            'accent' => 'text-indigo-700',
+            'bg' => 'bg-indigo-50',
+            'url' => null,
+        ],
+    ];
 @endphp
 
 <div class="mx-auto max-w-7xl space-y-5">
@@ -96,23 +204,85 @@
 
     {{-- KPI Cards --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
         @foreach ($stats as $stat)
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <div>
-                        <div class="text-sm font-medium text-slate-500">
-                            {{ $stat['label'] }}
+
+            @if (!empty($stat['url']))
+
+                <a
+                    href="{{ $stat['url'] }}"
+                    class="group block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+                >
+                    <div class="flex items-center justify-between gap-3">
+
+                        <div>
+                            <div
+                                class="text-sm font-medium text-slate-500 transition group-hover:text-slate-700"
+                            >
+                                {{ $stat['label'] }}
+                            </div>
+
+                            <div
+                                class="mt-2 text-2xl font-bold {{ $stat['accent'] }}"
+                            >
+                                {{ $stat['value'] }}
+                            </div>
+
+                            <div
+                                class="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 group-hover:text-blue-600"
+                            >
+                                View Leads →
+                            </div>
                         </div>
 
-                        <div class="mt-2 text-2xl font-bold {{ $stat['accent'] }}">
-                            {{ $stat['value'] }}
+                        <div
+                            class="flex h-10 w-10 items-center justify-center rounded-lg {{ $stat['bg'] }}"
+                        >
+                            <svg
+                                class="h-5 w-5 {{ $stat['accent'] }}"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path d="M5 12h14"/>
+                                <path d="m13 6 6 6-6 6"/>
+                            </svg>
                         </div>
+
                     </div>
+                </a>
 
-                    <div class="h-10 w-10 rounded-lg {{ $stat['bg'] }}"></div>
+            @else
+
+                <div
+                    class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                    <div class="flex items-center justify-between gap-3">
+
+                        <div>
+                            <div class="text-sm font-medium text-slate-500">
+                                {{ $stat['label'] }}
+                            </div>
+
+                            <div
+                                class="mt-2 text-2xl font-bold {{ $stat['accent'] }}"
+                            >
+                                {{ $stat['value'] }}
+                            </div>
+                        </div>
+
+                        <div
+                            class="h-10 w-10 rounded-lg {{ $stat['bg'] }}"
+                        ></div>
+
+                    </div>
                 </div>
-            </div>
+
+            @endif
+
         @endforeach
+
     </div>
 
     {{-- Quick Links --}}
