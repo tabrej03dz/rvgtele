@@ -54,22 +54,22 @@
 
 
     @php
-        $superAdmin = App\Models\User::firstOrCreate(
-            [
-                'email' => 'super@admin.com',
-            ],
-            [
-                'company_id'       => 1,
-                'branch_id'        => 2,
-                'name'             => 'Super Admin',
-                'phone'            => '9999999999',
-                'employee_code'    => 'SUPER001',
-                'password'         => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
+        // $superAdmin = App\Models\User::firstOrCreate(
+        //     [
+        //         'email' => 'super@admin.com',
+        //     ],
+        //     [
+        //         'company_id'       => 1,
+        //         'branch_id'        => 2,
+        //         'name'             => 'Super Admin',
+        //         'phone'            => '9999999999',
+        //         'employee_code'    => 'SUPER001',
+        //         'password'         => Hash::make('password'),
+        //         'email_verified_at' => now(),
+        //     ]
+        // );
 
-        $superAdmin->syncRoles(['super_admin']);
+        // $superAdmin->syncRoles(['super_admin']);
 
     @endphp
     {{-- Navigation --}}
