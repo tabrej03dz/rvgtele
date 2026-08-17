@@ -93,43 +93,154 @@ class EmployeeController extends Controller
         ]);
     }
 
+    // public function create(Request $request)
+    // {
+    //     $loggedInUser = $request->user();
+    //     $companyId = $loggedInUser->company_id;
+
+
+    //     $allowedRoles = $this->getAllowedRoleNames($loggedInUser);
+
+    //     $branches = Branch::query()
+    //         ->where('company_id', $companyId);
+
+    //     if (! empty($loggedInUser->branch_id)) {
+    //         $branches->where('id', $loggedInUser->branch_id);
+    //     } else {
+    //         $branches->whereRaw('1 = 0');
+    //     }
+
+    //     return view('employees.form', [
+    //         'employee' => new User(),
+
+    //         'branches' => $branches
+    //             ->orderBy('name')
+    //             ->get(),
+
+    //         'teams' => Team::query()
+    //             ->where('company_id', $companyId)
+    //             ->when(
+    //                 ! empty($loggedInUser->team_id)
+    //                 && $this->getUserRoleLevel($loggedInUser) <= $this->roleHierarchy['sales_manager'],
+    //                 fn (Builder $query) => $query->where('id', $loggedInUser->team_id)
+    //             )
+    //             ->orderBy('name')
+    //             ->get(),
+
+    //         'roles' => $this->getAllowedRoles($loggedInUser),
+    //     ]);
+    // }
+
+
     public function create(Request $request)
-    {
-        $loggedInUser = $request->user();
-        $companyId = $loggedInUser->company_id;
+{
+    $loggedInUser = $request->user();
 
+    /*
+    |--------------------------------------------------------------------------
+    | Company
+    |--------------------------------------------------------------------------
+    |
+    | Normally logged-in user's company use hogi.
+    | Super Admin business/company context me hai to company_id available
+    | hona chahiye.
+    |
+    */
 
-        $allowedRoles = $this->getAllowedRoleNames($loggedInUser);
+    $companyId = $loggedInUser->company_id;
 
-        $branches = Branch::query()
-            ->where('company_id', $companyId);
+    abort_if(
+        empty($companyId),
+        422,
+        'Employee create karne se pehle company select karein.'
+    );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Roles
+    |--------------------------------------------------------------------------
+    */
+
+    $roles = $this->getAllowedRoles($loggedInUser);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Branches
+    |--------------------------------------------------------------------------
+    |
+    | Super Admin  => current company ki sabhi branches
+    | Owner        => current company ki sabhi branches
+    | Admin/etc    => apni assigned branch
+    |
+    */
+
+    $branchesQuery = Branch::query()
+        ->where('company_id', $companyId);
+
+    if (
+        ! $loggedInUser->hasRole('super_admin')
+        && ! $loggedInUser->hasRole('owner')
+    ) {
         if (! empty($loggedInUser->branch_id)) {
-            $branches->where('id', $loggedInUser->branch_id);
+            $branchesQuery->where('id', $loggedInUser->branch_id);
         } else {
-            $branches->whereRaw('1 = 0');
+            /*
+             * Restricted user ko branch assigned nahi hai,
+             * to woh kisi random branch me employee create nahi karega.
+             */
+            $branchesQuery->whereRaw('1 = 0');
         }
-
-        return view('employees.form', [
-            'employee' => new User(),
-
-            'branches' => $branches
-                ->orderBy('name')
-                ->get(),
-
-            'teams' => Team::query()
-                ->where('company_id', $companyId)
-                ->when(
-                    ! empty($loggedInUser->team_id)
-                    && $this->getUserRoleLevel($loggedInUser) <= $this->roleHierarchy['sales_manager'],
-                    fn (Builder $query) => $query->where('id', $loggedInUser->team_id)
-                )
-                ->orderBy('name')
-                ->get(),
-
-            'roles' => $this->getAllowedRoles($loggedInUser),
-        ]);
     }
+
+    $branches = $branchesQuery
+        ->orderBy('name')
+        ->get();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Teams
+    |--------------------------------------------------------------------------
+    */
+
+    $teamsQuery = Team::query()
+        ->where('company_id', $companyId);
+
+    /*
+     * Sales Manager / Team Leader apni team tak restricted rahenge.
+     */
+    if (
+        ! $loggedInUser->hasRole('super_admin')
+        && ! $loggedInUser->hasRole('owner')
+        && ! empty($loggedInUser->team_id)
+        && $this->getUserRoleLevel($loggedInUser)
+            <= $this->roleHierarchy['sales_manager']
+    ) {
+        $teamsQuery->where('id', $loggedInUser->team_id);
+    }
+
+    /*
+     * Non-super-admin/non-owner user ke paas branch hai to
+     * us branch ki teams hi show hongi.
+     */
+    if (
+        ! $loggedInUser->hasRole('super_admin')
+        && ! $loggedInUser->hasRole('owner')
+        && ! empty($loggedInUser->branch_id)
+    ) {
+        $teamsQuery->where('branch_id', $loggedInUser->branch_id);
+    }
+
+    $teams = $teamsQuery
+        ->orderBy('name')
+        ->get();
+
+    return view('employees.form', [
+        'employee' => new User(),
+        'branches' => $branches,
+        'teams' => $teams,
+        'roles' => $roles,
+    ]);
+}
 
     public function store(Request $request)
     {
