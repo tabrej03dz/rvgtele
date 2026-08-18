@@ -163,6 +163,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FollowUp;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -170,20 +171,10 @@ use Illuminate\View\View;
 
 class FollowUpController extends Controller
 {
-    /**
-     * Follow-ups listing.
-     */
     public function index(Request $request): View
     {
         $user = $request->user();
-
         $companyId = (int) $user->company_id;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Base Query
-        |--------------------------------------------------------------------------
-        */
 
         $query = FollowUp::query()
             ->with([
@@ -192,21 +183,13 @@ class FollowUpController extends Controller
             ])
             ->where('company_id', $companyId);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Status Filter
-        |--------------------------------------------------------------------------
-        */
-
         if ($request->status === 'overdue') {
-
             $query
                 ->where('status', 'pending')
                 ->whereNotNull('scheduled_at')
                 ->where('scheduled_at', '<', now());
 
         } elseif ($request->status === 'due_soon') {
-
             $query
                 ->where('status', 'pending')
                 ->whereNotNull('scheduled_at')
@@ -216,15 +199,8 @@ class FollowUpController extends Controller
                 ]);
 
         } elseif ($request->filled('status')) {
-
             $query->where('status', $request->status);
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Follow-ups
-        |--------------------------------------------------------------------------
-        */
 
         $followups = $query
             ->orderByRaw("
@@ -245,17 +221,10 @@ class FollowUpController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Summary Cards
-        |--------------------------------------------------------------------------
-        */
-
         $base = FollowUp::query()
             ->where('company_id', $companyId);
 
-        $totalCount = (clone $base)
-            ->count();
+        $totalCount = (clone $base)->count();
 
         $pendingCount = (clone $base)
             ->where('status', 'pending')
@@ -291,22 +260,14 @@ class FollowUpController extends Controller
     }
 
     /**
-     * Get follow-ups which need reminder.
-     *
-     * Reminder starts 5 minutes before scheduled time.
-     * Only currently logged-in user's assigned follow-ups are returned.
+     * Reminder starts 10 minutes before scheduled time.
+     * Overdue pending follow-ups are also returned.
      */
     public function reminders(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | User Must Belong To Company
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$user->company_id) {
+        if (!$user || !$user->company_id) {
             return response()->json([
                 'success' => true,
                 'reminders' => [],
@@ -317,144 +278,193 @@ class FollowUpController extends Controller
         $companyId = (int) $user->company_id;
         $userId = (int) $user->id;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Reminder Window
-        |--------------------------------------------------------------------------
-        |
-        | Current time se lekar next 5 minutes tak ke follow-ups.
-        |
-        | Example:
-        |
-        | Follow-up = 4:30 PM
-        | Reminder start = 4:25 PM
-        |
-        |--------------------------------------------------------------------------
-        */
-
         $now = now();
-
-        $fiveMinutesLater = $now->copy()->addMinutes(5);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Fetch Reminders
-        |--------------------------------------------------------------------------
-        */
+        $tenMinutesLater = $now->copy()->addMinutes(10);
 
         $followUps = FollowUp::query()
             ->with([
-                'lead:id,name,mobile',
-                'assignedUser:id,name',
+                'lead',
+                'assignedUser',
             ])
             ->where('company_id', $companyId)
             ->where('assigned_to', $userId)
             ->where('status', 'pending')
             ->whereNotNull('scheduled_at')
-            ->whereBetween('scheduled_at', [
-                $now,
-                $fiveMinutesLater,
-            ])
+            ->where('scheduled_at', '<=', $tenMinutesLater)
             ->orderBy('scheduled_at')
-            ->limit(10)
+            ->limit(20)
             ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Format Response
-        |--------------------------------------------------------------------------
-        */
+        $reminders = $followUps
+            ->map(function (FollowUp $followUp) use ($now) {
+                $scheduledAt = $followUp->scheduled_at
+                    ? Carbon::parse($followUp->scheduled_at)
+                    : null;
 
-        $reminders = $followUps->map(function (FollowUp $followUp) use ($now) {
+                if (!$scheduledAt) {
+                    return null;
+                }
 
-            $scheduledAt = $followUp->scheduled_at;
+                $secondsRemaining = $now->diffInSeconds(
+                    $scheduledAt,
+                    false
+                );
 
-            $secondsRemaining = max(
-                0,
-                $now->diffInSeconds($scheduledAt, false)
-            );
+                $isOverdue = $scheduledAt->lt($now);
 
-            return [
-                'id' => $followUp->id,
+                $minutesRemaining = $isOverdue
+                    ? 0
+                    : max(
+                        0,
+                        (int) ceil($secondsRemaining / 60)
+                    );
 
-                'lead_id' => $followUp->lead_id,
+                $overdueMinutes = $isOverdue
+                    ? (int) floor(
+                        $scheduledAt->diffInSeconds($now) / 60
+                    )
+                    : 0;
 
-                'lead_name' => $followUp->lead?->name
-                    ?? 'Unknown Lead',
+                $mobile =
+                    $followUp->lead?->mobile
+                    ?? $followUp->lead?->phone
+                    ?? $followUp->lead?->phone_number
+                    ?? null;
 
-                'mobile' => $followUp->lead?->mobile,
+                return [
+                    'id' => (int) $followUp->id,
+                    'lead_id' => $followUp->lead_id,
+                    'lead_name' => $followUp->lead?->name ?? 'Unknown Lead',
+                    'mobile' => $mobile,
+                    'assigned_user' => $followUp->assignedUser?->name,
+                    'type' => $followUp->type ?: 'Follow-up',
+                    'priority' => $followUp->priority ?: 'normal',
+                    'notes' => $followUp->notes,
 
-                'assigned_user' => $followUp->assignedUser?->name,
+                    'scheduled_at' => $scheduledAt->toIso8601String(),
+                    'scheduled_at_formatted' => $scheduledAt->format(
+                        'd M Y, h:i A'
+                    ),
 
-                'type' => $followUp->type,
+                    'seconds_remaining' => $secondsRemaining,
+                    'minutes_remaining' => $minutesRemaining,
+                    'is_overdue' => $isOverdue,
+                    'overdue_minutes' => $overdueMinutes,
 
-                'priority' => $followUp->priority,
+                    'lead_url' => $followUp->lead
+                        ? route('leads.show', $followUp->lead)
+                        : null,
 
-                'notes' => $followUp->notes,
+                    'complete_url' => route(
+                        'followups.complete',
+                        $followUp
+                    ),
 
-                'scheduled_at' => $scheduledAt?->toIso8601String(),
+                    'snooze_url' => route(
+                        'followups.snooze',
+                        $followUp
+                    ),
 
-                'scheduled_at_formatted' => $scheduledAt
-                    ? $scheduledAt->format('d M Y, h:i A')
-                    : null,
+                    'reschedule_url' => route(
+                        'followups.reschedule',
+                        $followUp
+                    ),
 
-                'seconds_remaining' => $secondsRemaining,
-
-                'minutes_remaining' => max(
-                    0,
-                    (int) ceil($secondsRemaining / 60)
-                ),
-
-                'lead_url' => $followUp->lead
-                    ? route('leads.show', $followUp->lead)
-                    : null,
-
-                'complete_url' => route(
-                    'followups.complete',
-                    $followUp
-                ),
-            ];
-        });
+                    'cancel_url' => route(
+                        'followups.cancel',
+                        $followUp
+                    ),
+                ];
+            })
+            ->filter()
+            ->values();
 
         return response()->json([
             'success' => true,
             'reminders' => $reminders,
+            'count' => $reminders->count(),
             'server_time' => now()->toIso8601String(),
         ]);
     }
 
+
     /**
-     * Complete follow-up.
+     * Nearest pending/overdue follow-up for sidebar timer.
      */
+    public function nearest(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->company_id) {
+            return response()->json([
+                'success' => true,
+                'followup' => null,
+            ]);
+        }
+
+        $followUp = FollowUp::query()
+            ->where('company_id', (int) $user->company_id)
+            ->where('assigned_to', (int) $user->id)
+            ->where('status', 'pending')
+            ->whereNotNull('scheduled_at')
+            ->orderByRaw("
+                ABS(
+                    TIMESTAMPDIFF(
+                        SECOND,
+                        NOW(),
+                        scheduled_at
+                    )
+                ) ASC
+            ")
+            ->first();
+
+        if (!$followUp || !$followUp->scheduled_at) {
+            return response()->json([
+                'success' => true,
+                'followup' => null,
+            ]);
+        }
+
+        $scheduledAt = Carbon::parse(
+            $followUp->scheduled_at
+        );
+
+        return response()->json([
+            'success' => true,
+
+            'followup' => [
+                'id' => (int) $followUp->id,
+
+                'scheduled_at' =>
+                    $scheduledAt->toIso8601String(),
+
+                'scheduled_at_formatted' =>
+                    $scheduledAt->format(
+                        'd M Y, h:i A'
+                    ),
+
+                'is_overdue' =>
+                    $scheduledAt->isPast(),
+            ],
+        ]);
+    }
+
     public function complete(
         Request $request,
         FollowUp $followUp
     ): RedirectResponse|JsonResponse {
-
-        $user = $request->user();
-
-        abort_unless(
-            (int) $followUp->company_id === (int) $user->company_id,
-            403
+        $this->authorizeFollowUpAction(
+            $request,
+            $followUp
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Assigned User Security
-        |--------------------------------------------------------------------------
-        |
-        | followups.manage permission wala user kisi visible follow-up ko
-        | complete kar sakta hai.
-        |
-        | Normal employee sirf apna follow-up complete karega.
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !$user->can('followups.manage')
-            && (int) $followUp->assigned_to !== (int) $user->id
-        ) {
-            abort(403);
+        if ($followUp->status === 'completed') {
+            return $this->actionResponse(
+                $request,
+                true,
+                'Follow-up is already completed.',
+                $followUp
+            );
         }
 
         $followUp->update([
@@ -462,37 +472,176 @@ class FollowUpController extends Controller
             'completed_at' => now(),
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | AJAX / Popup Request
-        |--------------------------------------------------------------------------
-        */
+        return $this->actionResponse(
+            $request,
+            true,
+            'Follow-up completed successfully.',
+            $followUp
+        );
+    }
 
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Follow-up completed successfully.',
-                'follow_up_id' => $followUp->id,
-            ]);
+    public function snooze(
+        Request $request,
+        FollowUp $followUp
+    ): JsonResponse|RedirectResponse {
+        $this->authorizeFollowUpAction(
+            $request,
+            $followUp
+        );
+
+        $validated = $request->validate([
+            'minutes' => [
+                'required',
+                'integer',
+                'in:5,10,15,30,60',
+            ],
+        ]);
+
+        if ($followUp->status !== 'pending') {
+            return $this->actionResponse(
+                $request,
+                false,
+                'Only pending follow-ups can be snoozed.',
+                $followUp,
+                422
+            );
         }
 
-        return back()->with(
-            'success',
-            'Follow-up completed successfully.'
+        $minutes = (int) $validated['minutes'];
+
+        $newScheduledAt = now()
+            ->copy()
+            ->addMinutes($minutes);
+
+        $followUp->update([
+            'scheduled_at' => $newScheduledAt,
+        ]);
+
+        return $this->actionResponse(
+            $request,
+            true,
+            "Follow-up snoozed for {$minutes} minutes.",
+            $followUp,
+            200,
+            [
+                'scheduled_at' => $newScheduledAt->toIso8601String(),
+                'scheduled_at_formatted' => $newScheduledAt->format(
+                    'd M Y, h:i A'
+                ),
+            ]
         );
     }
 
     /**
-     * Delete follow-up.
+     * Set an exact new date/time for a pending follow-up.
      */
+    public function reschedule(
+        Request $request,
+        FollowUp $followUp
+    ): JsonResponse|RedirectResponse {
+        $this->authorizeFollowUpAction(
+            $request,
+            $followUp
+        );
+
+        $validated = $request->validate([
+            'scheduled_at' => [
+                'required',
+                'date',
+                'after:now',
+            ],
+        ], [
+            'scheduled_at.required' => 'Please select new date and time.',
+            'scheduled_at.date' => 'Please select a valid date and time.',
+            'scheduled_at.after' => 'New follow-up time must be in the future.',
+        ]);
+
+        if ($followUp->status !== 'pending') {
+            return $this->actionResponse(
+                $request,
+                false,
+                'Only pending follow-ups can be rescheduled.',
+                $followUp,
+                422
+            );
+        }
+
+        $newScheduledAt = Carbon::parse(
+            $validated['scheduled_at'],
+            config('app.timezone')
+        );
+
+        $followUp->update([
+            'scheduled_at' => $newScheduledAt,
+            'completed_at' => null,
+        ]);
+
+        return $this->actionResponse(
+            $request,
+            true,
+            'Follow-up rescheduled successfully.',
+            $followUp,
+            200,
+            [
+                'scheduled_at' => $newScheduledAt->toIso8601String(),
+                'scheduled_at_formatted' => $newScheduledAt->format(
+                    'd M Y, h:i A'
+                ),
+            ]
+        );
+    }
+
+    /**
+     * Cancel a pending follow-up without deleting its history.
+     */
+    public function cancel(
+        Request $request,
+        FollowUp $followUp
+    ): JsonResponse|RedirectResponse {
+        $this->authorizeFollowUpAction(
+            $request,
+            $followUp
+        );
+
+        if ($followUp->status === 'cancelled') {
+            return $this->actionResponse(
+                $request,
+                true,
+                'Follow-up is already cancelled.',
+                $followUp
+            );
+        }
+
+        if ($followUp->status === 'completed') {
+            return $this->actionResponse(
+                $request,
+                false,
+                'Completed follow-up cannot be cancelled.',
+                $followUp,
+                422
+            );
+        }
+
+        $followUp->update([
+            'status' => 'cancelled',
+            'completed_at' => null,
+        ]);
+
+        return $this->actionResponse(
+            $request,
+            true,
+            'Follow-up cancelled successfully.',
+            $followUp
+        );
+    }
+
     public function destroy(
         Request $request,
         FollowUp $followUp
     ): RedirectResponse {
-
         abort_unless(
-            (int) $followUp->company_id ===
-            (int) $request->user()->company_id,
+            (int) $followUp->company_id
+                === (int) $request->user()->company_id,
             403
         );
 
@@ -501,6 +650,61 @@ class FollowUpController extends Controller
         return back()->with(
             'success',
             'Follow-up deleted successfully.'
+        );
+    }
+
+    /**
+     * Company + assigned-user permission check.
+     */
+    private function authorizeFollowUpAction(
+        Request $request,
+        FollowUp $followUp
+    ): void {
+        $user = $request->user();
+
+        abort_unless(
+            (int) $followUp->company_id
+                === (int) $user->company_id,
+            403
+        );
+
+        if (
+            !$user->can('followups.manage')
+            && (int) $followUp->assigned_to
+                !== (int) $user->id
+        ) {
+            abort(403);
+        }
+    }
+
+    /**
+     * Return JSON for popup/AJAX and redirect for normal form requests.
+     */
+    private function actionResponse(
+        Request $request,
+        bool $success,
+        string $message,
+        FollowUp $followUp,
+        int $statusCode = 200,
+        array $extra = []
+    ): JsonResponse|RedirectResponse {
+        if (
+            $request->expectsJson()
+            || $request->ajax()
+        ) {
+            return response()->json(
+                array_merge([
+                    'success' => $success,
+                    'message' => $message,
+                    'follow_up_id' => $followUp->id,
+                ], $extra),
+                $statusCode
+            );
+        }
+
+        return back()->with(
+            $success ? 'success' : 'error',
+            $message
         );
     }
 }

@@ -77,6 +77,25 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::post('/leads/{lead}/calls', [CallLogController::class, 'store'])->middleware('permission:calls.create')->name('calls.store');
 
     // Follow ups
+    Route::get('/follow-ups/nearest', [FollowUpController::class, 'nearest'])
+        ->name('followups.nearest');
+
+    Route::get('/follow-ups/reminders', [FollowUpController::class, 'reminders'])
+        ->name('followups.reminders');
+
+    Route::post('/follow-ups/{followUp}/complete', [FollowUpController::class, 'complete'])
+        ->name('followups.complete');
+
+    Route::post('/follow-ups/{followUp}/snooze', [FollowUpController::class, 'snooze'])
+        ->name('followups.snooze');
+
+    Route::post('/follow-ups/{followUp}/reschedule', [FollowUpController::class, 'reschedule'])
+        ->name('followups.reschedule');
+
+    Route::post('/follow-ups/{followUp}/cancel', [FollowUpController::class, 'cancel'])
+        ->name('followups.cancel');
+
+
     Route::get('/follow-ups', [FollowUpController::class, 'index'])->middleware('permission:followups.view')->name('followups.index');
     Route::post('/follow-ups/{followUp}/complete', [FollowUpController::class, 'complete'])->middleware('permission:followups.complete')->name('followups.complete');
     Route::delete('/follow-ups/{followUp}', [FollowUpController::class, 'destroy'])->middleware('permission:followups.delete')->name('followups.destroy');

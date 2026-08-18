@@ -83,7 +83,7 @@
         */
 
         [
-            'label' => 'Today Lead Send',
+            'label' => 'Today Demo Send',
             'value' => number_format($todayLeadSend),
             'accent' => 'text-green-700',
             'bg' => 'bg-green-50',
@@ -100,7 +100,7 @@
         */
 
         [
-            'label' => 'Total Lead Send',
+            'label' => 'Total Demo Send',
             'value' => number_format($totalLeadSend),
             'accent' => 'text-teal-700',
             'bg' => 'bg-teal-50',
