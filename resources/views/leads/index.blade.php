@@ -1323,7 +1323,7 @@
                                     @endforeach
                                 </select></div>
                             <div><label class="software-label">Reason</label><input type="text" name="reason"
-                                    required maxlength="500" class="w-full" placeholder="Reason..."></div>
+                                     maxlength="500" class="w-full" placeholder="Reason..."></div>
                         </div>
                         <div class="flex justify-end gap-2 border-t border-slate-200 p-4"><button type="button"
                                 @click="showBulkModal=false" class="software-btn">CANCEL</button><button
