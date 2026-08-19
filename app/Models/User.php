@@ -15,6 +15,9 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
+use Laravel\Sanctum\HasApiTokens;
+
+
 
 
 /**
@@ -30,13 +33,22 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email',
-        'company_id', 'branch_id', 'team_id', 'phone', 'employee_code', 'is_active', 'password',])]
+#[Fillable([
+    'name',
+    'email',
+    'company_id',
+    'branch_id',
+    'team_id',
+    'phone',
+    'employee_code',
+    'is_active',
+    'password',
+])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable, HasRoles;
+    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable, HasRoles, HasApiTokens;
 
     /**
      * Get the attributes that should be cast.
@@ -59,12 +71,23 @@ class User extends Authenticatable implements PasskeyUser
         $initials = Str::initials($this->name, true);
 
         return Str::length($initials) > 1
-            ? Str::substr($initials, 0, 1).Str::substr($initials, -1)
+            ? Str::substr($initials, 0, 1) . Str::substr($initials, -1)
             : $initials;
     }
-    public function company(){ return $this->belongsTo(Company::class); }
-    public function branch(){ return $this->belongsTo(Branch::class); }
-    public function team(){ return $this->belongsTo(Team::class); }
-    public function assignedLeads(){ return $this->hasMany(Lead::class, 'assigned_to'); }
-
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+    public function assignedLeads()
+    {
+        return $this->hasMany(Lead::class, 'assigned_to');
+    }
 }
