@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FollowUp;
+use App\Models\CallDisposition;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -200,7 +201,7 @@ class FollowUpController extends Controller
      * LIVE REMINDERS
      * ============================================================
      *
-     * Scheduled time se 10 minutes pehle reminder dikhega.
+     * Scheduled time se 1 minute pehle reminder dikhega.
      * Overdue pending follow-ups bhi return honge.
      *
      * Sirf logged-in user ke follow-ups.
@@ -224,9 +225,9 @@ class FollowUpController extends Controller
 
         $now = now();
 
-        $tenMinutesLater = $now
+        $oneMinuteLater = $now
             ->copy()
-            ->addMinutes(10);
+            ->addMinute();
 
         /*
         |--------------------------------------------------------------------------
@@ -243,7 +244,7 @@ class FollowUpController extends Controller
             ->where('assigned_to', $userId)
             ->where('status', 'pending')
             ->whereNotNull('scheduled_at')
-            ->where('scheduled_at', '<=', $tenMinutesLater)
+            ->where('scheduled_at', '<=', $oneMinuteLater)
             ->orderBy('scheduled_at')
             ->limit(20)
             ->get();
@@ -368,6 +369,14 @@ class FollowUpController extends Controller
                             )
                             : null,
 
+                    'call_store_url' =>
+                        $followUp->lead
+                            ? route(
+                                'calls.store',
+                                $followUp->lead
+                            )
+                            : null,
+
                     'complete_url' =>
                         route(
                             'followups.complete',
@@ -396,10 +405,58 @@ class FollowUpController extends Controller
             ->filter()
             ->values();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Call Dispositions For Reminder Popup
+        |--------------------------------------------------------------------------
+        |
+        | Popup ke andar "Save Call Result" ke liye wahi active dispositions
+        | bheje ja rahe hain jo lead page par use hote hain.
+        |
+        */
+
+        $dispositions = CallDisposition::query()
+            ->where(function (Builder $query) use ($companyId) {
+
+                $query
+                    ->whereNull('company_id')
+                    ->orWhere(
+                        'company_id',
+                        $companyId
+                    );
+            })
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'requires_remarks',
+                'requires_follow_up',
+            ])
+            ->map(function (CallDisposition $disposition) {
+
+                return [
+                    'id' =>
+                        (int) $disposition->id,
+
+                    'name' =>
+                        $disposition->name,
+
+                    'requires_remarks' =>
+                        (bool) $disposition->requires_remarks,
+
+                    'requires_follow_up' =>
+                        (bool) $disposition->requires_follow_up,
+                ];
+            })
+            ->values();
+
         return response()->json([
             'success' => true,
 
             'reminders' => $reminders,
+
+            'dispositions' => $dispositions,
 
             'count' =>
                 $reminders->count(),

@@ -202,17 +202,96 @@
             </div>
 
 
-            <div
-                class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
 
-                <div class="text-xs text-slate-400">
-                    Current Time
+                {{-- Permanent Follow-up Reminder ON/OFF Switch --}}
+                <div
+                    class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur"
+                >
+                    <div class="flex items-center justify-between gap-4">
+
+                        <div>
+                            <div class="text-xs text-slate-400">
+                                Reminder Popup
+                            </div>
+
+                            <div
+                                id="followup-page-reminder-status"
+                                class="mt-1 text-sm font-bold text-emerald-300"
+                            >
+                                ON
+                            </div>
+                        </div>
+
+                        <label
+                            for="followup-page-reminder-toggle"
+                            class="relative inline-flex cursor-pointer items-center"
+                            title="Follow-up reminder popup ON/OFF"
+                        >
+                            <input
+                                type="checkbox"
+                                id="followup-page-reminder-toggle"
+                                class="peer sr-only"
+                                checked
+                            >
+
+                            <span
+                                class="
+                                    relative
+                                    h-7
+                                    w-12
+                                    rounded-full
+                                    bg-slate-600
+                                    transition
+                                    duration-200
+
+                                    after:absolute
+                                    after:left-1
+                                    after:top-1
+                                    after:h-5
+                                    after:w-5
+                                    after:rounded-full
+                                    after:bg-white
+                                    after:transition
+                                    after:duration-200
+                                    after:content-['']
+
+                                    peer-checked:bg-emerald-500
+                                    peer-checked:after:translate-x-5
+
+                                    peer-focus:ring-2
+                                    peer-focus:ring-emerald-300/50
+                                "
+                            ></span>
+                        </label>
+
+                    </div>
+
+                    <div
+                        id="followup-page-reminder-help"
+                        class="mt-1.5 text-[11px] text-slate-400"
+                    >
+                        Popup reminders are enabled
+                    </div>
                 </div>
 
+
+                {{-- Current Time --}}
                 <div
-                    id="followup-current-time"
-                    class="mt-1 font-semibold text-white">
-                    {{ now()->format('d M Y, h:i:s A') }}
+                    class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur"
+                >
+
+                    <div class="text-xs text-slate-400">
+                        Current Time
+                    </div>
+
+                    <div
+                        id="followup-current-time"
+                        class="mt-1 font-semibold text-white"
+                    >
+                        {{ now()->format('d M Y, h:i:s A') }}
+                    </div>
+
                 </div>
 
             </div>
@@ -1268,6 +1347,163 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const countdowns =
         document.querySelectorAll('.countdown');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permanent Reminder Popup ON/OFF Switch
+    |--------------------------------------------------------------------------
+    |
+    | Same localStorage key use hoti hai jo global CRM reminder popup
+    | layout use karta hai. Isliye is page ka switch aur popup ka switch
+    | hamesha same preference ko control karenge.
+    |
+    */
+
+    const followupPageReminderToggle =
+        document.getElementById('followup-page-reminder-toggle');
+
+    const followupPageReminderStatus =
+        document.getElementById('followup-page-reminder-status');
+
+    const followupPageReminderHelp =
+        document.getElementById('followup-page-reminder-help');
+
+    const followupReminderPreferenceKey =
+        'followup_popup_enabled_user_' + @json(auth()->id());
+
+
+    function isFollowupReminderEnabled() {
+
+        return localStorage.getItem(
+            followupReminderPreferenceKey
+        ) !== '0';
+
+    }
+
+
+    function syncFollowupReminderSwitch() {
+
+        const enabled =
+            isFollowupReminderEnabled();
+
+        if (followupPageReminderToggle) {
+
+            followupPageReminderToggle.checked =
+                enabled;
+
+        }
+
+
+        if (followupPageReminderStatus) {
+
+            followupPageReminderStatus.textContent =
+                enabled
+                    ? 'ON'
+                    : 'OFF';
+
+            followupPageReminderStatus.classList.remove(
+                'text-emerald-300',
+                'text-rose-300'
+            );
+
+            followupPageReminderStatus.classList.add(
+                enabled
+                    ? 'text-emerald-300'
+                    : 'text-rose-300'
+            );
+
+        }
+
+
+        if (followupPageReminderHelp) {
+
+            followupPageReminderHelp.textContent =
+                enabled
+                    ? 'Popup reminders are enabled'
+                    : 'Popup reminders are disabled';
+
+        }
+
+    }
+
+
+    function notifyGlobalReminderToggle(enabled) {
+
+        /*
+        | Global CRM layout me popup ke andar jo toggle already hai,
+        | usko bhi same state dete hain. Change event dispatch karne se
+        | currently open popup OFF karte hi close ho jayega.
+        */
+
+        const globalToggle =
+            document.getElementById(
+                'followUpReminderEnabledToggle'
+            );
+
+        if (!globalToggle) {
+            return;
+        }
+
+        globalToggle.checked =
+            enabled;
+
+        globalToggle.dispatchEvent(
+            new Event(
+                'change',
+                {
+                    bubbles: true,
+                }
+            )
+        );
+
+    }
+
+
+    if (followupPageReminderToggle) {
+
+        followupPageReminderToggle.addEventListener(
+            'change',
+            function () {
+
+                const enabled =
+                    followupPageReminderToggle.checked;
+
+                localStorage.setItem(
+                    followupReminderPreferenceKey,
+                    enabled
+                        ? '1'
+                        : '0'
+                );
+
+                syncFollowupReminderSwitch();
+                notifyGlobalReminderToggle(enabled);
+
+            }
+        );
+
+    }
+
+
+    window.addEventListener(
+        'storage',
+        function (event) {
+
+            if (
+                event.key
+                ===
+                followupReminderPreferenceKey
+            ) {
+
+                syncFollowupReminderSwitch();
+
+            }
+
+        }
+    );
+
+
+    syncFollowupReminderSwitch();
 
 
     function updateClock() {

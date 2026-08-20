@@ -801,7 +801,7 @@
 >
     <div
         id="followUpReminderCard"
-        class="relative w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5"
+        class="relative w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5"
     >
         {{-- Header --}}
         <div
@@ -828,9 +828,22 @@
                     </div>
                 </div>
 
-                {{-- Real Close: this reminder stays dismissed for this browser tab
-                     until its scheduled_at changes. --}}
-                <button
+                <div class="flex items-center gap-2">
+                    <label
+                        class="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-xs font-bold hover:bg-white/25"
+                        title="Disable follow-up reminder popups for this user on this browser"
+                    >
+                        <input
+                            type="checkbox"
+                            id="followUpReminderEnabledToggle"
+                            class="h-4 w-4 rounded border-white/50"
+                            checked
+                        >
+                        <span id="followUpReminderEnabledText">Popup ON</span>
+                    </label>
+
+                    {{-- Close only hides current reminder for 1 minute --}}
+                    <button
                     type="button"
                     id="followUpReminderClose"
                     class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-xl font-bold transition hover:bg-white/25"
@@ -838,7 +851,8 @@
                     aria-label="Close reminder"
                 >
                     ×
-                </button>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -861,7 +875,7 @@
                     id="followUpCountdown"
                     class="mt-1 text-3xl font-black text-amber-800"
                 >
-                    10:00
+                    01:00
                 </div>
             </div>
 
@@ -933,6 +947,109 @@
                     -
                 </div>
             </div>
+
+            {{-- Save Call Result inside Reminder Popup --}}
+            @can('calls.create')
+            <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="text-sm font-black text-slate-900">Save Call Result</div>
+                        <div class="mt-0.5 text-xs text-slate-500">
+                            Lead page wala same call result yahin se save karein.
+                        </div>
+                    </div>
+                    <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                        QUICK SAVE
+                    </span>
+                </div>
+
+                <form id="followUpPopupCallForm" method="POST" action="">
+                    @csrf
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Disposition <span class="text-rose-500">*</span>
+                            </span>
+                            <select
+                                id="followUpPopupDisposition"
+                                name="call_disposition_id"
+                                required
+                                class="w-full rounded-xl border-slate-300 bg-white text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            >
+                                <option value="">Select disposition</option>
+                            </select>
+                            <div
+                                id="followUpPopupDispositionHint"
+                                class="mt-2 hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"
+                            ></div>
+                        </label>
+
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">Duration</span>
+                            <div class="relative">
+                                <input
+                                    id="followUpPopupDuration"
+                                    name="duration_seconds"
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    class="w-full rounded-xl border-slate-300 bg-white pr-16 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                >
+                                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                                    seconds
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div
+                        id="followUpPopupRemarksWrapper"
+                        class="mt-4 hidden"
+                    >
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Call Remarks
+                                <span id="followUpPopupRemarksRequired" class="hidden text-rose-500">*</span>
+                            </span>
+                            <textarea
+                                id="followUpPopupRemarks"
+                                name="remarks"
+                                rows="3"
+                                placeholder="Call discussion aur customer response..."
+                                class="w-full rounded-xl border-slate-300 bg-white text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            ></textarea>
+                        </label>
+                    </div>
+
+                    <div
+                        id="followUpPopupNextFollowUpWrapper"
+                        class="mt-4 hidden"
+                    >
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Next Follow-up Date & Time
+                                <span id="followUpPopupNextFollowUpRequired" class="hidden text-rose-500">*</span>
+                            </span>
+                            <input
+                                id="followUpPopupNextFollowUp"
+                                name="follow_up_at"
+                                type="datetime-local"
+                                class="w-full rounded-xl border-slate-300 bg-white text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            >
+                        </label>
+                    </div>
+
+                    <button
+                        type="submit"
+                        id="followUpPopupSaveCall"
+                        class="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        ✓ Save Call Result
+                    </button>
+                </form>
+            </div>
+            @endcan
 
             {{-- Queue --}}
             <div
@@ -1120,6 +1237,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const rescheduleClose = document.getElementById('followUpRescheduleClose');
     const actionMessage = document.getElementById('followUpActionMessage');
 
+    const reminderEnabledToggle = document.getElementById('followUpReminderEnabledToggle');
+    const reminderEnabledText = document.getElementById('followUpReminderEnabledText');
+
+    const popupCallForm = document.getElementById('followUpPopupCallForm');
+    const popupDisposition = document.getElementById('followUpPopupDisposition');
+    const popupDispositionHint = document.getElementById('followUpPopupDispositionHint');
+    const popupDuration = document.getElementById('followUpPopupDuration');
+    const popupRemarksWrapper = document.getElementById('followUpPopupRemarksWrapper');
+    const popupRemarks = document.getElementById('followUpPopupRemarks');
+    const popupRemarksRequired = document.getElementById('followUpPopupRemarksRequired');
+    const popupNextFollowUpWrapper = document.getElementById('followUpPopupNextFollowUpWrapper');
+    const popupNextFollowUp = document.getElementById('followUpPopupNextFollowUp');
+    const popupNextFollowUpRequired = document.getElementById('followUpPopupNextFollowUpRequired');
+
     const sidebarNearestFollowup = document.getElementById('sidebarNearestFollowup');
     const sidebarNearestFollowupText = document.getElementById('sidebarNearestFollowupText');
     const sidebarNearestFollowupDot = document.getElementById('sidebarNearestFollowupDot');
@@ -1130,6 +1261,33 @@ document.addEventListener('DOMContentLoaded', function () {
     let isFetching = false;
     let modalOpen = false;
     let audioContext = null;
+    let callDispositions = [];
+
+    const reminderPreferenceKey =
+        'followup_popup_enabled_user_' + @json(auth()->id());
+
+    function isReminderPopupEnabled() {
+        return localStorage.getItem(reminderPreferenceKey) !== '0';
+    }
+
+    function syncReminderPreferenceUi() {
+        const enabled = isReminderPopupEnabled();
+
+        if (reminderEnabledToggle) {
+            reminderEnabledToggle.checked = enabled;
+        }
+
+        if (reminderEnabledText) {
+            reminderEnabledText.textContent = enabled ? 'Popup ON' : 'Popup OFF';
+        }
+    }
+
+    function disableReminderPopupNow() {
+        reminderQueue = [];
+        if (modalOpen) {
+            closeModal(false);
+        }
+    }
 
     function escapePhone(phone) {
         if (!phone) {
@@ -1397,8 +1555,129 @@ document.addEventListener('DOMContentLoaded', function () {
         actionMessage.textContent = '';
     }
 
+    function populatePopupDispositions() {
+        if (!popupDisposition) {
+            return;
+        }
+
+        const currentValue = popupDisposition.value;
+
+        popupDisposition.innerHTML =
+            '<option value="">Select disposition</option>';
+
+        callDispositions.forEach(disposition => {
+            const option = document.createElement('option');
+
+            option.value = disposition.id;
+            option.textContent = disposition.name;
+            option.dataset.requiresRemarks =
+                disposition.requires_remarks ? '1' : '0';
+            option.dataset.requiresFollowUp =
+                disposition.requires_follow_up ? '1' : '0';
+
+            popupDisposition.appendChild(option);
+        });
+
+        if (
+            currentValue
+            && [...popupDisposition.options].some(
+                option => String(option.value) === String(currentValue)
+            )
+        ) {
+            popupDisposition.value = currentValue;
+        }
+    }
+
+    function updatePopupDispositionFields() {
+        if (
+            !popupDisposition
+            || !popupRemarksWrapper
+            || !popupRemarks
+            || !popupNextFollowUpWrapper
+            || !popupNextFollowUp
+        ) {
+            return;
+        }
+
+        const option =
+            popupDisposition.options[popupDisposition.selectedIndex];
+
+        const hasDisposition = !!option && !!option.value;
+        const requiresRemarks =
+            hasDisposition
+            && option.dataset.requiresRemarks === '1';
+        const requiresFollowUp =
+            hasDisposition
+            && option.dataset.requiresFollowUp === '1';
+
+        popupRemarks.required = requiresRemarks;
+        popupNextFollowUp.required = requiresFollowUp;
+
+        if (requiresRemarks) {
+            popupRemarksWrapper.classList.remove('hidden');
+            popupRemarksRequired?.classList.remove('hidden');
+        } else {
+            popupRemarksWrapper.classList.add('hidden');
+            popupRemarksRequired?.classList.add('hidden');
+            popupRemarks.value = '';
+        }
+
+        if (requiresFollowUp) {
+            popupNextFollowUpWrapper.classList.remove('hidden');
+            popupNextFollowUpRequired?.classList.remove('hidden');
+        } else {
+            popupNextFollowUpWrapper.classList.add('hidden');
+            popupNextFollowUpRequired?.classList.add('hidden');
+            popupNextFollowUp.value = '';
+        }
+
+        if (popupDispositionHint) {
+            if (!hasDisposition) {
+                popupDispositionHint.classList.add('hidden');
+                popupDispositionHint.textContent = '';
+            } else {
+                const rules = [];
+
+                if (requiresRemarks) {
+                    rules.push('Remarks required');
+                }
+
+                if (requiresFollowUp) {
+                    rules.push('Follow-up required');
+                }
+
+                if (rules.length === 0) {
+                    rules.push('No remarks or follow-up required');
+                }
+
+                popupDispositionHint.textContent =
+                    option.text.trim() + ' — ' + rules.join(' • ');
+
+                popupDispositionHint.classList.remove('hidden');
+            }
+        }
+    }
+
+    function resetPopupCallForm(reminder) {
+        if (!popupCallForm) {
+            return;
+        }
+
+        popupCallForm.reset();
+        populatePopupDispositions();
+
+        popupCallForm.action =
+            reminder.call_store_url || '';
+
+        if (popupNextFollowUp) {
+            popupNextFollowUp.min = minimumDatetimeLocalValue();
+        }
+
+        updatePopupDispositionFields();
+    }
+
     function openModal(reminder) {
-        if (!reminder) {
+        if (!reminder || !isReminderPopupEnabled()) {
             return;
         }
 
@@ -1448,21 +1727,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const remainingQueue = reminderQueue.length;
 
-        if (remainingQueue > 0) {
-            queueInfo.classList.remove('hidden');
-            queueInfo.textContent =
-                remainingQueue
-                + ' more follow-up reminder'
-                + (remainingQueue > 1 ? 's' : '')
-                + ' waiting';
-        } else {
-            queueInfo.classList.add('hidden');
+        if (queueInfo) {
+            if (remainingQueue > 0) {
+                queueInfo.classList.remove('hidden');
+                queueInfo.textContent =
+                    remainingQueue
+                    + ' more follow-up reminder'
+                    + (remainingQueue > 1 ? 's' : '')
+                    + ' waiting';
+            } else {
+                queueInfo.classList.add('hidden');
+            }
         }
 
         rescheduleInput.min = minimumDatetimeLocalValue();
         rescheduleInput.value = toDatetimeLocalValue(
             reminder.scheduled_at
         );
+
+        resetPopupCallForm(reminder);
 
         backdrop.classList.remove('hidden');
         modal.classList.remove('hidden');
@@ -1674,16 +1957,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showNextReminder() {
-        if (modalOpen) {
+        if (modalOpen || !isReminderPopupEnabled()) {
             return;
         }
 
         while (reminderQueue.length > 0) {
             const reminder = reminderQueue.shift();
 
-            if (
-                isTemporarilyHidden(reminder.id)
-            ) {
+            if (isTemporarilyHidden(reminder.id)) {
+                continue;
+            }
+
+            const scheduledTime =
+                new Date(reminder.scheduled_at).getTime();
+
+            const diffMs = scheduledTime - Date.now();
+
+            // Upcoming reminder only during the final 60 seconds.
+            // Overdue pending reminder remains eligible.
+            if (diffMs > 60 * 1000) {
                 continue;
             }
 
@@ -1693,7 +1985,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function fetchReminders() {
-        if (isFetching) {
+        if (isFetching || !isReminderPopupEnabled()) {
             return;
         }
 
@@ -1731,6 +2023,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 || !Array.isArray(data.reminders)
             ) {
                 return;
+            }
+
+            if (Array.isArray(data.dispositions)) {
+                callDispositions = data.dispositions;
+                populatePopupDispositions();
             }
 
             const currentId = currentReminder
@@ -2379,6 +2676,50 @@ document.addEventListener('DOMContentLoaded', function () {
             );
         });
 
+    reminderEnabledToggle?.addEventListener(
+        'change',
+        function () {
+            localStorage.setItem(
+                reminderPreferenceKey,
+                this.checked ? '1' : '0'
+            );
+
+            syncReminderPreferenceUi();
+
+            if (!this.checked) {
+                disableReminderPopupNow();
+                return;
+            }
+
+            fetchReminders();
+        }
+    );
+
+    popupDisposition?.addEventListener(
+        'change',
+        updatePopupDispositionFields
+    );
+
+    popupCallForm?.addEventListener(
+        'submit',
+        function (event) {
+            if (!currentReminder || !this.action) {
+                event.preventDefault();
+                showActionMessage(
+                    'Call save URL not available for this lead.',
+                    false
+                );
+                return;
+            }
+
+            if (!this.reportValidity()) {
+                event.preventDefault();
+                return;
+            }
+        }
+    );
+
+    syncReminderPreferenceUi();
     requestNotificationPermission();
 
     fetchReminders();
@@ -2387,7 +2728,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     setInterval(
         fetchReminders,
-        30000
+        10000
     );
 
     setInterval(
