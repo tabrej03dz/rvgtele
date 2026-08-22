@@ -285,14 +285,109 @@
             }
 
             .lead-table-wrap {
-                max-height: calc(100vh - 230px);
-                min-height: 320px;
+                max-height: none;
+                min-height: 0;
+                height: auto;
+                overflow-x: auto;
+                overflow-y: visible;
             }
 
-            @media (max-width: 768px) {
-                .lead-table-wrap {
-                    max-height: 65vh;
-                }
+            /* Screenshot-matched premium CRM theme */
+            .software-ui { color: #18213a; font-size: 12px; }
+            .software-ui::before { background: #f8faff; }
+            .software-panel,
+            .software-toolbar {
+                border: 1px solid #e5e9f2;
+                border-radius: 12px;
+                box-shadow: 0 4px 14px rgba(31, 42, 80, .055);
+            }
+            .software-toolbar { border-top: 1px solid #e5e9f2; }
+            .software-panel-title {
+                min-height: 46px;
+                padding: 11px 16px;
+                border-bottom: 0;
+                background: #fff;
+                border-radius: 12px 12px 0 0;
+                color: #17203a;
+                font-size: 13px;
+            }
+            .panel-heading-label { display: inline-flex; align-items: center; gap: 9px; }
+            .panel-heading-icon {
+                display: inline-flex;
+                width: 27px;
+                height: 27px;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                background: #eef2ff;
+                color: #4f46e5;
+            }
+            .panel-heading-icon svg { width: 15px; height: 15px; }
+            .software-btn {
+                min-height: 36px;
+                border-color: #e1e5ed;
+                border-radius: 8px;
+                padding: 0 14px;
+                color: #33405b;
+                font-size: 10px;
+                letter-spacing: .01em;
+                box-shadow: 0 2px 5px rgba(15, 23, 42, .025);
+            }
+            .software-btn:hover { border-color: #c5bcff; background: #faf9ff; color: #6237e8; }
+            .software-btn-primary {
+                border-color: transparent;
+                background: linear-gradient(100deg, #2563eb 0%, #6338ef 58%, #8b2de9 100%);
+                color: #fff;
+                box-shadow: 0 7px 16px rgba(77, 61, 232, .22);
+            }
+            .software-btn-primary:hover {
+                border-color: transparent;
+                background: linear-gradient(100deg, #1d56db 0%, #5930df 58%, #7d25dc 100%);
+                color: #fff;
+                transform: translateY(-1px);
+            }
+            .software-btn svg { width: 14px; height: 14px; }
+            .gradient-selected {
+                border-color: transparent !important;
+                background: linear-gradient(100deg, #2563eb, #7434ed) !important;
+                color: #fff !important;
+                box-shadow: 0 5px 13px rgba(76, 61, 230, .19);
+            }
+            .lead-search-input { min-height: 44px !important; border-radius: 9px !important; }
+            .lead-search-button { min-height: 44px; min-width: 108px; font-size: 11px; }
+            .lead-toolbar-icon {
+                display: inline-flex;
+                width: 40px;
+                height: 40px;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                background: linear-gradient(145deg, #2864fa, #842de8);
+                color: #fff;
+                box-shadow: 0 7px 15px rgba(78, 54, 229, .23);
+            }
+            .lead-toolbar-icon svg { width: 20px; height: 20px; }
+            .lead-count-badge { border: 0 !important; border-radius: 6px; background: #f1f0ff !important; color: #6251d8 !important; }
+            .software-ui thead th {
+                height: 43px;
+                border-top: 1px solid #e8ebf2;
+                border-bottom-color: #e8ebf2 !important;
+                background: #fbfcfe;
+                color: #313b54 !important;
+                font-size: 9px !important;
+                letter-spacing: 0 !important;
+            }
+            .software-ui tbody td { padding-top: 12px !important; padding-bottom: 12px !important; }
+            .lead-table-wrap {
+                max-height: none;
+                min-height: 0;
+                height: auto;
+            }
+            .lead-register-footer { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+            @media (max-width: 640px) {
+                .software-panel-title { padding: 10px 12px; }
+                .software-btn { padding: 0 11px; }
+                .lead-search-button { width: 100%; }
             }
         </style>
     @endonce
@@ -383,13 +478,13 @@
                             type="text"
                             name="search"
                             value="{{ request('search') }}"
-                            class="w-full !pl-10"
+                            class="lead-search-input w-full !pl-10"
                             placeholder="Search by name, mobile, company, email or city..."
                         >
                     </div>
 
-                    <button type="submit" class="software-btn software-btn-primary">
-                        SEARCH
+                    <button type="submit" class="software-btn software-btn-primary lead-search-button">
+                        <i data-lucide="search"></i> SEARCH
                     </button>
 
                     @if (request()->filled('search'))
@@ -410,9 +505,10 @@
             $isDemoSendTab = request()->boolean('demo_send');
         @endphp
 
+        <div class="grid gap-3 lg:grid-cols-2">
         <section class="software-panel">
             <div class="software-panel-title">
-                <span>Lead Type</span>
+                <span class="panel-heading-label"><span class="panel-heading-icon"><i data-lucide="layers-3"></i></span>Lead Type</span>
 
                 @if ($isDemoSendTab)
                     <span class="text-[10px] font-bold text-emerald-700">
@@ -424,7 +520,7 @@
             <div class="crm-scrollbar flex gap-1 overflow-x-auto p-2">
                 <a
                     href="{{ route('leads.index', $demoBaseQuery) }}"
-                    class="software-btn {{ !$isDemoSendTab ? 'border-slate-800 bg-slate-800 text-white' : '' }}"
+                    class="software-btn {{ !$isDemoSendTab ? 'gradient-selected' : '' }}"
                 >
                     ALL LEADS
                 </a>
@@ -441,7 +537,10 @@
         {{-- Labels --}}
         <section class="software-panel">
             <div class="software-panel-title">
-                <span>Lead Labels</span>
+                <span class="panel-heading-label"><span class="panel-heading-icon"><i data-lucide="tag"></i></span>Lead Labels</span>
+                @can('leads.labels.manage')
+                    <button type="button" @click="showCreateLabelModal=true" class="software-btn !min-h-[32px]">+ CREATE LABEL</button>
+                @endcan
                 @if (request('label_id'))
                     <a href="{{ route('leads.index', request()->except(['page', 'label_id'])) }}"
                         class="text-[10px] font-bold text-rose-600">CLEAR LABEL FILTER</a>
@@ -449,7 +548,7 @@
             </div>
             <div class="crm-scrollbar flex gap-2 overflow-x-auto p-3">
                 <a href="{{ route('leads.index', request()->except(['page', 'label_id'])) }}"
-                    class="inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-[11px] font-bold {{ !request('label_id') ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-700' }}">ALL
+                    class="inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-[11px] font-bold {{ !request('label_id') ? 'gradient-selected' : 'border-slate-200 bg-white text-slate-700' }}">ALL
                     LEADS</a>
                 @foreach ($labels as $label)
                     <div class="flex shrink-0 items-center overflow-hidden rounded-md border border-slate-200 bg-white">
@@ -471,14 +570,17 @@
                 @endif
             </div>
         </section>
+        </div>
 
         <section class="software-toolbar">
             <div class="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
+                <div class="flex items-center gap-3">
+                    <span class="lead-toolbar-icon"><i data-lucide="users"></i></span>
+                    <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-[18px] font-bold uppercase text-slate-900">Lead Management</h1>
+                        <h1 class="text-[18px] font-bold text-slate-900">Lead Management</h1>
                         <span
-                            class="border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{{ number_format($leads->total()) }}
+                            class="lead-count-badge border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">{{ number_format($leads->total()) }}
                             RECORDS</span>
                     </div>
                     <p class="mt-1 text-[11px] text-slate-500">
@@ -490,38 +592,42 @@
                             Leads assigned to your account.
                         @endif
                     </p>
+                    </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5">
                     <button type="button" @click="toggleFullscreen()"
-                        class="software-btn border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white">
+                        class="software-btn">
+                        <i data-lucide="maximize-2"></i>
                         <span x-text="isFullscreen ? 'EXIT FULL SCREEN' : 'FULL SCREEN'"></span>
                     </button>
                     <button type="button" @click="showFilters=!showFilters" class="software-btn"
-                        :class="showFilters ? 'border-blue-500 bg-blue-50 text-blue-700' : ''">FILTERS</button>
+                        :class="showFilters ? 'border-blue-500 bg-blue-50 text-blue-700' : ''">
+                        <i data-lucide="list-filter"></i> FILTERS
+                    </button>
                     @can('leads.labels.manage')
-                    <button type="button" @click="showCreateLabelModal=true" class="software-btn">+ CREATE LABEL</button>
+                    <button type="button" @click="showCreateLabelModal=true" class="software-btn"><i data-lucide="plus"></i> CREATE LABEL</button>
                     <button type="button"
                         @click="if(selected.length===0){alert('Please select at least one lead.')}else{labelAction='add';showLabelModal=true}"
-                        class="software-btn border-violet-300 text-violet-700">LABEL SELECTED <span x-show="selected.length"
+                        class="software-btn border-violet-300 text-violet-700"><i data-lucide="tag"></i> LABEL SELECTED <span x-show="selected.length"
                             x-text="'('+selected.length+')'"></span></button>
                     @endcan
                     
                         @can('leads.assign')
                         <button type="button" @click="bulkAction='assign';assignmentScope='selected';showBulkModal=true"
-                            class="software-btn">BULK ASSIGN</button>
+                            class="software-btn"><i data-lucide="user-round-plus"></i> BULK ASSIGN</button>
                             
                                 
                         <button type="button" @click="bulkAction='unassign';assignmentScope='selected';showBulkModal=true"
-                            class="software-btn border-rose-300 text-rose-700">BULK UNASSIGN</button>
+                            class="software-btn border-rose-300 text-rose-700"><i data-lucide="user-round-x"></i> BULK UNASSIGN</button>
                             @endcan
 
                             @can('leads.import') 
-                                <a href="{{ route('leads.import.create') }}" class="software-btn">IMPORT</a>
+                                <a href="{{ route('leads.import.create') }}" class="software-btn"><i data-lucide="upload"></i> IMPORT</a>
                             @endcan
 
                     
                     @can('leads.create')
-                    <a href="{{ route('leads.create') }}" class="software-btn software-btn-primary">+ NEW LEAD</a>
+                    <a href="{{ route('leads.create') }}" class="software-btn software-btn-primary"><i data-lucide="plus"></i> NEW LEAD</a>
                     @endcan
                 </div>
             </div>
@@ -533,7 +639,7 @@
             $currentDisposition = (string) request('call_disposition', '');
         @endphp
         <section class="software-panel">
-            <div class="software-panel-title"><span>Latest Call Disposition</span>
+            <div class="software-panel-title"><span class="panel-heading-label"><span class="panel-heading-icon"><i data-lucide="phone-call"></i></span>Latest Call Disposition</span>
                 @if ($currentDisposition !== '')
                     <a href="{{ route('leads.index', $dispositionBaseQuery) }}"
                         class="text-[10px] font-bold text-rose-600">RESET</a>
@@ -541,7 +647,7 @@
             </div>
             <div class="crm-scrollbar flex gap-1 overflow-x-auto p-2">
                 <a href="{{ route('leads.index', $dispositionBaseQuery) }}"
-                    class="software-btn {{ $currentDisposition === '' ? 'border-slate-800 bg-slate-800 text-white' : '' }}">ALL</a>
+                    class="software-btn {{ $currentDisposition === '' ? 'gradient-selected' : '' }}">ALL</a>
                 <a href="{{ route('leads.index', array_merge($dispositionBaseQuery, ['call_disposition' => 'no_call'])) }}"
                     class="software-btn {{ $currentDisposition === 'no_call' ? 'border-amber-400 bg-amber-50 text-amber-700' : '' }}">NO
                     CALL YET</a>
@@ -900,8 +1006,8 @@
         <section class="software-panel overflow-hidden">
             <div class="software-panel-title">
                 <div class="flex items-center gap-2">
-                    <span>Lead Register</span>
-                    <span class="rounded bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-600">
+                    <span class="panel-heading-label"><span class="panel-heading-icon"><i data-lucide="table-2"></i></span>Lead Register</span>
+                    <span class="lead-count-badge rounded bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-600">
                         {{ $leads->count() }} SHOWING
                     </span>
                 </div>
@@ -925,7 +1031,7 @@
                 </form>
             </div>
 
-            <div class="crm-scrollbar lead-table-wrap overflow-auto">
+            <div class="crm-scrollbar lead-table-wrap overflow-x-auto">
                 <table class="lead-table text-sm">
                     <thead>
                         <tr class="text-left uppercase">
@@ -1185,11 +1291,14 @@
                 </table>
             </div>
 
-            @if ($leads->hasPages())
-                <div class="border-t border-slate-200 bg-slate-50 px-3 py-2">
-                    {{ $leads->links() }}
+            <div class="lead-register-footer border-t border-slate-200 bg-white px-4 py-3">
+                <div class="text-[10px] text-slate-500">
+                    Showing {{ $leads->firstItem() ?? 0 }} to {{ $leads->lastItem() ?? 0 }} of {{ number_format($leads->total()) }} results
                 </div>
-            @endif
+                @if ($leads->hasPages())
+                    <div>{{ $leads->links() }}</div>
+                @endif
+            </div>
         </section>
 
         {{-- Create label modal --}}
