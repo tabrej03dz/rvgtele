@@ -1863,38 +1863,109 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function startCountdown(reminder) {
+
         if (countdownInterval) {
             clearInterval(countdownInterval);
         }
 
-        const targetTime = new Date(reminder.scheduled_at).getTime();
+        const targetTime =
+            new Date(reminder.scheduled_at).getTime();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HH:MM:SS Formatter
+        |--------------------------------------------------------------------------
+        */
+
+        function formatTimer(totalSeconds) {
+
+            totalSeconds = Math.max(
+                0,
+                Math.floor(totalSeconds)
+            );
+
+            const hours =
+                Math.floor(totalSeconds / 3600);
+
+            const minutes =
+                Math.floor((totalSeconds % 3600) / 60);
+
+            const seconds =
+                totalSeconds % 60;
+
+            return (
+                String(hours).padStart(2, '0')
+                + ':'
+                + String(minutes).padStart(2, '0')
+                + ':'
+                + String(seconds).padStart(2, '0')
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Timer
+        |--------------------------------------------------------------------------
+        */
 
         const update = function () {
+
             const now = Date.now();
-            const difference = targetTime - now;
+
+            const difference =
+                targetTime - now;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | OVERDUE
+            |--------------------------------------------------------------------------
+            */
 
             if (difference <= 0) {
-                const overdueSeconds = Math.abs(
-                    Math.floor(difference / 1000)
-                );
 
-                const overdueMinutes = Math.floor(overdueSeconds / 60);
-                const overdueSecs = overdueSeconds % 60;
+                const overdueSeconds =
+                    Math.abs(
+                        Math.floor(
+                            difference / 1000
+                        )
+                    );
 
-                heading.textContent = 'Follow-up is overdue';
-                timerLabel.textContent = 'Overdue by';
+
+                heading.textContent =
+                    'Follow-up is overdue';
+
+                timerLabel.textContent =
+                    'Overdue by';
+
+
+                /*
+                |--------------------------------------------------------------
+                | HH:MM:SS
+                |--------------------------------------------------------------
+                */
 
                 countdown.textContent =
-                    String(overdueMinutes).padStart(2, '0')
-                    + ':'
-                    + String(overdueSecs).padStart(2, '0');
+                    formatTimer(overdueSeconds);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Red Theme
+                |--------------------------------------------------------------------------
+                */
 
                 topBar.classList.remove(
                     'bg-amber-500',
                     'bg-emerald-600'
                 );
 
-                topBar.classList.add('bg-rose-600');
+                topBar.classList.add(
+                    'bg-rose-600'
+                );
+
 
                 timerBox.classList.remove(
                     'border-amber-200',
@@ -1908,33 +1979,63 @@ document.addEventListener('DOMContentLoaded', function () {
                     'bg-rose-50'
                 );
 
+
                 timerLabel.className =
                     'text-xs font-bold uppercase tracking-wider text-rose-700';
 
+
                 countdown.className =
-                    'mt-1 text-3xl font-black text-rose-800';
+                    'mt-1 text-3xl font-black text-rose-800 tabular-nums';
+
 
                 return;
             }
 
-            const totalSeconds = Math.floor(difference / 1000);
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
 
-            heading.textContent = 'Follow-up is due soon';
-            timerLabel.textContent = 'Time remaining';
+            /*
+            |--------------------------------------------------------------------------
+            | UPCOMING
+            |--------------------------------------------------------------------------
+            */
+
+            const totalSeconds =
+                Math.floor(
+                    difference / 1000
+                );
+
+
+            heading.textContent =
+                'Follow-up is due soon';
+
+            timerLabel.textContent =
+                'Time remaining';
+
+
+            /*
+            |--------------------------------------------------------------
+            | HH:MM:SS
+            |--------------------------------------------------------------
+            */
 
             countdown.textContent =
-                String(minutes).padStart(2, '0')
-                + ':'
-                + String(seconds).padStart(2, '0');
+                formatTimer(totalSeconds);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Amber Theme
+            |--------------------------------------------------------------------------
+            */
 
             topBar.classList.remove(
                 'bg-rose-600',
                 'bg-emerald-600'
             );
 
-            topBar.classList.add('bg-amber-500');
+            topBar.classList.add(
+                'bg-amber-500'
+            );
+
 
             timerBox.classList.remove(
                 'border-rose-200',
@@ -1948,15 +2049,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 'bg-amber-50'
             );
 
+
             timerLabel.className =
                 'text-xs font-bold uppercase tracking-wider text-amber-700';
 
+
             countdown.className =
-                'mt-1 text-3xl font-black text-amber-800';
+                'mt-1 text-3xl font-black text-amber-800 tabular-nums';
         };
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Start
+        |--------------------------------------------------------------------------
+        */
+
         update();
-        countdownInterval = setInterval(update, 1000);
+
+        countdownInterval =
+            setInterval(
+                update,
+                1000
+            );
     }
 
     function showNextReminder() {
