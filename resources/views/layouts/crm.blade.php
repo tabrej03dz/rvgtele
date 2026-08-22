@@ -955,7 +955,7 @@
                     <div>
                         <div class="text-sm font-black text-slate-900">Save Call Result</div>
                         <div class="mt-0.5 text-xs text-slate-500">
-                            Lead page wala same call result yahin se save karein.
+                            Call result yahin save karein. Mark as Completed par bhi pehle call result save hoga.
                         </div>
                     </div>
                     <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
@@ -1084,7 +1084,7 @@
                 id="followUpCompleteButton"
                 class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-                ✓ Mark as Completed
+                ✓ Save Call Result & Mark Completed
             </button>
 
             {{-- Reschedule / Cancel --}}
@@ -1241,6 +1241,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const reminderEnabledText = document.getElementById('followUpReminderEnabledText');
 
     const popupCallForm = document.getElementById('followUpPopupCallForm');
+    const popupSaveCallButton = document.getElementById('followUpPopupSaveCall');
     const popupDisposition = document.getElementById('followUpPopupDisposition');
     const popupDispositionHint = document.getElementById('followUpPopupDispositionHint');
     const popupDuration = document.getElementById('followUpPopupDuration');
@@ -1262,6 +1263,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let modalOpen = false;
     let audioContext = null;
     let callDispositions = [];
+    let popupCallResultSaved = false;
 
     const reminderPreferenceKey =
         'followup_popup_enabled_user_' + @json(auth()->id());
@@ -1664,6 +1666,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         popupCallForm.reset();
+        popupCallResultSaved = false;
         populatePopupDispositions();
 
         popupCallForm.action =
@@ -2123,6 +2126,95 @@ document.addEventListener('DOMContentLoaded', function () {
         return data;
     }
 
+    async function savePopupCallResult(showSuccessMessage = false) {
+        if (!popupCallForm) {
+            return null;
+        }
+
+        if (!currentReminder) {
+            throw new Error('Current follow-up reminder not available.');
+        }
+
+        if (!popupCallForm.action) {
+            throw new Error('Call save URL not available for this lead.');
+        }
+
+        if (!popupCallForm.reportValidity()) {
+            throw new Error('Please fill all required call result fields.');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate Protection
+        |--------------------------------------------------------------------------
+        | Same popup form agar already successfully save ho chuka hai aur user ne
+        | uske baad koi field change nahi ki, to dubara Call Log create nahi hoga.
+        */
+        if (popupCallResultSaved) {
+            return {
+                success: true,
+                already_saved: true,
+                message: 'Call result already saved.'
+            };
+        }
+
+        const formData = new FormData(popupCallForm);
+
+        const response = await fetch(
+            popupCallForm.action,
+            {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+            }
+        );
+
+        let data = {};
+        const contentType = response.headers.get('content-type') || '';
+
+        if (contentType.includes('application/json')) {
+            try {
+                data = await response.json();
+            } catch (error) {
+                data = {};
+            }
+        }
+
+        if (!response.ok) {
+            let message =
+                data.message
+                || 'Unable to save call result.';
+
+            if (data.errors) {
+                const firstError = Object.values(data.errors)
+                    .flat()
+                    .find(Boolean);
+
+                if (firstError) {
+                    message = firstError;
+                }
+            }
+
+            throw new Error(message);
+        }
+
+        popupCallResultSaved = true;
+
+        if (showSuccessMessage) {
+            showActionMessage(
+                data.message || 'Call result saved successfully.',
+                true
+            );
+        }
+
+        return data;
+    }
+
     async function completeFollowUp() {
         if (!currentReminder) {
             return;
@@ -2130,10 +2222,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const reminder = currentReminder;
 
+        clearActionMessage();
+
         completeButton.disabled = true;
-        completeButton.textContent = 'Completing...';
+        completeButton.textContent = 'Saving Call & Completing...';
+
+        if (popupSaveCallButton) {
+            popupSaveCallButton.disabled = true;
+        }
 
         try {
+            /*
+            |--------------------------------------------------------------------------
+            | STEP 1: Save Call Result
+            |--------------------------------------------------------------------------
+            | calls.create permission hone par popup form available hoga. Us case me
+            | call result successfully save hone ke baad hi follow-up complete hoga.
+            */
+            if (popupCallForm) {
+                await savePopupCallResult(false);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | STEP 2: Mark Current Follow-up Completed
+            |--------------------------------------------------------------------------
+            */
             const data = await postJson(
                 reminder.complete_url,
                 {}
@@ -2148,7 +2262,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             showActionMessage(
                 data.message
-                || 'Follow-up completed successfully.',
+                || (popupCallForm
+                    ? 'Call result saved and follow-up completed successfully.'
+                    : 'Follow-up completed successfully.'),
                 true
             );
 
@@ -2160,12 +2276,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (error) {
             showActionMessage(
-                error.message || 'Something went wrong.',
+                error.message
+                || 'Unable to save call result and complete follow-up.',
                 false
             );
         } finally {
             completeButton.disabled = false;
-            completeButton.textContent = '✓ Mark as Completed';
+            completeButton.textContent = '✓ Save Call Result & Mark Completed';
+
+            if (popupSaveCallButton) {
+                popupSaveCallButton.disabled = false;
+            }
         }
     }
 
@@ -2702,9 +2823,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     popupCallForm?.addEventListener(
         'submit',
-        function (event) {
+        async function (event) {
+            event.preventDefault();
+
             if (!currentReminder || !this.action) {
-                event.preventDefault();
                 showActionMessage(
                     'Call save URL not available for this lead.',
                     false
@@ -2713,8 +2835,65 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (!this.reportValidity()) {
-                event.preventDefault();
                 return;
+            }
+
+            if (popupSaveCallButton) {
+                popupSaveCallButton.disabled = true;
+                popupSaveCallButton.textContent = 'Saving Call Result...';
+            }
+
+            try {
+                await savePopupCallResult(true);
+            } catch (error) {
+                showActionMessage(
+                    error.message || 'Unable to save call result.',
+                    false
+                );
+            } finally {
+                if (popupSaveCallButton) {
+                    popupSaveCallButton.disabled = false;
+                    popupSaveCallButton.textContent = popupCallResultSaved
+                        ? '✓ Call Result Saved'
+                        : '✓ Save Call Result';
+                }
+            }
+        }
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Form Change = Unsaved Again
+    |--------------------------------------------------------------------------
+    | User call result save karne ke baad koi disposition/duration/remarks/date
+    | change karta hai to next save ko naya/updated submission maana jayega.
+    */
+    popupCallForm?.addEventListener(
+        'input',
+        function () {
+            if (!popupCallResultSaved) {
+                return;
+            }
+
+            popupCallResultSaved = false;
+
+            if (popupSaveCallButton) {
+                popupSaveCallButton.textContent = '✓ Save Call Result';
+            }
+        }
+    );
+
+    popupCallForm?.addEventListener(
+        'change',
+        function () {
+            if (!popupCallResultSaved) {
+                return;
+            }
+
+            popupCallResultSaved = false;
+
+            if (popupSaveCallButton) {
+                popupSaveCallButton.textContent = '✓ Save Call Result';
             }
         }
     );
@@ -2759,8 +2938,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     );
 });
-
-
 
 </script>
 

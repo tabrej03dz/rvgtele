@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FollowUp;
 use App\Models\CallDisposition;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -15,18 +16,65 @@ class FollowUpController extends Controller
 {
     /**
      * ============================================================
+     * ROLE HIERARCHY
+     * ============================================================
+     *
+     * Lower number = higher authority.
+     *
+     * Same-rank users do NOT automatically see each other's follow-ups.
+     * A user sees:
+     * 1. Their own follow-ups
+     * 2. Follow-ups assigned to users with a numerically LOWER authority
+     *    (higher rank number) in the SAME company.
+     *
+     * Example:
+     * super_admin -> everyone below
+     * owner/company_owner -> admin and everyone below
+     * branch_manager -> sales_manager and everyone below
+     * team_leader -> quality_analyst and everyone below
+     * employee -> only own follow-ups
+     */
+    private const ROLE_RANKS = [
+        'super_admin'          => 1,
+
+        'company_owner'        => 2,
+        'owner'                => 2,
+
+        'admin'                => 3,
+
+        'branch_manager'       => 4,
+
+        'sales_manager'        => 5,
+
+        'team_leader'          => 6,
+
+        'quality_analyst'      => 7,
+
+        'sales_executive'      => 8,
+
+        'field_sales_executive'=> 9,
+
+        'telecaller'           => 10,
+        'customer_support'     => 10,
+        'accounts_user'        => 10,
+
+        'employee'             => 11,
+    ];
+
+    /**
+     * ============================================================
      * FOLLOW-UP LIST
      * ============================================================
      *
      * Important:
-     * Logged-in user ko sirf uske assigned follow-ups hi milenge.
+     * Logged-in user ko apne aur apne se niche hierarchy wale roles ke follow-ups milenge.
      */
     public function index(Request $request): View
     {
         $user = $request->user();
 
         $companyId = (int) $user->company_id;
-        $userId = (int) $user->id;
+        $visibleUserIds = $this->visibleAssignedUserIds($user);
 
         /*
         |--------------------------------------------------------------------------
@@ -35,7 +83,7 @@ class FollowUpController extends Controller
         |
         | SECURITY:
         | 1. Same company
-        | 2. Follow-up current user ko assigned hona chahiye
+        | 2. Follow-up current user ya hierarchy me niche role ko assigned hona chahiye
         |
         */
 
@@ -45,7 +93,7 @@ class FollowUpController extends Controller
                 'assignedUser',
             ])
             ->where('company_id', $companyId)
-            ->where('assigned_to', $userId);
+            ->whereIn('assigned_to', $visibleUserIds);
 
         /*
         |--------------------------------------------------------------------------
@@ -116,13 +164,13 @@ class FollowUpController extends Controller
         | Summary Base Query
         |--------------------------------------------------------------------------
         |
-        | Ye bhi current user ke hisaab se scoped hai.
+        | Ye bhi role hierarchy ke hisaab se scoped hai.
         |
         */
 
         $base = FollowUp::query()
             ->where('company_id', $companyId)
-            ->where('assigned_to', $userId);
+            ->whereIn('assigned_to', $visibleUserIds);
 
         /*
         |--------------------------------------------------------------------------
@@ -204,7 +252,7 @@ class FollowUpController extends Controller
      * Scheduled time se 1 minute pehle reminder dikhega.
      * Overdue pending follow-ups bhi return honge.
      *
-     * Sirf logged-in user ke follow-ups.
+     * Logged-in user + usse niche role hierarchy ke follow-ups.
      */
     public function reminders(Request $request): JsonResponse
     {
@@ -221,7 +269,7 @@ class FollowUpController extends Controller
         }
 
         $companyId = (int) $user->company_id;
-        $userId = (int) $user->id;
+        $visibleUserIds = $this->visibleAssignedUserIds($user);
 
         $now = now();
 
@@ -231,7 +279,7 @@ class FollowUpController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Only Current User Follow-ups
+        | Current User + Lower Hierarchy Follow-ups
         |--------------------------------------------------------------------------
         */
 
@@ -241,7 +289,7 @@ class FollowUpController extends Controller
                 'assignedUser',
             ])
             ->where('company_id', $companyId)
-            ->where('assigned_to', $userId)
+            ->whereIn('assigned_to', $visibleUserIds)
             ->where('status', 'pending')
             ->whereNotNull('scheduled_at')
             ->where('scheduled_at', '<=', $oneMinuteLater)
@@ -474,7 +522,7 @@ class FollowUpController extends Controller
      *
      * Sidebar timer ke liye nearest pending follow-up.
      *
-     * Sirf current user ka.
+     * Current user + lower hierarchy roles ka.
      */
     public function nearest(Request $request): JsonResponse
     {
@@ -489,17 +537,17 @@ class FollowUpController extends Controller
         }
 
         $companyId = (int) $user->company_id;
-        $userId = (int) $user->id;
+        $visibleUserIds = $this->visibleAssignedUserIds($user);
 
         /*
         |--------------------------------------------------------------------------
-        | Find Nearest Current User Follow-up
+        | Find Nearest Visible Follow-up
         |--------------------------------------------------------------------------
         */
 
         $followUp = FollowUp::query()
             ->where('company_id', $companyId)
-            ->where('assigned_to', $userId)
+            ->whereIn('assigned_to', $visibleUserIds)
             ->where('status', 'pending')
             ->whereNotNull('scheduled_at')
             ->orderByRaw("
@@ -877,9 +925,9 @@ class FollowUpController extends Controller
      * Kisi bhi follow-up action ke liye:
      *
      * 1. Same company hona mandatory.
-     * 2. Follow-up logged-in user ko assigned hona mandatory.
+     * 2. Follow-up logged-in user ya usse niche hierarchy role ko assigned hona mandatory.
      *
-     * Permission hone se dusre user ke follow-up ka access nahi milega.
+     * Same company ke sirf hierarchy-allowed assigned users ke follow-ups accessible honge.
      */
     private function authorizeFollowUpAction(
         Request $request,
@@ -920,17 +968,166 @@ class FollowUpController extends Controller
         |
         | THIS IS IMPORTANT
         |
-        | User dusre employee ka follow-up URL se bhi access nahi kar sakta.
+        | User sirf apne ya hierarchy me niche allowed role ka follow-up access kar sakta hai.
         |
         */
 
+        $visibleUserIds = $this->visibleAssignedUserIds($user);
+
         abort_unless(
-            (int) $followUp->assigned_to
-                ===
-            (int) $user->id,
+            in_array(
+                (int) $followUp->assigned_to,
+                $visibleUserIds,
+                true
+            ),
             403,
-            'This follow-up is not assigned to you.'
+            'You are not allowed to access this follow-up.'
         );
+    }
+
+
+    /**
+     * ============================================================
+     * ROLE HIERARCHY HELPERS
+     * ============================================================
+     */
+
+    /**
+     * Logged-in user ko kaun-kaun se assigned users ke follow-ups
+     * dekhne/action karne ki permission hai, un sab ke IDs return karta hai.
+     */
+    private function visibleAssignedUserIds(User $currentUser): array
+    {
+        $currentUserId = (int) $currentUser->id;
+        $companyId = (int) $currentUser->company_id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Safety
+        |--------------------------------------------------------------------------
+        |
+        | Company missing ho to kisi dusre user ka data expose nahi karna.
+        |
+        */
+
+        if (!$companyId) {
+            return [$currentUserId];
+        }
+
+        $currentRank = $this->effectiveRoleRank($currentUser);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Unknown Role Safety
+        |--------------------------------------------------------------------------
+        |
+        | Agar user ka role ROLE_RANKS me configured nahi hai,
+        | to wo sirf apne follow-ups dekhega.
+        |
+        */
+
+        if ($currentRank === null) {
+            return [$currentUserId];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Same Company Users
+        |--------------------------------------------------------------------------
+        */
+
+        $companyUsers = User::query()
+            ->where('company_id', $companyId)
+            ->with('roles:id,name')
+            ->get([
+                'id',
+                'company_id',
+            ]);
+
+        $visibleIds = $companyUsers
+            ->filter(function (User $candidate) use (
+                $currentUserId,
+                $currentRank
+            ) {
+
+                /*
+                |--------------------------------------------------------------
+                | Always Own Follow-ups
+                |--------------------------------------------------------------
+                */
+
+                if ((int) $candidate->id === $currentUserId) {
+                    return true;
+                }
+
+                /*
+                |--------------------------------------------------------------
+                | Candidate Effective Rank
+                |--------------------------------------------------------------
+                */
+
+                $candidateRank = $this->effectiveRoleRank($candidate);
+
+                if ($candidateRank === null) {
+                    return false;
+                }
+
+                /*
+                |--------------------------------------------------------------
+                | Only Strictly Lower Roles
+                |--------------------------------------------------------------
+                |
+                | Same rank ko access nahi milega.
+                |
+                */
+
+                return $candidateRank > $currentRank;
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Defensive Own-ID Guarantee
+        |--------------------------------------------------------------------------
+        */
+
+        if (!in_array($currentUserId, $visibleIds, true)) {
+            $visibleIds[] = $currentUserId;
+        }
+
+        return array_values(
+            array_unique($visibleIds)
+        );
+    }
+
+
+    /**
+     * User ke multiple roles ho sakte hain.
+     * Sabse powerful/highest role ka rank use hoga.
+     *
+     * Example:
+     * owner + employee => owner rank use hoga.
+     */
+    private function effectiveRoleRank(User $user): ?int
+    {
+        $user->loadMissing('roles:id,name');
+
+        $ranks = $user->roles
+            ->pluck('name')
+            ->map(function ($roleName) {
+                return self::ROLE_RANKS[$roleName] ?? null;
+            })
+            ->filter(fn ($rank) => $rank !== null)
+            ->map(fn ($rank) => (int) $rank);
+
+        if ($ranks->isEmpty()) {
+            return null;
+        }
+
+        return (int) $ranks->min();
     }
 
 

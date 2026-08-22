@@ -1886,7 +1886,6 @@ document.addEventListener('DOMContentLoaded', function () {
     updateClock();
     updateCountdowns();
 
-
     /*
     |--------------------------------------------------------------------------
     | Update Every Second
