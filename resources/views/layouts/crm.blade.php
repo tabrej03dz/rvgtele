@@ -969,16 +969,57 @@
                     </div>
                 </div>
 
-                {{-- Existing timer ids are kept so current JS continues to work --}}
-                <div
-                    id="followUpTimerBox"
-                    class="rounded-lg border border-white/25 bg-white px-3.5 py-2 text-rose-600 shadow-sm"
-                >
-                    <div class="flex items-center gap-2 whitespace-nowrap">
-                        <i data-lucide="clock-3" class="h-4 w-4"></i>
-                        <span id="followUpTimerLabel" class="text-xs font-bold">Overdue by</span>
-                        <span id="followUpCountdown" class="text-xs font-black tabular-nums">00:00:00</span>
+                {{-- Header Actions: Timer + Popup ON/OFF + Close --}}
+                <div class="flex shrink-0 items-center gap-2.5">
+
+                    {{-- Existing timer ids are kept so current JS continues to work --}}
+                    <div
+                        id="followUpTimerBox"
+                        class="rounded-lg border border-white/25 bg-white px-3.5 py-2 text-rose-600 shadow-sm"
+                    >
+                        <div class="flex items-center gap-2 whitespace-nowrap">
+                            <i data-lucide="clock-3" class="h-4 w-4"></i>
+                            <span id="followUpTimerLabel" class="text-xs font-bold">Overdue by</span>
+                            <span id="followUpCountdown" class="text-xs font-black tabular-nums">00:00:00</span>
+                        </div>
                     </div>
+
+                    {{-- Popup ON / OFF --}}
+                    <label
+                        class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-3 text-xs font-bold text-white transition hover:bg-white/20"
+                        title="Follow-up reminder popup on/off"
+                    >
+                        <input
+                            type="checkbox"
+                            id="followUpReminderEnabledToggle"
+                            class="peer sr-only"
+                            checked
+                        >
+
+                        <span
+                            class="relative h-5 w-9 rounded-full bg-white/30 transition
+                                   after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4
+                                   after:rounded-full after:bg-white after:shadow-sm after:transition-all
+                                   peer-checked:bg-emerald-400
+                                   peer-checked:after:translate-x-4"
+                        ></span>
+
+                        <span id="followUpReminderEnabledText" class="whitespace-nowrap">
+                            Popup ON
+                        </span>
+                    </label>
+
+                    {{-- Close current reminder --}}
+                    <button
+                        type="button"
+                        id="followUpReminderClose"
+                        class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/25 bg-white/15 text-white transition hover:bg-white/25"
+                        title="Close reminder"
+                        aria-label="Close reminder"
+                    >
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+
                 </div>
             </div>
         </div>
@@ -1200,12 +1241,9 @@
                 </div>
             </div>
 
-            {{-- Hidden compatibility controls: not shown in popup --}}
-            <button type="button" id="followUpReminderClose" class="hidden"></button>
+            {{-- Hidden compatibility controls --}}
             <button type="button" id="followUpRemindFiveButton" class="hidden"></button>
             <button type="button" id="followUpCancelButton" class="hidden"></button>
-            <input type="checkbox" id="followUpReminderEnabledToggle" class="hidden" checked>
-            <span id="followUpReminderEnabledText" class="hidden">Popup ON</span>
         </div>
     </div>
 </div>
@@ -3183,22 +3221,22 @@ document.addEventListener('DOMContentLoaded', function () {
         markCurrentLeadDemoSent
     );
 
-    completeButton.addEventListener(
+    completeButton?.addEventListener(
         'click',
         completeFollowUp
     );
 
-    closeButton.addEventListener(
+    closeButton?.addEventListener(
         'click',
         closeCurrentReminder
     );
 
-    remindFiveButton.addEventListener(
+    remindFiveButton?.addEventListener(
         'click',
         remindAgainInFiveMinutes
     );
 
-    cancelButton.addEventListener(
+    cancelButton?.addEventListener(
         'click',
         cancelFollowUp
     );
