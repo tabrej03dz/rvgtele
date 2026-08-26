@@ -1348,7 +1348,32 @@ document.addEventListener('DOMContentLoaded', function () {
     let isFetching = false;
     let modalOpen = false;
     let audioContext = null;
-    let callDispositions = [];
+    /*
+    |--------------------------------------------------------------------------
+    | Call Dispositions
+    |--------------------------------------------------------------------------
+    | Popup ko auto_remarks aur next_followup bhi chahiye.
+    | Isliye current company ke active dispositions directly Blade se preload
+    | kar rahe hain. Reminder API agar dispositions return kare to niche merge
+    | hoga, lekin auto_remarks / next_followup lose nahi honge.
+    */
+    @php
+        $popupCallDispositions = \App\Models\CallDisposition::query()
+            ->where('company_id', auth()->user()->company_id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'requires_remarks',
+                'requires_follow_up',
+                'auto_remarks',
+                'next_followup',
+            ]);
+    @endphp
+
+    let callDispositions = @json($popupCallDispositions);
+
     let popupCallResultSaved = false;
 
     const reminderPreferenceKey =
@@ -1658,10 +1683,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
             option.value = disposition.id;
             option.textContent = disposition.name;
+
             option.dataset.requiresRemarks =
                 disposition.requires_remarks ? '1' : '0';
+
             option.dataset.requiresFollowUp =
                 disposition.requires_follow_up ? '1' : '0';
+
+            /*
+            |--------------------------------------------------------------------------
+            | NEW: Auto Remarks
+            |--------------------------------------------------------------------------
+            */
+            option.dataset.autoRemarks =
+                disposition.auto_remarks
+                    ? String(disposition.auto_remarks)
+                    : '';
+
+            /*
+            |--------------------------------------------------------------------------
+            | NEW: Auto Next Follow-up Minutes
+            |--------------------------------------------------------------------------
+            */
+            option.dataset.nextFollowup =
+                disposition.next_followup !== null
+                && disposition.next_followup !== undefined
+                && disposition.next_followup !== ''
+                    ? String(disposition.next_followup)
+                    : '';
 
             popupDisposition.appendChild(option);
         });
@@ -1674,6 +1723,38 @@ document.addEventListener('DOMContentLoaded', function () {
         ) {
             popupDisposition.value = currentValue;
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Add Minutes To Current Browser Time
+    |--------------------------------------------------------------------------
+    | datetime-local input ke format me value return karega:
+    | YYYY-MM-DDTHH:mm
+    */
+    function datetimeLocalAfterMinutes(minutes) {
+        const value = Number(minutes);
+
+        if (!Number.isFinite(value) || value <= 0) {
+            return '';
+        }
+
+        const date = new Date(
+            Date.now() + (value * 60 * 1000)
+        );
+
+        const pad = number =>
+            String(number).padStart(2, '0');
+
+        return date.getFullYear()
+            + '-'
+            + pad(date.getMonth() + 1)
+            + '-'
+            + pad(date.getDate())
+            + 'T'
+            + pad(date.getHours())
+            + ':'
+            + pad(date.getMinutes());
     }
 
     function updatePopupDispositionFields() {
@@ -1690,18 +1771,77 @@ document.addEventListener('DOMContentLoaded', function () {
         const option =
             popupDisposition.options[popupDisposition.selectedIndex];
 
-        const hasDisposition = !!option && !!option.value;
+        const hasDisposition =
+            !!option && !!option.value;
+
         const requiresRemarks =
             hasDisposition
             && option.dataset.requiresRemarks === '1';
+
         const requiresFollowUp =
             hasDisposition
             && option.dataset.requiresFollowUp === '1';
 
-        popupRemarks.required = requiresRemarks;
-        popupNextFollowUp.required = requiresFollowUp;
+        /*
+        |--------------------------------------------------------------------------
+        | NEW: Selected Disposition Values
+        |--------------------------------------------------------------------------
+        */
+        const autoRemarks =
+            hasDisposition
+                ? String(option.dataset.autoRemarks || '').trim()
+                : '';
 
-        // Remarks field screenshot design ke hisab se hamesha visible rahega.
+        const nextFollowupMinutes =
+            hasDisposition
+                ? Number(option.dataset.nextFollowup || 0)
+                : 0;
+
+        const hasAutoNextFollowup =
+            Number.isFinite(nextFollowupMinutes)
+            && nextFollowupMinutes > 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | NEW: Fill Auto Remarks
+        |--------------------------------------------------------------------------
+        | Disposition me auto_remarks hai to popup remarks me automatic fill.
+        | Naya disposition select karne par purana auto remark carry nahi hoga.
+        */
+        popupRemarks.value = autoRemarks;
+
+        /*
+        |--------------------------------------------------------------------------
+        | NEW: Current Time + next_followup Minutes
+        |--------------------------------------------------------------------------
+        | Example:
+        | next_followup = 30
+        | current       = 06:00 PM
+        | follow_up_at  = 06:30 PM
+        |
+        | Ye hidden field FormData ke through existing call save endpoint par
+        | automatically submit ho jayega.
+        */
+        if (hasAutoNextFollowup) {
+            popupNextFollowUp.value =
+                datetimeLocalAfterMinutes(nextFollowupMinutes);
+        } else {
+            popupNextFollowUp.value = '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Required Rules
+        |--------------------------------------------------------------------------
+        | next_followup configured hai to follow-up create hona hi chahiye,
+        | chahe requires_follow_up checkbox galti se off ho.
+        */
+        popupRemarks.required = requiresRemarks;
+
+        popupNextFollowUp.required =
+            requiresFollowUp || hasAutoNextFollowup;
+
+        // Remarks field hamesha visible.
         popupRemarksWrapper.classList.remove('hidden');
 
         if (requiresRemarks) {
@@ -1710,11 +1850,26 @@ document.addEventListener('DOMContentLoaded', function () {
             popupRemarksRequired?.classList.add('hidden');
         }
 
-        // Next follow-up input visually hidden rakha gaya hai.
-        // Reschedule popup se selected date yahan sync hoti hai.
+        // Next follow-up field visually hidden hi rahega.
         popupNextFollowUpWrapper.classList.add('hidden');
         popupNextFollowUpRequired?.classList.add('hidden');
 
+        /*
+        |--------------------------------------------------------------------------
+        | Mark Form As Changed
+        |--------------------------------------------------------------------------
+        */
+        popupCallResultSaved = false;
+
+        if (popupSaveCallButton) {
+            popupSaveCallButton.textContent = 'Save Feedback';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hint
+        |--------------------------------------------------------------------------
+        */
         if (popupDispositionHint) {
             if (!hasDisposition) {
                 popupDispositionHint.classList.add('hidden');
@@ -1722,20 +1877,34 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 const rules = [];
 
+                if (autoRemarks) {
+                    rules.push('Auto remark filled');
+                }
+
+                if (hasAutoNextFollowup) {
+                    rules.push(
+                        'Next follow-up in '
+                        + nextFollowupMinutes
+                        + ' min'
+                    );
+                } else if (requiresFollowUp) {
+                    rules.push('Follow-up required');
+                }
+
                 if (requiresRemarks) {
                     rules.push('Remarks required');
                 }
 
-                if (requiresFollowUp) {
-                    rules.push('Follow-up required');
-                }
-
                 if (rules.length === 0) {
-                    rules.push('No remarks or follow-up required');
+                    rules.push(
+                        'No auto remark or auto follow-up'
+                    );
                 }
 
                 popupDispositionHint.textContent =
-                    option.text.trim() + ' — ' + rules.join(' • ');
+                    option.text.trim()
+                    + ' — '
+                    + rules.join(' • ');
 
                 popupDispositionHint.classList.remove('hidden');
             }
@@ -2300,7 +2469,56 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (Array.isArray(data.dispositions)) {
-                callDispositions = data.dispositions;
+                /*
+                |--------------------------------------------------------------------------
+                | Merge Reminder API Dispositions With Blade Preloaded Data
+                |--------------------------------------------------------------------------
+                | Reminder API purana payload return kare jisme auto_remarks aur
+                | next_followup na ho, tab bhi preloaded values preserve rahengi.
+                */
+                const existingById = new Map(
+                    callDispositions.map(item => [
+                        String(item.id),
+                        item
+                    ])
+                );
+
+                callDispositions = data.dispositions.map(item => {
+                    const existing =
+                        existingById.get(String(item.id)) || {};
+
+                    return {
+                        ...existing,
+                        ...item,
+
+                        auto_remarks:
+                            item.auto_remarks
+                            ?? existing.auto_remarks
+                            ?? null,
+
+                        next_followup:
+                            item.next_followup
+                            ?? existing.next_followup
+                            ?? null,
+                    };
+                });
+
+                /*
+                | API kisi active disposition ko omit kare to Blade-preloaded
+                | record dropdown se disappear na ho.
+                */
+                const apiIds = new Set(
+                    callDispositions.map(item =>
+                        String(item.id)
+                    )
+                );
+
+                existingById.forEach((item, id) => {
+                    if (!apiIds.has(id)) {
+                        callDispositions.push(item);
+                    }
+                });
+
                 populatePopupDispositions();
             }
 
