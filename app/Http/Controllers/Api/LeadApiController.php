@@ -451,4 +451,389 @@ class LeadApiController extends Controller
     {
         return response()->json(['status' => false, 'message' => $message, 'data' => null], $code);
     }
+
+
+
+
+    /*
+|--------------------------------------------------------------------------
+| Lead Complete Communication History
+|--------------------------------------------------------------------------
+|
+| Is API se lead ke:
+| - Saare notes
+| - Saare call logs
+| - Call remarks
+| - Call dispositions
+| - Kis user ne baat/note add kiya
+| - Combined timeline
+|
+| mil jayegi.
+|
+*/
+
+public function communicationHistory(
+    Request $request,
+    Lead $lead
+): JsonResponse {
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Access Security
+    |--------------------------------------------------------------------------
+    |
+    | Admin/Super Admin    : company ki lead
+    | Team Leader          : apni team ki lead
+    | Employee             : khud assigned lead
+    |
+    */
+
+    $this->guard($request, $lead);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Request Validation
+    |--------------------------------------------------------------------------
+    */
+
+    $validated = $request->validate([
+        'per_page' => [
+            'nullable',
+            'integer',
+            'min:1',
+            'max:100',
+        ],
+
+        'type' => [
+            'nullable',
+            Rule::in([
+                'all',
+                'calls',
+                'notes',
+            ]),
+        ],
+    ]);
+
+    $perPage = (int) ($validated['per_page'] ?? 50);
+    $historyType = $validated['type'] ?? 'all';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Basic Lead Details
+    |--------------------------------------------------------------------------
+    */
+
+    $lead->load([
+        'assignedUser:id,name,email,employee_code',
+        'source:id,name',
+        'status:id,name,color',
+        'team:id,name',
+        'stage:id,name,color',
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notes
+    |--------------------------------------------------------------------------
+    */
+
+    $notes = collect();
+
+    if (
+        $historyType === 'all'
+        || $historyType === 'notes'
+    ) {
+        $notes = Note::query()
+            ->where('lead_id', $lead->id)
+            ->with([
+                'user:id,name,email,employee_code',
+            ])
+            ->latest('id')
+            ->get()
+            ->map(function (Note $note) {
+                return [
+                    'id' => $note->id,
+
+                    'type' => 'note',
+
+                    'lead_id' => $note->lead_id,
+
+                    'body' => $note->body,
+
+                    'user_id' => $note->user_id,
+
+                    'user' => $note->user
+                        ? [
+                            'id' => $note->user->id,
+                            'name' => $note->user->name,
+                            'email' => $note->user->email,
+                            'employee_code' =>
+                                $note->user->employee_code,
+                        ]
+                        : null,
+
+                    'created_at' => $note->created_at,
+
+                    'updated_at' => $note->updated_at,
+
+                    /*
+                     * Combined timeline ko sort karne ke liye.
+                     */
+                    'activity_at' => $note->created_at,
+                ];
+            });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Call Logs and Remarks
+    |--------------------------------------------------------------------------
+    */
+
+    $calls = collect();
+
+    if (
+        $historyType === 'all'
+        || $historyType === 'calls'
+    ) {
+        $calls = $lead->calls()
+            ->with([
+                'user:id,name,email,employee_code',
+                'disposition:id,name',
+            ])
+            ->latest('id')
+            ->get()
+            ->map(function ($call) {
+                /*
+                |--------------------------------------------------------------------------
+                | Remark Column Compatibility
+                |--------------------------------------------------------------------------
+                |
+                | Alag projects me column ka naam:
+                |
+                | remarks
+                | remark
+                | notes
+                | call_remark
+                |
+                | ho sakta hai. Jo available hoga wahi response me jayega.
+                |
+                */
+
+                $remark =
+                    $call->remarks
+                    ?? $call->remark
+                    ?? $call->call_remark
+                    ?? $call->notes
+                    ?? null;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Call Date Compatibility
+                |--------------------------------------------------------------------------
+                */
+
+                $calledAt =
+                    $call->called_at
+                    ?? $call->started_at
+                    ?? $call->call_started_at
+                    ?? $call->created_at;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Call Duration Compatibility
+                |--------------------------------------------------------------------------
+                */
+
+                $duration =
+                    $call->duration_seconds
+                    ?? $call->duration
+                    ?? $call->call_duration
+                    ?? 0;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Recording Compatibility
+                |--------------------------------------------------------------------------
+                */
+
+                $recording =
+                    $call->recording_url
+                    ?? $call->recording_path
+                    ?? $call->audio_url
+                    ?? null;
+
+                return [
+                    'id' => $call->id,
+
+                    'type' => 'call',
+
+                    'lead_id' => $call->lead_id,
+
+                    'user_id' => $call->user_id,
+
+                    'call_disposition_id' =>
+                        $call->call_disposition_id,
+
+                    'disposition' => $call->disposition
+                        ? [
+                            'id' => $call->disposition->id,
+                            'name' => $call->disposition->name,
+                        ]
+                        : null,
+
+                    'call_type' =>
+                        $call->call_type
+                        ?? $call->direction
+                        ?? null,
+
+                    'phone_number' =>
+                        $call->phone_number
+                        ?? $call->mobile
+                        ?? null,
+
+                    'remark' => $remark,
+
+                    'duration_seconds' => (int) $duration,
+
+                    'called_at' => $calledAt,
+
+                    'recording_url' => $recording,
+
+                    'user' => $call->user
+                        ? [
+                            'id' => $call->user->id,
+                            'name' => $call->user->name,
+                            'email' => $call->user->email,
+                            'employee_code' =>
+                                $call->user->employee_code,
+                        ]
+                        : null,
+
+                    'created_at' => $call->created_at,
+
+                    'updated_at' => $call->updated_at,
+
+                    /*
+                     * Combined timeline ko sort karne ke liye.
+                     */
+                    'activity_at' => $calledAt,
+                ];
+            });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Combined Timeline
+    |--------------------------------------------------------------------------
+    |
+    | Notes aur calls ko ek saath date/time ke hisaab se latest first.
+    |
+    */
+
+    $timeline = $notes
+        ->concat($calls)
+        ->sortByDesc(function (array $history) {
+            return optional(
+                \Illuminate\Support\Carbon::parse(
+                    $history['activity_at']
+                )
+            )->timestamp;
+        })
+        ->values();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Manual Pagination
+    |--------------------------------------------------------------------------
+    */
+
+    $currentPage = max(
+        1,
+        (int) $request->input('page', 1)
+    );
+
+    $total = $timeline->count();
+
+    $paginatedTimeline = $timeline
+        ->forPage(
+            $currentPage,
+            $perPage
+        )
+        ->values();
+
+    $lastPage = max(
+        1,
+        (int) ceil($total / $perPage)
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Final Response
+    |--------------------------------------------------------------------------
+    */
+
+    return response()->json([
+        'status' => true,
+
+        'message' =>
+            'Lead communication history fetched successfully.',
+
+        'data' => [
+            'lead' => [
+                'id' => $lead->id,
+                'name' => $lead->name,
+                'company_name' => $lead->company_name,
+                'mobile' => $lead->mobile,
+                'alternate_mobile' =>
+                    $lead->alternate_mobile,
+                'whatsapp_number' =>
+                    $lead->whatsapp_number,
+                'email' => $lead->email,
+
+                'assigned_user' =>
+                    $lead->assignedUser,
+
+                'source' => $lead->source,
+
+                'status' => $lead->status,
+
+                'team' => $lead->team,
+
+                'stage' => $lead->stage,
+            ],
+
+            'summary' => [
+                'total_calls' =>
+                    $lead->calls()->count(),
+
+                'total_notes' =>
+                    $lead->notes()->count(),
+
+                'total_communications' =>
+                    $lead->calls()->count()
+                    + $lead->notes()->count(),
+
+                'last_call_at' =>
+                    $lead->calls()
+                        ->latest('id')
+                        ->value('created_at'),
+
+                'last_note_at' =>
+                    $lead->notes()
+                        ->latest('id')
+                        ->value('created_at'),
+            ],
+
+            'timeline' => [
+                'current_page' => $currentPage,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
+                'data' => $paginatedTimeline,
+            ],
+        ],
+    ]);
+}
+
+
 }

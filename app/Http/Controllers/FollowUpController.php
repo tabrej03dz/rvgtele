@@ -701,6 +701,7 @@ class FollowUpController extends Controller
 
         $followUp->update([
             'scheduled_at' => $newScheduledAt,
+         'reminder_notified_at' => null,
         ]);
 
         return $this->actionResponse(
@@ -794,6 +795,8 @@ class FollowUpController extends Controller
 
             'completed_at' =>
                 null,
+
+                'reminder_notified_at' => null,
         ]);
 
         return $this->actionResponse(

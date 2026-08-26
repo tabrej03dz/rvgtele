@@ -90,4 +90,10 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->hasMany(Lead::class, 'assigned_to');
     }
+
+
+    public function deviceTokens()
+{
+    return $this->hasMany(DeviceToken::class);
+}
 }
