@@ -9,13 +9,14 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-
-
 Schedule::command(
     'followups:send-reminder-notifications'
 )
     ->everyMinute()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->appendOutputTo(
+        storage_path('logs/followup-reminder.log')
+    );
 
 Schedule::call(function () {
     Log::info('HOSTINGER AUTOMATIC CRON WORKING', [
@@ -23,10 +24,5 @@ Schedule::call(function () {
     ]);
 })
     ->name('hostinger-automatic-cron-test')
-    ->everyMinute();
-
-Schedule::command(
-    'followups:send-reminder-notifications'
-)
     ->everyMinute()
     ->withoutOverlapping();
