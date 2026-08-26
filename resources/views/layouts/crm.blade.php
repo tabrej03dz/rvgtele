@@ -24,6 +24,10 @@
     ])
 
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 
     <style>
 
@@ -80,6 +84,99 @@
             infinite;
     }
 
+    :root {
+        --crm-navy: #081343;
+        --crm-navy-deep: #050b2c;
+        --crm-blue: #2563eb;
+        --crm-violet: #7c3aed;
+        --crm-border: #e5e9f2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f7f9fc;
+        color: #172033;
+    }
+
+    .crm-sidebar {
+        background:
+            radial-gradient(circle at 10% 0%, rgba(70, 71, 255, .23), transparent 29%),
+            linear-gradient(180deg, var(--crm-navy-deep) 0%, #071750 54%, #092570 100%);
+        box-shadow: 10px 0 35px rgba(12, 24, 73, .08);
+    }
+
+    .crm-brand-mark {
+        background: linear-gradient(145deg, #3668ff 0%, #5538ff 48%, #9b27ee 100%);
+        box-shadow: 0 10px 25px rgba(65, 72, 255, .38), inset 0 1px 0 rgba(255,255,255,.3);
+    }
+
+    .crm-nav-link { border: 1px solid transparent; }
+    .crm-nav-link svg { width: 18px; height: 18px; stroke-width: 1.8; }
+    .crm-nav-link.is-active {
+        background: linear-gradient(100deg, #2768ff 0%, #6638f5 56%, #8d37ef 100%);
+        box-shadow: 0 8px 23px rgba(63, 74, 255, .35), inset 0 1px 0 rgba(255,255,255,.18);
+        border-color: rgba(255,255,255,.12);
+    }
+
+    .crm-header {
+        min-height: 74px;
+        border-color: var(--crm-border);
+        box-shadow: 0 1px 8px rgba(15, 23, 42, .025);
+    }
+
+    .crm-avatar {
+        background: linear-gradient(145deg, #2464ff, #8a2ceb);
+        box-shadow: 0 6px 16px rgba(82, 55, 238, .22);
+    }
+
+    .crm-icon-button {
+        display: inline-flex;
+        height: 42px;
+        width: 42px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #e3e7ef;
+        border-radius: 10px;
+        background: #fff;
+        color: #1e293b;
+        box-shadow: 0 3px 10px rgba(15,23,42,.05);
+        transition: .18s ease;
+    }
+    .crm-icon-button:hover { color: #5b35ea; border-color: #cfc7ff; }
+    .crm-icon-button svg { width: 19px; height: 19px; }
+
+    .crm-logout {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #fee2e2;
+        border-radius: 10px;
+        padding: 0 16px;
+        background: #fff;
+        color: #ef4444;
+        font-weight: 700;
+        box-shadow: 0 3px 10px rgba(15,23,42,.035);
+    }
+    .crm-logout:hover { background: #fff5f5; border-color: #fecaca; }
+    .crm-logout svg { width: 17px; height: 17px; }
+
+    @media (max-width: 1023px) {
+        .crm-sidebar {
+            position: fixed !important;
+            inset: 0 auto 0 0 !important;
+            z-index: 60;
+            width: 285px !important;
+            transform: translateX(-105%);
+            transition: transform .25s ease;
+        }
+        .crm-sidebar.is-open { transform: translateX(0); }
+        .crm-sidebar-backdrop.is-open { display: block; }
+    }
+
 </style>
 </head>
 
@@ -91,8 +188,9 @@
     {{-- SIDEBAR --}}
     {{-- ========================================================= --}}
 
-    <aside
+    <aside id="crmSidebar"
         class="
+            crm-sidebar
             w-full
             bg-slate-950
             text-white
@@ -107,14 +205,15 @@
 
         {{-- Logo / Title --}}
 
-        <div class="border-b border-slate-800 px-6 py-5">
-
-            <div class="text-xl font-bold">
-                Telecalling Sales CRM
-            </div>
-
-            <div class="mt-1 text-xs text-slate-400">
-                Lead • Call • Follow-up • Conversion
+        <div class="border-b border-white/10 px-4 py-5">
+            <div class="flex items-center gap-3">
+                <div class="crm-brand-mark flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+                    <i data-lucide="phone-call" class="h-6 w-6 text-white"></i>
+                </div>
+                <div class="min-w-0">
+                    <div class="truncate text-[16px] font-bold tracking-tight text-white">Telecalling Sales CRM</div>
+                    <div class="mt-1 truncate text-[10px] text-slate-400">Lead • Call • Follow-up • Conversion</div>
+                </div>
             </div>
 
         </div>
@@ -344,6 +443,21 @@
 
             ];
 
+            $menuIcons = [
+                'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard',
+                'leads.index' => 'users', 'pipeline.index' => 'workflow',
+                'followups.index' => 'phone-forwarded', 'calls.index' => 'phone',
+                'employees.index' => 'user-round', 'branches.index' => 'map-pin',
+                'teams.index' => 'users-round', 'access-control.index' => 'shield-check',
+                'campaigns.index' => 'megaphone', 'products.index' => 'package',
+                'customers.index' => 'circle-user-round', 'tasks.index' => 'list-checks',
+                'orders.index' => 'shopping-cart', 'payments.index' => 'credit-card',
+                'reports.index' => 'chart-no-axes-combined',
+                'crm-settings.lead-sources.index' => 'waypoints',
+                'crm-settings.lead-statuses.index' => 'list-filter',
+                'crm-settings.call-dispositions.index' => 'sliders-horizontal',
+            ];
+
         @endphp
 
 
@@ -351,7 +465,7 @@
         {{-- SIDEBAR NAVIGATION --}}
         {{-- ===================================================== --}}
 
-        <nav class="space-y-5 p-4">
+        <nav class="space-y-5 p-3 pb-6">
 
             @if (session()->has('impersonator_id'))
 
@@ -460,6 +574,7 @@
                                 <a
                                     href="{{ route($route) }}"
                                     class="
+                                        crm-nav-link
                                         flex
                                         items-center
                                         justify-between
@@ -472,14 +587,15 @@
 
                                         {{
                                             request()->routeIs($pattern)
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                                ? 'is-active text-white'
+                                                : 'text-slate-300 hover:bg-white/10 hover:text-white'
                                         }}
                                     "
                                 >
 
-                                    <span>
-                                        {{ $text }}
+                                    <span class="flex min-w-0 items-center gap-3">
+                                        <i data-lucide="{{ $menuIcons[$route] ?? 'circle' }}" class="shrink-0"></i>
+                                        <span class="truncate">{{ $text }}</span>
                                     </span>
 
 
@@ -544,6 +660,19 @@
 
             @endforeach
 
+            <div class="rounded-xl border border-white/10 bg-white/[.07] p-3 text-white shadow-lg">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
+                        <i data-lucide="headphones" class="h-5 w-5"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-semibold">Need Help?</div>
+                        <div class="mt-0.5 text-[10px] text-cyan-300">Contact Support</div>
+                    </div>
+                    <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i>
+                </div>
+            </div>
+
         </nav>
 
     </aside>
@@ -552,6 +681,8 @@
     {{-- ========================================================= --}}
     {{-- MAIN CONTENT --}}
     {{-- ========================================================= --}}
+
+    <div id="crmSidebarBackdrop" class="crm-sidebar-backdrop fixed inset-0 z-50 hidden bg-slate-950/60 backdrop-blur-sm lg:hidden"></div>
 
     <main class="min-w-0 flex-1 lg:ml-72">
 
@@ -568,6 +699,7 @@
                 flex
                 items-center
                 justify-between
+                crm-header
                 border-b
                 bg-white/95
                 px-5
@@ -579,7 +711,12 @@
 
             {{-- Company / Branch --}}
 
-            <div>
+            <div class="flex min-w-0 items-center gap-4">
+                <button type="button" id="crmSidebarToggle" class="crm-icon-button" aria-label="Open navigation">
+                    <i data-lucide="menu"></i>
+                </button>
+
+                <div class="min-w-0">
 
                 <div class="font-semibold text-slate-900">
 
@@ -619,12 +756,17 @@
 
                 </div>
 
+                </div>
             </div>
 
 
             {{-- User --}}
 
             <div class="flex items-center gap-4">
+
+                <div class="crm-avatar hidden h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white sm:flex">
+                    {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 2)) }}
+                </div>
 
                 <div class="text-right">
 
@@ -656,22 +798,9 @@
 
                     @csrf
 
-                    <button
-                        type="submit"
-                        class="
-                            rounded-lg
-                            border
-                            border-rose-200
-                            px-3
-                            py-2
-                            text-sm
-                            font-medium
-                            text-rose-600
-                            transition
-                            hover:bg-rose-50
-                        "
-                    >
-                        Logout
+                    <button type="submit" class="crm-logout">
+                        <i data-lucide="log-out"></i>
+                        <span class="hidden sm:inline">Logout</span>
                     </button>
 
                 </form>
@@ -685,7 +814,7 @@
         {{-- PAGE CONTENT --}}
         {{-- ===================================================== --}}
 
-        <section class="p-5 lg:p-8">
+        <section class="p-3 sm:p-5 lg:p-5">
 
             {{-- Success Message --}}
 
@@ -1200,6 +1329,22 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    if (window.lucide) window.lucide.createIcons();
+
+    const crmSidebar = document.getElementById('crmSidebar');
+    const crmSidebarToggle = document.getElementById('crmSidebarToggle');
+    const crmSidebarBackdrop = document.getElementById('crmSidebarBackdrop');
+    const closeCrmSidebar = () => {
+        crmSidebar?.classList.remove('is-open');
+        crmSidebarBackdrop?.classList.remove('is-open');
+    };
+    crmSidebarToggle?.addEventListener('click', () => {
+        crmSidebar?.classList.toggle('is-open');
+        crmSidebarBackdrop?.classList.toggle('is-open');
+    });
+    crmSidebarBackdrop?.addEventListener('click', closeCrmSidebar);
+    crmSidebar?.querySelectorAll('a').forEach(link => link.addEventListener('click', closeCrmSidebar));
 
     const reminderUrl = @json(route('followups.reminders'));
     const sidebarNearestUrl = @json(route('followups.nearest'));

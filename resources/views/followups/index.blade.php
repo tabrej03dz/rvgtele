@@ -15,8 +15,8 @@
             || ($status === null && blank($currentStatus));
 
         return $isActive
-            ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900';
+            ? 'followup-tab-active'
+            : 'followup-tab-inactive';
     };
 
 @endphp
@@ -103,6 +103,99 @@
         animation: reminder-dot .8s infinite;
     }
 
+    .followups-ui {
+        --crm-blue: #2864f7;
+        --crm-violet: #8b2de7;
+        --crm-ink: #17203a;
+        --crm-border: #e5e9f2;
+        color: var(--crm-ink);
+    }
+
+    .followups-ui::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: radial-gradient(circle at 88% 4%, rgba(116,82,244,.07), transparent 26%), #f8faff;
+    }
+
+    .followup-hero {
+        background:
+            radial-gradient(circle at 92% 20%, rgba(153, 64, 255, .38), transparent 28%),
+            linear-gradient(110deg, #14245c 0%, #173e9f 45%, #6336e8 78%, #8d2ce7 100%);
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(45, 48, 139, .18);
+    }
+
+    .followup-summary-card {
+        border-radius: 14px !important;
+        box-shadow: 0 4px 15px rgba(31,42,80,.055) !important;
+    }
+
+    .followup-tabs,
+    .followup-table-card {
+        border: 1px solid var(--crm-border) !important;
+        border-radius: 14px !important;
+        background: #fff;
+        box-shadow: 0 5px 18px rgba(31,42,80,.055) !important;
+    }
+
+    .followup-tab-active {
+        border-color: transparent !important;
+        background: linear-gradient(100deg, var(--crm-blue), #6338ef 58%, var(--crm-violet)) !important;
+        color: #fff !important;
+        box-shadow: 0 6px 14px rgba(76,61,232,.20);
+    }
+
+    .followup-tab-inactive {
+        border-color: #e3e7ef !important;
+        background: #fff !important;
+        color: #526078 !important;
+    }
+    .followup-tab-inactive:hover { border-color: #c9c0ff !important; background: #faf9ff !important; color: #603ae5 !important; }
+
+    .followup-table-head { background: #fbfcff; }
+    .followup-table-head th { color: #3d4860; letter-spacing: .035em; white-space: nowrap; }
+    .followup-row td { vertical-align: middle; }
+
+    .followup-open-btn {
+        display: inline-flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(100deg, var(--crm-blue), #6638ee 62%, var(--crm-violet));
+        padding: 0 12px;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+        box-shadow: 0 6px 14px rgba(76,61,232,.18);
+        transition: .18s ease;
+        white-space: nowrap;
+    }
+    .followup-open-btn:hover { color: #fff; filter: brightness(.96); transform: translateY(-1px); }
+    .followup-open-btn svg { width: 14px; height: 14px; }
+    .followup-open-btn.is-disabled { cursor: not-allowed; background: #e8ebf2; color: #9aa3b4; box-shadow: none; }
+
+    .mobile-number-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: #2157d5;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+    .mobile-number-link:hover { color: #7038e8; }
+    .mobile-number-link svg { width: 14px; height: 14px; flex: none; }
+
+    @media (max-width: 640px) {
+        .followup-hero { padding: 18px !important; }
+    }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -123,7 +216,7 @@
 </style>
 
 
-<div class="mx-auto max-w-7xl space-y-6">
+<div class="followups-ui mx-auto max-w-none space-y-4">
 
 
     {{-- =========================================================
@@ -131,7 +224,7 @@
     ========================================================== --}}
 
     <div
-        class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-6 text-white shadow-lg">
+        class="followup-hero relative overflow-hidden p-6 text-white">
 
         {{-- Decorative Background --}}
 
@@ -314,7 +407,7 @@
 
         <a
             href="{{ route('followups.index') }}"
-            class="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            class="followup-summary-card group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
 
             <div class="flex items-center justify-between">
 
@@ -368,7 +461,7 @@
 
         <a
             href="{{ route('followups.index', ['status' => 'pending']) }}"
-            class="group rounded-2xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            class="followup-summary-card group rounded-2xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
 
             <div class="flex items-center justify-between">
 
@@ -420,7 +513,7 @@
 
         <a
             href="{{ route('followups.index', ['status' => 'due_soon']) }}"
-            class="reminder-soon group rounded-2xl border border-orange-200 bg-orange-50/60 p-4 shadow-sm transition hover:-translate-y-0.5">
+            class="followup-summary-card reminder-soon group rounded-2xl border border-orange-200 bg-orange-50/60 p-4 shadow-sm transition hover:-translate-y-0.5">
 
             <div class="flex items-center justify-between">
 
@@ -469,7 +562,7 @@
 
         <a
             href="{{ route('followups.index', ['status' => 'overdue']) }}"
-            class="{{ $overdueCount > 0 ? 'reminder-danger' : '' }}
+            class="followup-summary-card {{ $overdueCount > 0 ? 'reminder-danger' : '' }}
             rounded-2xl border border-rose-200 bg-rose-50/70 p-4 shadow-sm transition hover:-translate-y-0.5">
 
             <div class="flex items-center justify-between">
@@ -524,7 +617,7 @@
 
         <a
             href="{{ route('followups.index', ['status' => 'completed']) }}"
-            class="group rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            class="followup-summary-card group rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
 
             <div class="flex items-center justify-between">
 
@@ -568,7 +661,7 @@
     ========================================================== --}}
 
     <div
-        class="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        class="followup-tabs rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
 
         <div class="flex flex-wrap gap-2">
 
@@ -679,7 +772,7 @@
     ========================================================== --}}
 
     <section
-        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        class="followup-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
 
         {{-- Table Header --}}
@@ -753,20 +846,20 @@
         <div class="overflow-x-auto">
 
             <table
-                class="w-full min-w-[1100px] text-sm">
+                class="w-full min-w-[1260px] text-sm">
 
 
-                <thead class="bg-slate-50/80">
+                <thead class="followup-table-head bg-slate-50/80">
 
                     <tr
                         class="border-b border-slate-200 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
 
                         <th class="px-5 py-4">
-                            Lead
+                            Lead / Business
                         </th>
 
                         <th class="px-4 py-4">
-                            Assigned To
+                            Mobile Number
                         </th>
 
                         <th class="px-4 py-4">
@@ -774,11 +867,15 @@
                         </th>
 
                         <th class="px-4 py-4">
+                            Status
+                        </th>
+
+                        <th class="px-4 py-4">
                             Type
                         </th>
 
                         <th class="px-4 py-4">
-                            Status
+                            Assigned To
                         </th>
 
                         <th class="px-5 py-4 text-right">
@@ -982,6 +1079,10 @@
 
                                             </a>
 
+                                            <div class="mt-1 text-[11px] font-medium text-slate-500">
+                                                {{ $followup->lead->company_name ?: 'Individual Lead' }}
+                                            </div>
+
                                         @else
 
                                             <span
@@ -1016,27 +1117,23 @@
 
 
 
-                            {{-- Assigned User --}}
+                            {{-- Mobile Number --}}
 
                             <td class="px-4 py-4">
 
-                                <div
-                                    class="font-semibold text-slate-800">
-
-                                    {{ $followup->assignedUser?->name ?? 'Unassigned' }}
-
-                                </div>
-
-
-                                @if($followup->assignedUser?->employee_code)
-
-                                    <div
-                                        class="mt-1 text-xs text-slate-400">
-
-                                        {{ $followup->assignedUser->employee_code }}
-
-                                    </div>
-
+                                @if($followup->lead?->mobile)
+                                    <a
+                                        href="tel:{{ preg_replace('/[^0-9+]/', '', $followup->lead->mobile) }}"
+                                        class="mobile-number-link"
+                                        title="Call {{ $followup->lead->mobile }}"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z"/>
+                                        </svg>
+                                        {{ $followup->lead->mobile }}
+                                    </a>
+                                @else
+                                    <span class="text-xs font-medium text-slate-400">Not available</span>
                                 @endif
 
                             </td>
@@ -1115,22 +1212,6 @@
 
 
 
-                            {{-- Type --}}
-
-                            <td class="px-4 py-4">
-
-                                <span
-                                    class="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold capitalize ring-1
-                                    {{ $typeClass }}">
-
-                                    {{ $followup->type ?: 'follow-up' }}
-
-                                </span>
-
-                            </td>
-
-
-
                             {{-- Status --}}
 
                             <td class="px-4 py-4">
@@ -1159,12 +1240,65 @@
 
 
 
+                            {{-- Type --}}
+
+                            <td class="px-4 py-4">
+
+                                <span
+                                    class="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold capitalize ring-1
+                                    {{ $typeClass }}">
+
+                                    {{ $followup->type ?: 'follow-up' }}
+
+                                </span>
+
+                            </td>
+
+
+
+                            {{-- Assigned User --}}
+
+                            <td class="px-4 py-4">
+
+                                <div class="font-semibold text-slate-800">
+                                    {{ $followup->assignedUser?->name ?? 'Unassigned' }}
+                                </div>
+
+                                @if($followup->assignedUser?->employee_code)
+                                    <div class="mt-1 text-xs text-slate-400">
+                                        {{ $followup->assignedUser->employee_code }}
+                                    </div>
+                                @endif
+
+                            </td>
+
+
+
                             {{-- Actions --}}
 
                             <td class="px-5 py-4">
 
                                 <div
                                     class="flex items-center justify-end gap-2">
+
+                                    @if($followup->lead)
+                                        <a
+                                            href="{{ route('leads.show', $followup->lead) }}"
+                                            class="followup-open-btn"
+                                            title="Open {{ $followup->lead->name }}"
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M15 3h6v6"/>
+                                                <path d="M10 14 21 3"/>
+                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                            </svg>
+                                            Open
+                                        </a>
+                                    @else
+                                        <span class="followup-open-btn is-disabled" title="Lead unavailable">
+                                            Open
+                                        </span>
+                                    @endif
 
 
                                     @if($followup->status === 'pending')
@@ -1276,7 +1410,7 @@
                         <tr>
 
                             <td
-                                colspan="6"
+                                colspan="7"
                                 class="px-5 py-16 text-center">
 
                                 <div
