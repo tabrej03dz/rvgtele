@@ -27,6 +27,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
+Route::middleware(['auth'])->group(function () {
+
+    Route::post(
+        '/leads/{lead}/call-on-mobile',
+        [LeadController::class, 'callOnMobile']
+    )->name('leads.call-on-mobile');
+
+});
+
 Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware('permission:dashboard.view')

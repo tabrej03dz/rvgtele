@@ -19,9 +19,111 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Services\MobileCallService;
+
 
 class LeadApiController extends Controller
 {
+
+
+
+public function callOnMobile(
+    Request $request,
+    Lead $lead,
+    MobileCallService $mobileCallService
+): JsonResponse {
+
+    $user = $request->user();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company Security
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        isset($user->company_id) &&
+        isset($lead->company_id) &&
+        (int) $user->company_id !== (int) $lead->company_id
+    ) {
+        return response()->json([
+            'status' => false,
+            'message' => 'You are not allowed to access this lead.',
+        ], 403);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Employee Lead Security
+    |--------------------------------------------------------------------------
+    |
+    | Normal employee ko doosre employee ki lead par call nahi karne dena.
+    |
+    | Agar aapke LeadApiController me already guard/access method hai,
+    | to ye block hata kar wahi guard use karna better hai.
+    |
+    */
+
+    $hasFullAccess = $user->hasAnyRole([
+        'super_admin',
+        'admin',
+    ]);
+
+    if (
+        !$hasFullAccess &&
+        (int) $lead->assigned_to !== (int) $user->id
+    ) {
+        return response()->json([
+            'status' => false,
+            'message' => 'This lead is not assigned to you.',
+        ], 403);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mobile Number
+    |--------------------------------------------------------------------------
+    */
+
+    if (blank($lead->mobile)) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Lead mobile number is missing.',
+        ], 422);
+    }
+
+    try {
+
+        $result = $mobileCallService->send(
+            $user,
+            $lead
+        );
+
+        return response()->json([
+            'status' => true,
+
+            'message' =>
+                'Call command sent to your mobile app.',
+
+            'data' => [
+                'lead_id' => $lead->id,
+                'lead_name' => $lead->name,
+                'mobile' => $lead->mobile,
+                'device' => $result,
+            ],
+        ]);
+
+    } catch (Throwable $e) {
+
+        report($e);
+
+        return response()->json([
+            'status' => false,
+            'message' => $e->getMessage(),
+        ], 422);
+    }
+}
+
     private array $fullAccessRoles = ['super_admin', 'admin'];
 
     public function index(Request $request): JsonResponse

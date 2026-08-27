@@ -349,6 +349,34 @@
                 @endif
 
 
+                {{-- CALL ON MOBILE --}}
+                @if ($lead->mobile)
+
+                    <button
+                        type="button"
+                        id="callOnMobileButton"
+                        onclick="callLeadOnMobile()"
+                        class="header-call-btn"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z"/>
+                        </svg>
+
+                        <span id="callOnMobileText">
+                            Call on Mobile
+                        </span>
+                    </button>
+
+                @endif
+
+
 
                 {{-- PREVIOUS --}}
                 @if ($previousLead)
@@ -830,6 +858,8 @@
                                     value=""
                                     data-requires-remarks="0"
                                     data-requires-follow-up="0"
+                                    data-auto-remarks=""
+                                    data-next-followup=""
                                 >
                                     Select call result
                                 </option>
@@ -841,6 +871,8 @@
                                         value="{{ $disposition->id }}"
                                         data-requires-remarks="{{ $disposition->requires_remarks ? '1' : '0' }}"
                                         data-requires-follow-up="{{ $disposition->requires_follow_up ? '1' : '0' }}"
+                                        data-auto-remarks="{{ e($disposition->auto_remarks ?? '') }}"
+                                        data-next-followup="{{ $disposition->next_followup ?? '' }}"
                                         @selected(
                                             (string) old('call_disposition_id')
                                             ===
@@ -1284,6 +1316,33 @@
     |--------------------------------------------------------------------------
     */
 
+    function datetimeLocalAfterMinutes(minutes)
+    {
+        const value = Number(minutes);
+
+        if (!Number.isFinite(value) || value <= 0) {
+            return '';
+        }
+
+        const date = new Date(
+            Date.now() + (value * 60 * 1000)
+        );
+
+        const pad = number =>
+            String(number).padStart(2, '0');
+
+        return date.getFullYear()
+            + '-'
+            + pad(date.getMonth() + 1)
+            + '-'
+            + pad(date.getDate())
+            + 'T'
+            + pad(date.getHours())
+            + ':'
+            + pad(date.getMinutes());
+    }
+
+
     function updateDispositionFields()
     {
         const select =
@@ -1291,42 +1350,35 @@
                 'callDispositionSelect'
             );
 
-
         const remarksWrapper =
             document.getElementById(
                 'remarksFieldWrapper'
             );
-
 
         const remarksInput =
             document.getElementById(
                 'callRemarks'
             );
 
-
         const remarksRequiredMark =
             document.getElementById(
                 'remarksRequiredMark'
             );
-
 
         const followUpWrapper =
             document.getElementById(
                 'followUpFieldWrapper'
             );
 
-
         const followUpInput =
             document.getElementById(
                 'followUpAt'
             );
 
-
         const followUpRequiredMark =
             document.getElementById(
                 'followUpRequiredMark'
             );
-
 
         if (
             !select
@@ -1338,46 +1390,62 @@
             return;
         }
 
-
         const option =
             select.options[
                 select.selectedIndex
             ];
 
-
         const hasDisposition =
             !!option
             && !!option.value;
-
 
         const requiresRemarks =
             hasDisposition
             && option.dataset.requiresRemarks === '1';
 
-
         const requiresFollowUp =
             hasDisposition
             && option.dataset.requiresFollowUp === '1';
 
+        const autoRemarks =
+            hasDisposition
+                ? String(
+                    option.dataset.autoRemarks || ''
+                ).trim()
+                : '';
+
+        const nextFollowupMinutes =
+            hasDisposition
+                ? Number(
+                    option.dataset.nextFollowup || 0
+                )
+                : 0;
+
+        const hasAutoNextFollowup =
+            Number.isFinite(nextFollowupMinutes)
+            && nextFollowupMinutes > 0;
 
 
         /*
         |--------------------------------------------------------------------------
-        | REMARKS
+        | AUTO REMARKS
         |--------------------------------------------------------------------------
         */
+
+        remarksInput.value = autoRemarks;
 
         remarksInput.required =
             requiresRemarks;
 
-
-        if (requiresRemarks) {
+        if (
+            hasDisposition
+            && (
+                requiresRemarks
+                || autoRemarks !== ''
+            )
+        ) {
 
             remarksWrapper.classList.remove(
-                'hidden'
-            );
-
-            remarksRequiredMark?.classList.remove(
                 'hidden'
             );
 
@@ -1386,34 +1454,55 @@
             remarksWrapper.classList.add(
                 'hidden'
             );
+        }
+
+        if (requiresRemarks) {
+
+            remarksRequiredMark?.classList.remove(
+                'hidden'
+            );
+
+        } else {
 
             remarksRequiredMark?.classList.add(
                 'hidden'
             );
-
-            remarksInput.value = '';
-
         }
-
 
 
         /*
         |--------------------------------------------------------------------------
-        | FOLLOW-UP
+        | AUTO NEXT FOLLOW-UP
         |--------------------------------------------------------------------------
+        | next_followup = minutes
+        | Example: 30 => current time + 30 minutes
         */
 
+        if (hasAutoNextFollowup) {
+
+            followUpInput.value =
+                datetimeLocalAfterMinutes(
+                    nextFollowupMinutes
+                );
+
+        } else {
+
+            followUpInput.value = '';
+        }
+
         followUpInput.required =
-            requiresFollowUp;
+            requiresFollowUp
+            || hasAutoNextFollowup;
 
-
-        if (requiresFollowUp) {
+        if (
+            hasDisposition
+            && (
+                requiresFollowUp
+                || hasAutoNextFollowup
+            )
+        ) {
 
             followUpWrapper.classList.remove(
-                'hidden'
-            );
-
-            followUpRequiredMark?.classList.remove(
                 'hidden'
             );
 
@@ -1422,16 +1511,24 @@
             followUpWrapper.classList.add(
                 'hidden'
             );
+        }
+
+        if (
+            requiresFollowUp
+            || hasAutoNextFollowup
+        ) {
+
+            followUpRequiredMark?.classList.remove(
+                'hidden'
+            );
+
+        } else {
 
             followUpRequiredMark?.classList.add(
                 'hidden'
             );
-
-            followUpInput.value = '';
-
         }
     }
-
 
 
     /*
@@ -1638,6 +1735,140 @@
             }
         );
 
+</script>
+
+<script>
+async function callLeadOnMobile() {
+
+    const button = document.getElementById(
+        'callOnMobileButton'
+    );
+
+    const text = document.getElementById(
+        'callOnMobileText'
+    );
+
+    if (!button) {
+        return;
+    }
+
+    button.disabled = true;
+
+    if (text) {
+        text.innerText = 'Sending...';
+    }
+
+    try {
+
+        const response = await fetch(
+            @json(route('leads.call-on-mobile', $lead)),
+            {
+                method: 'POST',
+
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+
+                    'X-CSRF-TOKEN':
+                        document.querySelector(
+                            'meta[name="csrf-token"]'
+                        )?.getAttribute('content') ?? ''
+                },
+
+                credentials: 'same-origin',
+
+                body: JSON.stringify({})
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || data.status !== true) {
+
+            throw new Error(
+                data.message ??
+                'Unable to send call to mobile.'
+            );
+        }
+
+        if (text) {
+            text.innerText = 'Sent ✓';
+        }
+
+        showCallToast(
+            data.message ||
+            'Call sent to mobile.'
+        );
+
+        setTimeout(() => {
+
+            if (text) {
+                text.innerText = 'Call on Mobile';
+            }
+
+        }, 2000);
+
+    } catch (error) {
+
+        console.error(error);
+
+        showCallToast(
+            error.message ||
+            'Something went wrong.',
+            true
+        );
+
+    } finally {
+
+        button.disabled = false;
+    }
+}
+
+
+function showCallToast(message, isError = false) {
+
+    const oldToast =
+        document.getElementById('mobile-call-toast');
+
+    if (oldToast) {
+        oldToast.remove();
+    }
+
+    const toast = document.createElement('div');
+
+    toast.id = 'mobile-call-toast';
+
+    toast.style.position = 'fixed';
+    toast.style.right = '20px';
+    toast.style.bottom = '20px';
+    toast.style.zIndex = '99999';
+
+    toast.style.padding = '12px 16px';
+    toast.style.borderRadius = '10px';
+
+    toast.style.fontSize = '13px';
+    toast.style.fontWeight = '700';
+
+    toast.style.color = '#fff';
+
+    toast.style.background =
+        isError
+            ? '#dc2626'
+            : '#059669';
+
+    toast.style.boxShadow =
+        '0 10px 30px rgba(0,0,0,.18)';
+
+    toast.innerText = message;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+
+        toast.remove();
+
+    }, 3500);
+}
 </script>
 
 @endsection
