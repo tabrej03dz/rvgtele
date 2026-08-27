@@ -282,7 +282,7 @@
                     <div class="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1">
 
                         <h1 class="truncate text-lg font-extrabold text-slate-900">
-                            {{ $lead->name ?: 'No Name' }}
+                            {{ $lead->name ?: 'No Name' }}({{ $lead->company_name ?: 'No Name' }})
                         </h1>
 
                         @if ($lead->mobile)
@@ -312,6 +312,44 @@
                             </div>
 
                         @endif
+
+
+
+
+                            <div
+                                class="
+                                    inline-flex
+                                    items-center
+                                    gap-1.5
+                                    rounded-full
+                                    border
+                                    border-indigo-200
+                                    bg-indigo-50
+                                    px-2.5
+                                    py-1
+                                    text-xs
+                                    font-bold
+                                    text-indigo-700
+                                "
+                                title="Lead Category"
+                            >
+                                <svg
+                                    width="13"
+                                    height="13"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.82 0l3.36-3.36a2 2 0 0 0 0-2.82Z"/>
+                                    <circle cx="7.5" cy="6.5" r=".5" fill="currentColor"/>
+                                </svg>
+
+                                <span>
+                                    {{ $lead->category }}
+                                </span>
+                            </div>
+
 
                     </div>
 
