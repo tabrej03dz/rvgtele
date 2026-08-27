@@ -1,10 +1,6 @@
 <?php
 
-
-
-
 namespace App\Http\Controllers;
-
 use App\Models\CallDisposition;
 use App\Models\Lead;
 use App\Models\LeadAssignment;
@@ -22,9 +18,79 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use App\Models\LeadLabel;
+use App\Services\MobileCallService;
+use Illuminate\Http\JsonResponse;
+use Throwable;
 
 class LeadController extends Controller
 {
+
+
+
+
+public function callOnMobile(
+    Request $request,
+    Lead $lead,
+    MobileCallService $mobileCallService
+): JsonResponse {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Existing Lead Security
+    |--------------------------------------------------------------------------
+    |
+    | Aapke current controller ka wahi guard reuse hoga.
+    |
+    */
+
+    $this->guard(
+        $request,
+        $lead
+    );
+
+    if (blank($lead->mobile)) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Lead mobile number is missing.',
+        ], 422);
+    }
+
+    try {
+
+        $result = $mobileCallService->send(
+            $request->user(),
+            $lead
+        );
+
+        return response()->json([
+            'status' => true,
+
+            'message' =>
+                'Call sent to mobile successfully.',
+
+            'data' => [
+                'lead_id' => $lead->id,
+                'lead_name' => $lead->name,
+                'mobile' => $lead->mobile,
+                'device' => $result,
+            ],
+        ]);
+
+    } catch (Throwable $e) {
+
+        report($e);
+
+        return response()->json([
+            'status' => false,
+            'message' => $e->getMessage(),
+        ], 422);
+    }
+}
+
+
+
+
+
     /*
     |--------------------------------------------------------------------------
     | FULL ACCESS ROLES
@@ -381,9 +447,12 @@ class LeadController extends Controller
     public function store(
         Request $request
     ): RedirectResponse {
+
+
         $companyId = $this->companyId($request);
 
         $validated = $this->validateData($request);
+
 
         /*
         |--------------------------------------------------------------------------
@@ -479,7 +548,10 @@ class LeadController extends Controller
     public function show(
         Request $request,
         Lead $lead
-    ): View {
+    ):
+     View {
+
+
         /*
         | Employee doosre employee ki lead URL se open nahi kar sakta.
         */
@@ -1671,7 +1743,7 @@ class LeadController extends Controller
         );
     }
 
- 
+
 
     private function filteredLeadQuery(
     Request $request

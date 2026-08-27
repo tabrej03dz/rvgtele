@@ -21,6 +21,11 @@ Route::get(
     [DeviceTokenController::class, 'firebaseHealth']
 );
 
+   Route::post(
+        '/leads/{lead}/call-on-mobile',
+        [LeadApiController::class, 'callOnMobile']
+    );
+
     Route::prefix('leads')->controller(LeadApiController::class)->group(function () {
         Route::get('/options', 'options');
         Route::get('/', 'index');
