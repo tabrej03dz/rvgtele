@@ -45,6 +45,11 @@ class CallDispositionController extends Controller
                         'type',
                         'like',
                         "%{$search}%"
+                    )
+                    ->orWhere(
+                        'auto_remarks',
+                        'like',
+                        "%{$search}%"
                     );
             });
         }
@@ -72,6 +77,8 @@ class CallDispositionController extends Controller
                 'type',
                 'requires_follow_up',
                 'requires_remarks',
+                'auto_remarks',
+                'next_followup',
                 'is_active',
             ],
 
@@ -80,6 +87,8 @@ class CallDispositionController extends Controller
                 'type' => 'Type',
                 'requires_follow_up' => 'Follow-up Required',
                 'requires_remarks' => 'Remarks Required',
+                'auto_remarks' => 'Auto Remarks',
+                'next_followup' => 'Next Follow-up',
                 'is_active' => 'Active',
             ],
         ]);
@@ -142,6 +151,20 @@ class CallDispositionController extends Controller
             $request,
             $data
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normalize Nullable Fields
+        |--------------------------------------------------------------------------
+        */
+
+        $data['auto_remarks'] = $request->filled('auto_remarks')
+            ? trim((string) $request->input('auto_remarks'))
+            : null;
+
+        $data['next_followup'] = $request->filled('next_followup')
+            ? (int) $request->input('next_followup')
+            : null;
 
         /*
         |--------------------------------------------------------------------------
@@ -236,6 +259,20 @@ class CallDispositionController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Normalize Nullable Fields
+        |--------------------------------------------------------------------------
+        */
+
+        $data['auto_remarks'] = $request->filled('auto_remarks')
+            ? trim((string) $request->input('auto_remarks'))
+            : null;
+
+        $data['next_followup'] = $request->filled('next_followup')
+            ? (int) $request->input('next_followup')
+            : null;
+
+        /*
+        |--------------------------------------------------------------------------
         | Update
         |--------------------------------------------------------------------------
         */
@@ -295,14 +332,6 @@ class CallDispositionController extends Controller
     |--------------------------------------------------------------------------
     | Form Fields
     |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    |
-    | Yahan koi existing record load nahi ho raha.
-    | Koi predefined ENUM options nahi hain.
-    |
-    | Name aur Type completely manually create honge.
-    |
     */
 
     private function formFields(): array
@@ -334,9 +363,6 @@ class CallDispositionController extends Controller
             |--------------------------------------------------------------------------
             | Type
             |--------------------------------------------------------------------------
-            |
-            | Completely independent custom field.
-            |
             */
 
             'type' => [
@@ -391,6 +417,69 @@ class CallDispositionController extends Controller
 
             /*
             |--------------------------------------------------------------------------
+            | Auto Remarks
+            |--------------------------------------------------------------------------
+            */
+
+            'auto_remarks' => [
+                'type' =>
+                    'textarea',
+
+                'label' =>
+                    'Auto Remarks',
+
+                'required' =>
+                    false,
+
+                'placeholder' =>
+                    'Enter automatic remarks',
+
+                'rows' =>
+                    4,
+
+                'help' =>
+                    'Disposition select hone par default remarks ke roop me use ki ja sakti hain.',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Next Follow-up
+            |--------------------------------------------------------------------------
+            |
+            | Value Minutes me store hogi.
+            |
+            | Example:
+            | 30 = 30 Minutes
+            | 60 = 1 Hour
+            | 1440 = 1 Day
+            |
+            */
+
+            'next_followup' => [
+                'type' =>
+                    'number',
+
+                'label' =>
+                    'Next Follow-up (Minutes)',
+
+                'required' =>
+                    false,
+
+                'placeholder' =>
+                    'Example: 30, 60, 1440',
+
+                'min' =>
+                    0,
+
+                'step' =>
+                    1,
+
+                'help' =>
+                    'Follow-up kitne minutes baad automatically schedule hona chahiye. Example: 60 = 1 hour, 1440 = 1 day.',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
             | Active
             |--------------------------------------------------------------------------
             */
@@ -435,20 +524,6 @@ class CallDispositionController extends Controller
                 |--------------------------------------------------------------------------
                 | Type
                 |--------------------------------------------------------------------------
-                |
-                | Koi Rule::in() nahi hai.
-                |
-                | Isliye:
-                |
-                | connected
-                | not_connected
-                | interested
-                | callback
-                | sale
-                | xyz
-                |
-                | kuch bhi valid custom type ho sakta hai.
-                |
                 */
 
                 'type' => [
@@ -470,13 +545,38 @@ class CallDispositionController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | Remarks
+                | Remarks Required
                 |--------------------------------------------------------------------------
                 */
 
                 'requires_remarks' => [
                     'nullable',
                     'boolean',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Auto Remarks
+                |--------------------------------------------------------------------------
+                */
+
+                'auto_remarks' => [
+                    'nullable',
+                    'string',
+                    'max:5000',
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Next Follow-up
+                |--------------------------------------------------------------------------
+                */
+
+                'next_followup' => [
+                    'nullable',
+                    'integer',
+                    'min:0',
+                    'max:525600',
                 ],
 
                 /*
@@ -493,7 +593,7 @@ class CallDispositionController extends Controller
             [
                 /*
                 |--------------------------------------------------------------------------
-                | Messages
+                | Validation Messages
                 |--------------------------------------------------------------------------
                 */
 
@@ -505,6 +605,18 @@ class CallDispositionController extends Controller
 
                 'type.max' =>
                     'Type cannot be longer than 100 characters.',
+
+                'auto_remarks.max' =>
+                    'Auto remarks cannot be longer than 5000 characters.',
+
+                'next_followup.integer' =>
+                    'Next follow-up must be a valid number.',
+
+                'next_followup.min' =>
+                    'Next follow-up cannot be negative.',
+
+                'next_followup.max' =>
+                    'Next follow-up duration is too large.',
             ]
         );
     }
