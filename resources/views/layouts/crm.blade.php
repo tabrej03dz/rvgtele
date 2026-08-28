@@ -324,6 +324,13 @@
                     ],
 
                     [
+                        'Data',
+                        'data.index',
+                        'data.*',
+                        'data.view'
+                    ],
+
+                    [
                         'Pipeline',
                         'pipeline.index',
                         'pipeline.*',
@@ -460,6 +467,7 @@
 
             $menuIcons = [
                 'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard',
+                'data.index' => 'database',
                 'leads.index' => 'users', 'pipeline.index' => 'workflow',
                 'followups.index' => 'phone-forwarded', 'calls.index' => 'phone',
                 'employees.index' => 'user-round', 'branches.index' => 'map-pin',

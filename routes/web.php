@@ -24,10 +24,84 @@ use App\Http\Controllers\SuperAdminBusinessController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DataController;
 
 Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth'])->group(function () {
+
+
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Data List
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/data', [DataController::class, 'index'])
+            ->name('data.index');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create / Store
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/data/create', [DataController::class, 'create'])
+            ->name('data.create');
+
+        Route::post('/data', [DataController::class, 'store'])
+            ->name('data.store');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Bulk Actions
+        |--------------------------------------------------------------------------
+        */
+        Route::delete('/data/bulk-delete', [DataController::class, 'bulkDelete'])
+            ->name('data.bulk-delete');
+
+        Route::post('/data/bulk-convert-to-lead', [DataController::class, 'bulkConvertToLead'])
+            ->name('data.bulk-convert-to-lead');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Restore / Force Delete
+        |--------------------------------------------------------------------------
+        */
+        Route::post('/data/{id}/restore', [DataController::class, 'restore'])
+            ->name('data.restore');
+
+        Route::delete('/data/{id}/force-delete', [DataController::class, 'forceDelete'])
+            ->name('data.force-delete');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Conversion
+        |--------------------------------------------------------------------------
+        */
+        Route::post('/data/{data}/convert-to-lead', [DataController::class, 'convertToLead'])
+            ->name('data.convert-to-lead');
+
+        Route::post('/data/{data}/mark-unconverted', [DataController::class, 'markUnconverted'])
+            ->name('data.mark-unconverted');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Show / Edit / Update / Delete
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/data/{data}', [DataController::class, 'show'])
+            ->name('data.show');
+
+        Route::get('/data/{data}/edit', [DataController::class, 'edit'])
+            ->name('data.edit');
+
+        Route::put('/data/{data}', [DataController::class, 'update'])
+            ->name('data.update');
+
+        Route::delete('/data/{data}', [DataController::class, 'destroy'])
+            ->name('data.destroy');
 
     Route::post(
         '/leads/{lead}/call-on-mobile',
