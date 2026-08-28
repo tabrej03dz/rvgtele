@@ -2,7 +2,7 @@
 
 @section('content')
 
-@include('backend.data.partials.styles')
+@include('data.partials.styles')
 
 <div class="software-ui mx-auto w-full max-w-6xl space-y-3">
 
@@ -52,7 +52,7 @@
 
         @csrf
 
-        @include('backend.data.partials.form', [
+        @include('data.partials.form', [
             'data' => null
         ])
 

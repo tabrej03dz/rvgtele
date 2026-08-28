@@ -2,7 +2,7 @@
 
 @section('content')
 
-@include('backend.data.partials.styles')
+@include('data.partials.styles')
 
 <div class="software-ui mx-auto w-full max-w-6xl space-y-3">
 
@@ -179,7 +179,7 @@
             <div class="grid gap-4 p-4 md:grid-cols-2">
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Name',
                         'value' => $data->name
@@ -187,7 +187,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Business Name',
                         'value' => $data->company_name
@@ -195,7 +195,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Mobile',
                         'value' => $data->mobile
@@ -203,7 +203,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Alternate Mobile',
                         'value' => $data->alternate_mobile
@@ -211,7 +211,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'WhatsApp',
                         'value' => $data->whatsapp_number
@@ -219,7 +219,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Email',
                         'value' => $data->email
@@ -227,7 +227,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Language',
                         'value' => $data->preferred_language
@@ -261,7 +261,7 @@
             <div class="grid gap-4 p-4 md:grid-cols-2">
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'CRM Company',
                         'value' => $data->company?->name
@@ -269,7 +269,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Category',
                         'value' => $data->category
@@ -277,7 +277,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Lead Source',
                         'value' => $data->lead_source
@@ -285,7 +285,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Campaign',
                         'value' => $data->campaign
@@ -293,7 +293,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Industry',
                         'value' => $data->industry
@@ -301,7 +301,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Required Product',
                         'value' => $data->required_product
@@ -309,7 +309,7 @@
                 )
 
                 @include(
-                    'backend.data.partials.detail-row',
+                    'data.partials.detail-row',
                     [
                         'label' => 'Estimated Budget',
                         'value' =>
@@ -374,7 +374,7 @@
 
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'City',
                     'value' => $data->city
@@ -382,7 +382,7 @@
             )
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'District',
                     'value' => $data->district
@@ -390,7 +390,7 @@
             )
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'State',
                     'value' => $data->state
@@ -398,7 +398,7 @@
             )
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'Pincode',
                     'value' => $data->pincode
@@ -465,7 +465,7 @@
         <div class="grid gap-4 p-4 md:grid-cols-3">
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'Converted',
                     'value' =>
@@ -476,7 +476,7 @@
             )
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'Lead ID',
                     'value' => $data->lead_id
@@ -484,7 +484,7 @@
             )
 
             @include(
-                'backend.data.partials.detail-row',
+                'data.partials.detail-row',
                 [
                     'label' => 'Converted At',
                     'value' =>
