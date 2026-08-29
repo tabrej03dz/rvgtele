@@ -952,7 +952,20 @@ class DataController extends Controller
         |--------------------------------------------------------------------------
         */
         $header = array_map(function ($value) {
-            $value = trim((string) $value);
+
+            $value = (string) $value;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Remove UTF-8 BOM
+            |--------------------------------------------------------------------------
+            */
+            $value = preg_replace('/^\xEF\xBB\xBF/', '', $value);
+
+            // Unicode BOM safety
+            $value = str_replace("\xEF\xBB\xBF", '', $value);
+
+            $value = trim($value);
             $value = strtolower($value);
 
             $value = str_replace([
@@ -963,6 +976,7 @@ class DataController extends Controller
             ], '_', $value);
 
             return $value;
+
         }, $header);
 
         $allowedFields = [
