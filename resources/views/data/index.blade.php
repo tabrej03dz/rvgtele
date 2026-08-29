@@ -380,6 +380,15 @@
                     FILTERS
                 </button>
 
+                @can('data.import')
+                    <a
+                        href="{{ route('data.import.create') }}"
+                        class="software-btn"
+                    >
+                        <i data-lucide="upload"></i>
+                        IMPORT
+                    </a>
+                @endcan
                 @can('data.create')
                     <a
                         href="{{ route('data.create') }}"

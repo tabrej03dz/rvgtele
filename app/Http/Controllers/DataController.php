@@ -888,4 +888,284 @@ class DataController extends Controller
             'Data marked as unconverted.'
         );
     }
+
+    public function importCreate()
+    {
+        $companies = Company::orderBy('name')->get();
+
+        return view('data.import', compact('companies'));
+    }
+
+
+    public function importStore(Request $request)
+    {
+        $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                'exists:companies,id',
+            ],
+
+            'category' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'file' => [
+                'required',
+                'file',
+                'mimes:csv,txt',
+                'max:10240',
+            ],
+        ]);
+
+        $file = $request->file('file');
+
+        if (!$file || !$file->isValid()) {
+            return back()
+                ->withInput()
+                ->with('error', 'Invalid import file.');
+        }
+
+        $handle = fopen($file->getRealPath(), 'r');
+
+        if (!$handle) {
+            return back()
+                ->withInput()
+                ->with('error', 'Unable to open CSV file.');
+        }
+
+        $header = fgetcsv($handle);
+
+        if (!$header) {
+            fclose($handle);
+
+            return back()
+                ->withInput()
+                ->with('error', 'CSV file is empty.');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normalize CSV Headers
+        |--------------------------------------------------------------------------
+        */
+        $header = array_map(function ($value) {
+            $value = trim((string) $value);
+            $value = strtolower($value);
+
+            $value = str_replace([
+                ' ',
+                '-',
+                '.',
+                '/',
+            ], '_', $value);
+
+            return $value;
+        }, $header);
+
+        $allowedFields = [
+            'name',
+            'company_name',
+
+            'mobile',
+            'alternate_mobile',
+            'whatsapp_number',
+            'email',
+
+            'category',
+            'lead_source',
+            'campaign',
+
+            'address',
+            'city',
+            'district',
+            'state',
+            'pincode',
+
+            'industry',
+            'required_product',
+            'preferred_language',
+
+            'estimated_budget',
+            'remarks',
+        ];
+
+        $inserted = 0;
+        $skipped = 0;
+        $rowNumber = 1;
+
+        DB::beginTransaction();
+
+        try {
+
+            while (($row = fgetcsv($handle)) !== false) {
+
+                $rowNumber++;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Skip completely empty rows
+                |--------------------------------------------------------------------------
+                */
+                $hasValue = collect($row)->contains(function ($value) {
+                    return trim((string) $value) !== '';
+                });
+
+                if (!$hasValue) {
+                    continue;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Fix column mismatch
+                |--------------------------------------------------------------------------
+                */
+                if (count($row) < count($header)) {
+                    $row = array_pad(
+                        $row,
+                        count($header),
+                        null
+                    );
+                }
+
+                if (count($row) > count($header)) {
+                    $row = array_slice(
+                        $row,
+                        0,
+                        count($header)
+                    );
+                }
+
+                $csvData = array_combine(
+                    $header,
+                    $row
+                );
+
+                if (!$csvData) {
+                    $skipped++;
+                    continue;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Only allowed columns
+                |--------------------------------------------------------------------------
+                */
+                $data = [];
+
+                foreach ($allowedFields as $field) {
+
+                    if (!array_key_exists($field, $csvData)) {
+                        continue;
+                    }
+
+                    $value = trim(
+                        (string) ($csvData[$field] ?? '')
+                    );
+
+                    $data[$field] = $value !== ''
+                        ? $value
+                        : null;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Default Company
+                |--------------------------------------------------------------------------
+                */
+                $data['company_id'] = $validated['company_id'];
+
+                /*
+                |--------------------------------------------------------------------------
+                | Default Category
+                |--------------------------------------------------------------------------
+                |
+                | Agar upload page par category select ki hai,
+                | to wo CSV category ko override karegi.
+                |
+                */
+                if (!empty($validated['category'])) {
+                    $data['category'] = $validated['category'];
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Budget Clean
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    isset($data['estimated_budget'])
+                    && $data['estimated_budget'] !== null
+                ) {
+
+                    $budget = str_replace(
+                        [',', '₹', ' '],
+                        '',
+                        $data['estimated_budget']
+                    );
+
+                    $data['estimated_budget'] =
+                        is_numeric($budget)
+                            ? $budget
+                            : null;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Raw Original Data
+                |--------------------------------------------------------------------------
+                */
+                $data['raw_data'] = $csvData;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Ignore row if everything useful is empty
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    empty($data['name'])
+                    && empty($data['mobile'])
+                    && empty($data['company_name'])
+                    && empty($data['email'])
+                ) {
+                    $skipped++;
+                    continue;
+                }
+
+                Data::create($data);
+
+                $inserted++;
+            }
+
+            fclose($handle);
+
+            DB::commit();
+
+            return redirect()
+                ->route('data.index')
+                ->with(
+                    'success',
+                    "{$inserted} data records imported successfully. {$skipped} rows skipped."
+                );
+
+        } catch (\Throwable $e) {
+
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+
+            DB::rollBack();
+
+            report($e);
+
+            return back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'Import failed: ' . $e->getMessage()
+                );
+        }
+    }
 }

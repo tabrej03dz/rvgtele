@@ -53,6 +53,18 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/data', [DataController::class, 'store'])
             ->name('data.store');
 
+
+
+        Route::get(
+            '/data/import',
+            [DataController::class, 'importCreate']
+        )->name('data.import.create');
+
+        Route::post(
+            '/data/import',
+            [DataController::class, 'importStore']
+        )->name('data.import.store');
+
         /*
         |--------------------------------------------------------------------------
         | Bulk Actions
