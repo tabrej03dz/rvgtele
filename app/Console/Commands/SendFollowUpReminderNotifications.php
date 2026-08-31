@@ -5,70 +5,121 @@ namespace App\Console\Commands;
 use App\Models\FollowUp;
 use App\Services\FirebasePushService;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class SendFollowUpReminderNotifications extends Command
 {
+    /**
+     * Command:
+     *
+     * Normal:
+     * php artisan followups:send-reminder-notifications
+     *
+     * Specific follow-up testing:
+     * php artisan followups:send-reminder-notifications --force-id=217
+     */
     protected $signature =
-        'followups:send-reminder-notifications {--force-id=}';
+        'followups:send-reminder-notifications
+        {--force-id= : Send reminder for a specific follow-up ID}';
 
     protected $description =
         'Send Firebase notifications for due follow-ups';
 
+    /**
+     * Command execute करें।
+     */
     public function handle(
         FirebasePushService $firebase
     ): int {
-        Log::info('FOLLOW-UP REMINDER COMMAND STARTED', [
-            'time' => now()->toDateTimeString(),
-            'timezone' => config('app.timezone'),
-            'force_id' => $this->option('force-id'),
-        ]);
+        $currentTime = now();
+
+        $forceId = $this->option('force-id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Command Start Log
+        |--------------------------------------------------------------------------
+        */
 
         $this->info(
             'Command started at: '
-            . now()->toDateTimeString()
+            . $currentTime->toDateTimeString()
             . ' | Timezone: '
             . config('app.timezone')
         );
 
-        try {
-            $now = now();
+        Log::info(
+            'FOLLOW-UP REMINDER COMMAND STARTED',
+            [
+                'current_time' =>
+                    $currentTime->toDateTimeString(),
 
+                'timezone' =>
+                    config('app.timezone'),
+
+                'force_id' =>
+                    $forceId,
+            ]
+        );
+
+        try {
             /*
             |--------------------------------------------------------------------------
-            | Notification Window
+            | Reminder Window
             |--------------------------------------------------------------------------
             |
-            | Follow-up के समय से 5 मिनट पहले notification भेजेगा।
-            | पुराने overdue pending follow-ups भी शामिल होंगे।
+            | Follow-up के scheduled time से 5 minute पहले notification जाएगा।
+            |
+            | Example:
+            | Scheduled: 04:00 PM
+            | Notification: 03:55 PM से eligible
+            |
+            | पुराने overdue pending follow-ups भी eligible रहेंगे।
             |
             */
 
-            $notificationUntil = $now
-                ->copy()
-                ->addMinutes(5);
+            $notificationUntil =
+                $currentTime
+                    ->copy()
+                    ->addMinutes(5);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Base Follow-up Query
+            |--------------------------------------------------------------------------
+            */
 
             $query = FollowUp::query()
                 ->with([
                     'lead',
                     'assignedUser',
                 ])
-                ->where('status', 'pending')
-                ->whereNotNull('scheduled_at')
-                ->whereNull('reminder_notified_at');
+                ->where(
+                    'status',
+                    'pending'
+                )
+                ->whereNotNull(
+                    'scheduled_at'
+                )
+                ->whereNull(
+                    'reminder_notified_at'
+                );
 
             /*
             |--------------------------------------------------------------------------
-            | Manual Testing
+            | Force Test अथवा Normal Scheduled Query
             |--------------------------------------------------------------------------
             */
 
-            if ($this->option('force-id')) {
-                $query->where(
-                    'id',
-                    (int) $this->option('force-id')
+            if (
+                $forceId !== null
+                && $forceId !== ''
+            ) {
+                $query->whereKey(
+                    (int) $forceId
                 );
             } else {
                 $query->where(
@@ -78,6 +129,12 @@ class SendFollowUpReminderNotifications extends Command
                 );
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | Eligible Count
+            |--------------------------------------------------------------------------
+            */
+
             $eligibleCount =
                 (clone $query)->count();
 
@@ -85,13 +142,30 @@ class SendFollowUpReminderNotifications extends Command
                 "Eligible follow-ups: {$eligibleCount}"
             );
 
-            Log::info('FOLLOW-UP REMINDER ELIGIBLE COUNT', [
-                'eligible_count' => $eligibleCount,
-                'current_time' =>
-                    $now->toDateTimeString(),
-                'notification_until' =>
-                    $notificationUntil->toDateTimeString(),
-            ]);
+            Log::info(
+                'FOLLOW-UP REMINDER ELIGIBLE COUNT',
+                [
+                    'eligible_count' =>
+                        $eligibleCount,
+
+                    'current_time' =>
+                        $currentTime
+                            ->toDateTimeString(),
+
+                    'notification_until' =>
+                        $notificationUntil
+                            ->toDateTimeString(),
+
+                    'force_id' =>
+                        $forceId,
+                ]
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Nothing Found
+            |--------------------------------------------------------------------------
+            */
 
             if ($eligibleCount === 0) {
                 $this->warn(
@@ -101,50 +175,90 @@ class SendFollowUpReminderNotifications extends Command
                 Log::warning(
                     'NO ELIGIBLE FOLLOW-UP FOUND',
                     [
-                        'conditions' => [
-                            'status' => 'pending',
-                            'reminder_notified_at' => null,
-                            'scheduled_at_before' =>
-                                $notificationUntil
-                                    ->toDateTimeString(),
-                        ],
+                        'status' =>
+                            'pending',
+
+                        'reminder_notified_at' =>
+                            null,
+
+                        'scheduled_at_before' =>
+                            $notificationUntil
+                                ->toDateTimeString(),
+
+                        'force_id' =>
+                            $forceId,
                     ]
                 );
 
                 return self::SUCCESS;
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | Process Follow-ups
+            |--------------------------------------------------------------------------
+            */
+
             $query
                 ->orderBy('id')
                 ->chunkById(
                     100,
-                    function ($followUps) use (
+                    function (
+                        $followUps
+                    ) use (
                         $firebase,
-                        $now
+                        $currentTime
                     ) {
-                        foreach ($followUps as $followUp) {
+                        foreach (
+                            $followUps
+                            as
+                            $followUp
+                        ) {
                             $this->sendReminder(
-                                followUp: $followUp,
-                                firebase: $firebase,
-                                now: $now
+                                followUp:
+                                    $followUp,
+
+                                firebase:
+                                    $firebase,
+
+                                currentTime:
+                                    $currentTime
                             );
                         }
                     }
                 );
 
-            Log::info(
-                'FOLLOW-UP REMINDER COMMAND FINISHED',
-                [
-                    'time' => now()->toDateTimeString(),
-                ]
-            );
+            /*
+            |--------------------------------------------------------------------------
+            | Command Complete
+            |--------------------------------------------------------------------------
+            */
 
             $this->info(
                 'Follow-up reminder command finished.'
             );
 
+            Log::info(
+                'FOLLOW-UP REMINDER COMMAND FINISHED',
+                [
+                    'finished_at' =>
+                        now()->toDateTimeString(),
+                ]
+            );
+
             return self::SUCCESS;
         } catch (Throwable $exception) {
+            /*
+            |--------------------------------------------------------------------------
+            | Complete Error Log
+            |--------------------------------------------------------------------------
+            */
+
+            $this->error(
+                'Command failed: '
+                . $exception->getMessage()
+            );
+
             Log::error(
                 'FOLLOW-UP REMINDER COMMAND FAILED',
                 [
@@ -161,58 +275,106 @@ class SendFollowUpReminderNotifications extends Command
                         $exception->getLine(),
 
                     'trace' =>
-                        $exception->getTraceAsString(),
+                        $exception
+                            ->getTraceAsString(),
                 ]
-            );
-
-            $this->error(
-                'Command failed: '
-                . $exception->getMessage()
             );
 
             return self::FAILURE;
         }
     }
 
+    /**
+     * Single follow-up reminder भेजें।
+     *
+     * CarbonInterface इस्तेमाल किया गया है क्योंकि Laravel 13 में
+     * now() CarbonImmutable return कर सकता है।
+     */
     private function sendReminder(
         FollowUp $followUp,
         FirebasePushService $firebase,
-        Carbon $now
+        CarbonInterface $currentTime
     ): void {
-        $this->line(
-            "Checking follow-up #{$followUp->id}"
-        );
-
-        Log::info('PROCESSING FOLLOW-UP', [
-            'follow_up_id' => $followUp->id,
-            'lead_id' => $followUp->lead_id,
-            'assigned_to' => $followUp->assigned_to,
-            'status' => $followUp->status,
-            'scheduled_at' =>
-                optional($followUp->scheduled_at)
-                    ->toDateTimeString(),
-            'reminder_notified_at' =>
-                optional($followUp->reminder_notified_at)
-                    ->toDateTimeString(),
-        ]);
-
         /*
         |--------------------------------------------------------------------------
-        | Follow-up को दोबारा check करें
+        | Follow-up Processing Information
         |--------------------------------------------------------------------------
         */
 
-        $lockedFollowUp = FollowUp::query()
-            ->whereKey($followUp->id)
-            ->where('status', 'pending')
-            ->whereNull('reminder_notified_at')
+        $this->line(
+            "Processing follow-up #{$followUp->id}"
+        );
+
+        Log::info(
+            'PROCESSING FOLLOW-UP REMINDER',
+            [
+                'follow_up_id' =>
+                    $followUp->id,
+
+                'lead_id' =>
+                    $followUp->lead_id,
+
+                'assigned_to' =>
+                    $followUp->assigned_to,
+
+                'status' =>
+                    $followUp->status,
+
+                'scheduled_at' =>
+                    $followUp->scheduled_at
+                        ? $followUp
+                            ->scheduled_at
+                            ->toDateTimeString()
+                        : null,
+
+                'reminder_notified_at' =>
+                    $followUp
+                        ->reminder_notified_at
+                        ? $followUp
+                            ->reminder_notified_at
+                            ->toDateTimeString()
+                        : null,
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recheck Database Record
+        |--------------------------------------------------------------------------
+        |
+        | अगर किसी दूसरी process ने notification भेज दिया है तो दोबारा
+        | notification नहीं जाएगा।
+        |
+        */
+
+        $freshFollowUp = FollowUp::query()
+            ->with([
+                'lead',
+                'assignedUser',
+            ])
+            ->whereKey(
+                $followUp->id
+            )
+            ->where(
+                'status',
+                'pending'
+            )
+            ->whereNull(
+                'reminder_notified_at'
+            )
             ->first();
 
-        if (!$lockedFollowUp) {
+        if (!$freshFollowUp) {
+            $this->warn(
+                "Follow-up #{$followUp->id} "
+                . 'was already processed or cancelled.'
+            );
+
             Log::warning(
                 'FOLLOW-UP SKIPPED AFTER RECHECK',
                 [
-                    'follow_up_id' => $followUp->id,
+                    'follow_up_id' =>
+                        $followUp->id,
                 ]
             );
 
@@ -225,35 +387,48 @@ class SendFollowUpReminderNotifications extends Command
         |--------------------------------------------------------------------------
         */
 
-        if (!$followUp->assigned_to) {
-            Log::warning(
-                'FOLLOW-UP HAS NO ASSIGNED USER',
-                [
-                    'follow_up_id' => $followUp->id,
-                ]
-            );
-
-            $this->warn(
-                "Follow-up #{$followUp->id}: "
+        if (empty($freshFollowUp->assigned_to)) {
+            $this->error(
+                "Follow-up #{$freshFollowUp->id}: "
                 . 'assigned_to is empty.'
             );
 
-            return;
-        }
-
-        if (!$followUp->assignedUser) {
-            Log::warning(
-                'FOLLOW-UP ASSIGNED USER NOT FOUND',
+            Log::error(
+                'FOLLOW-UP HAS NO ASSIGNED USER',
                 [
-                    'follow_up_id' => $followUp->id,
-                    'assigned_to' =>
-                        $followUp->assigned_to,
+                    'follow_up_id' =>
+                        $freshFollowUp->id,
+
+                    'lead_id' =>
+                        $freshFollowUp->lead_id,
                 ]
             );
 
-            $this->warn(
-                "Follow-up #{$followUp->id}: "
-                . 'assigned user not found.'
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Assigned User Exists Check
+        |--------------------------------------------------------------------------
+        */
+
+        if (!$freshFollowUp->assignedUser) {
+            $this->error(
+                "Follow-up #{$freshFollowUp->id}: "
+                . 'assigned user does not exist.'
+            );
+
+            Log::error(
+                'FOLLOW-UP ASSIGNED USER NOT FOUND',
+                [
+                    'follow_up_id' =>
+                        $freshFollowUp->id,
+
+                    'assigned_to' =>
+                        $freshFollowUp
+                            ->assigned_to,
+                ]
             );
 
             return;
@@ -261,48 +436,84 @@ class SendFollowUpReminderNotifications extends Command
 
         /*
         |--------------------------------------------------------------------------
-        | Lead Details
-        |--------------------------------------------------------------------------
-        */
-
-        $leadName =
-            $followUp->lead?->name
-            ?: 'Customer';
-
-        $mobile =
-            $followUp->lead?->mobile
-            ?: $followUp->lead?->alternate_mobile
-            ?: '';
-
-        /*
-        |--------------------------------------------------------------------------
-        | Scheduled Time
+        | Scheduled Date Parse
         |--------------------------------------------------------------------------
         */
 
         $scheduledAt =
-            $followUp->scheduled_at instanceof Carbon
-                ? $followUp->scheduled_at
-                : Carbon::parse(
-                    $followUp->scheduled_at,
-                    config('app.timezone')
-                );
+            $freshFollowUp->scheduled_at;
+
+        if (
+            !$scheduledAt instanceof
+            CarbonInterface
+        ) {
+            $scheduledAt = Carbon::parse(
+                $freshFollowUp->scheduled_at,
+                config(
+                    'app.timezone',
+                    'Asia/Kolkata'
+                )
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Information
+        |--------------------------------------------------------------------------
+        */
+
+        $leadName =
+            $freshFollowUp->lead?->name
+            ?: 'Customer';
+
+        $mobile =
+            $freshFollowUp->lead?->mobile
+            ?: $freshFollowUp
+                ->lead
+                ?->alternate_mobile
+            ?: '';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Overdue Check
+        |--------------------------------------------------------------------------
+        */
 
         $isOverdue =
-            $scheduledAt->lt($now);
+            $scheduledAt->lt(
+                $currentTime
+            );
 
         $scheduledTime =
             $scheduledAt->format(
                 'd M Y, h:i A'
             );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Notification Title
+        |--------------------------------------------------------------------------
+        */
+
         $title = $isOverdue
             ? "Overdue Follow-up: {$leadName}"
             : "Follow-up Reminder: {$leadName}";
 
-        $body = $isOverdue
-            ? "Follow-up overdue hai. Customer: {$leadName}"
-            : "Follow-up {$scheduledTime} par scheduled hai.";
+        /*
+        |--------------------------------------------------------------------------
+        | Notification Body
+        |--------------------------------------------------------------------------
+        */
+
+        if ($isOverdue) {
+            $body =
+                "Follow-up overdue hai. "
+                . "Customer: {$leadName}";
+        } else {
+            $body =
+                "Follow-up {$scheduledTime} "
+                . 'par scheduled hai.';
+        }
 
         if ($mobile !== '') {
             $body .= " Mobile: {$mobile}";
@@ -310,16 +521,20 @@ class SendFollowUpReminderNotifications extends Command
 
         /*
         |--------------------------------------------------------------------------
-        | Send Firebase Notification
+        | Firebase Notification
         |--------------------------------------------------------------------------
         */
 
         $result = $firebase->sendToUser(
-            userId: (int) $followUp->assigned_to,
+            userId:
+                (int) $freshFollowUp
+                    ->assigned_to,
 
-            title: $title,
+            title:
+                $title,
 
-            body: $body,
+            body:
+                $body,
 
             data: [
                 'type' =>
@@ -328,12 +543,18 @@ class SendFollowUpReminderNotifications extends Command
                 'action' =>
                     'open_follow_up',
 
+                'screen' =>
+                    'follow_up_detail',
+
                 'follow_up_id' =>
-                    (string) $followUp->id,
+                    (string) $freshFollowUp
+                        ->id,
 
                 'lead_id' =>
                     (string) (
-                        $followUp->lead_id ?? ''
+                        $freshFollowUp
+                            ->lead_id
+                        ?? ''
                     ),
 
                 'lead_name' =>
@@ -347,10 +568,9 @@ class SendFollowUpReminderNotifications extends Command
                         ->toIso8601String(),
 
                 'is_overdue' =>
-                    $isOverdue ? '1' : '0',
-
-                'screen' =>
-                    'follow_up_detail',
+                    $isOverdue
+                        ? '1'
+                        : '0',
 
                 'click_action' =>
                     'FLUTTER_NOTIFICATION_CLICK',
@@ -360,64 +580,138 @@ class SendFollowUpReminderNotifications extends Command
             ]
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Firebase Result Log
+        |--------------------------------------------------------------------------
+        */
+
         Log::info(
             'FOLLOW-UP FIREBASE RESULT',
             [
-                'follow_up_id' => $followUp->id,
+                'follow_up_id' =>
+                    $freshFollowUp->id,
+
                 'assigned_to' =>
-                    $followUp->assigned_to,
-                'result' => $result,
+                    $freshFollowUp
+                        ->assigned_to,
+
+                'total_tokens' =>
+                    $result['total_tokens']
+                    ?? 0,
+
+                'sent' =>
+                    $result['sent']
+                    ?? 0,
+
+                'failed' =>
+                    $result['failed']
+                    ?? 0,
+
+                'result' =>
+                    $result,
             ]
         );
 
         /*
         |--------------------------------------------------------------------------
-        | Mark Notification Sent
+        | Notification Successfully Sent
         |--------------------------------------------------------------------------
         */
 
-        if (($result['sent'] ?? 0) > 0) {
-            $lockedFollowUp->update([
-                'reminder_notified_at' => now(),
-            ]);
+        if (
+            (int) (
+                $result['sent']
+                ?? 0
+            ) > 0
+        ) {
+            /*
+             * Conditional update duplicate notification से बचाता है।
+             */
+            $updated = FollowUp::query()
+                ->whereKey(
+                    $freshFollowUp->id
+                )
+                ->whereNull(
+                    'reminder_notified_at'
+                )
+                ->update([
+                    'reminder_notified_at' =>
+                        now(),
+                ]);
 
-            $this->info(
-                "Reminder sent for follow-up "
-                . "#{$followUp->id}"
-            );
+            if ($updated === 1) {
+                $this->info(
+                    'Reminder sent for follow-up '
+                    . "#{$freshFollowUp->id}"
+                );
 
-            Log::info(
-                'FOLLOW-UP REMINDER SENT SUCCESSFULLY',
-                [
-                    'follow_up_id' =>
-                        $followUp->id,
+                Log::info(
+                    'FOLLOW-UP REMINDER SENT SUCCESSFULLY',
+                    [
+                        'follow_up_id' =>
+                            $freshFollowUp->id,
 
-                    'assigned_to' =>
-                        $followUp->assigned_to,
+                        'assigned_to' =>
+                            $freshFollowUp
+                                ->assigned_to,
 
-                    'sent_devices' =>
-                        $result['sent'] ?? 0,
-                ]
-            );
+                        'sent_devices' =>
+                            $result['sent'],
+
+                        'notified_at' =>
+                            now()
+                                ->toDateTimeString(),
+                    ]
+                );
+            } else {
+                $this->warn(
+                    "Follow-up #{$freshFollowUp->id}: "
+                    . 'notification sent but record '
+                    . 'was already marked.'
+                );
+            }
 
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Notification Failed
+        |--------------------------------------------------------------------------
+        */
+
+        $totalTokens =
+            (int) (
+                $result['total_tokens']
+                ?? 0
+            );
+
+        $failedTokens =
+            (int) (
+                $result['failed']
+                ?? 0
+            );
+
         $this->error(
-            "Follow-up #{$followUp->id}: "
+            "Follow-up #{$freshFollowUp->id}: "
             . 'notification failed. '
-            . 'Total tokens: '
-            . ($result['total_tokens'] ?? 0)
+            . "Total tokens: {$totalTokens}, "
+            . "Failed: {$failedTokens}"
         );
 
         Log::error(
             'FOLLOW-UP REMINDER NOT DELIVERED',
             [
                 'follow_up_id' =>
-                    $followUp->id,
+                    $freshFollowUp->id,
+
+                'lead_id' =>
+                    $freshFollowUp->lead_id,
 
                 'assigned_to' =>
-                    $followUp->assigned_to,
+                    $freshFollowUp
+                        ->assigned_to,
 
                 'result' =>
                     $result,
