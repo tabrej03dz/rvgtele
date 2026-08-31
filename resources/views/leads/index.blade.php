@@ -635,27 +635,102 @@
 
         {{-- Call Disposition tabs --}}
         @php
-            $dispositionBaseQuery = request()->except(['page', 'call_disposition']);
-            $currentDisposition = (string) request('call_disposition', '');
+            $dispositionBaseQuery = request()->except([
+                'page',
+                'call_disposition'
+            ]);
+
+            $currentDisposition = (string) request(
+                'call_disposition',
+                'no_call'
+            );
         @endphp
+
         <section class="software-panel">
-            <div class="software-panel-title"><span class="panel-heading-label"><span class="panel-heading-icon"><i data-lucide="phone-call"></i></span>Latest Call Disposition</span>
-                @if ($currentDisposition !== '')
-                    <a href="{{ route('leads.index', $dispositionBaseQuery) }}"
-                        class="text-[10px] font-bold text-rose-600">RESET</a>
-                @endif
+
+            <div class="software-panel-title">
+
+                <span class="panel-heading-label">
+
+                    <span class="panel-heading-icon">
+                        <i data-lucide="phone-call"></i>
+                    </span>
+
+                    Latest Call Disposition
+
+                </span>
+
             </div>
+
             <div class="crm-scrollbar flex gap-1 overflow-x-auto p-2">
-                <a href="{{ route('leads.index', $dispositionBaseQuery) }}"
-                    class="software-btn {{ $currentDisposition === '' ? 'gradient-selected' : '' }}">ALL</a>
-                <a href="{{ route('leads.index', array_merge($dispositionBaseQuery, ['call_disposition' => 'no_call'])) }}"
-                    class="software-btn {{ $currentDisposition === 'no_call' ? 'border-amber-400 bg-amber-50 text-amber-700' : '' }}">NO
-                    CALL YET</a>
+
+                {{-- ALL --}}
+                <a
+                    href="{{ route(
+                        'leads.index',
+                        array_merge(
+                            $dispositionBaseQuery,
+                            [
+                                'call_disposition' => 'all'
+                            ]
+                        )
+                    ) }}"
+                    class="software-btn
+                        {{ $currentDisposition === 'all'
+                            ? 'gradient-selected'
+                            : ''
+                        }}"
+                >
+                    ALL
+                </a>
+
+                {{-- NO CALL YET --}}
+                <a
+                    href="{{ route(
+                        'leads.index',
+                        array_merge(
+                            $dispositionBaseQuery,
+                            [
+                                'call_disposition' => 'no_call'
+                            ]
+                        )
+                    ) }}"
+                    class="software-btn
+                        {{ $currentDisposition === 'no_call'
+                            ? 'gradient-selected'
+                            : ''
+                        }}"
+                >
+                    NO CALL YET
+                </a>
+
+                {{-- Actual Call Dispositions --}}
                 @foreach ($dispositions as $disposition)
-                    <a href="{{ route('leads.index', array_merge($dispositionBaseQuery, ['call_disposition' => $disposition->id])) }}"
-                        class="software-btn {{ $currentDisposition === (string) $disposition->id ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : '' }}">{{ strtoupper($disposition->name) }}</a>
+
+                    <a
+                        href="{{ route(
+                            'leads.index',
+                            array_merge(
+                                $dispositionBaseQuery,
+                                [
+                                    'call_disposition' => $disposition->id
+                                ]
+                            )
+                        ) }}"
+                        class="software-btn
+                            {{
+                                $currentDisposition === (string) $disposition->id
+                                    ? 'gradient-selected'
+                                    : ''
+                            }}"
+                    >
+                        {{ strtoupper($disposition->name) }}
+                    </a>
+
                 @endforeach
+
             </div>
+
         </section>
 
         {{-- Filters --}}
@@ -1048,11 +1123,7 @@
                             <th class="lead-col-demo px-2 py-2">Demo Send</th>
                             <th class="lead-col-action px-2 py-2 text-right">Action</th>
                             <th class="lead-col-labels px-2 py-2">Labels</th>
-                            <th class="lead-col-source px-2 py-2">Source</th>
                             <th class="lead-col-status px-2 py-2">Status</th>
-                            <th class="lead-col-priority px-2 py-2">Priority</th>
-                            <th class="lead-col-temp px-2 py-2">Temp.</th>
-                            <th class="lead-col-team px-2 py-2">Team</th>
                             <th class="lead-col-owner px-2 py-2">Owner</th>
 
                         </tr>
@@ -1243,11 +1314,6 @@
                                     </div>
                                 </td>
 
-                                {{-- Source --}}
-                                <td class="px-2 py-2 align-top">
-                                    {{ $lead->source?->name ?? '—' }}
-                                </td>
-
                                 {{-- Status --}}
                                 <td class="px-2 py-2 align-top">
                                     <span class="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
@@ -1255,25 +1321,7 @@
                                     </span>
                                 </td>
 
-                                {{-- Priority --}}
-                                <td class="px-2 py-2 align-top">
-                                    <span class="rounded-full px-2 py-1 text-xs font-semibold capitalize {{ $priorityClass }}">
-                                        {{ $lead->priority ?: 'normal' }}
-                                    </span>
-                                </td>
-
-                                {{-- Temperature --}}
-                                <td class="px-2 py-2 align-top">
-                                    <span class="font-medium capitalize {{ $temperatureClass }}">
-                                        {{ $lead->temperature ?: 'cold' }}
-                                    </span>
-                                </td>
-
-                                {{-- Team --}}
-                                <td class="px-2 py-2 align-top">
-                                    {{ $lead->team?->name ?? '—' }}
-                                </td>
-
+ 
                                 {{-- Owner --}}
                                 <td class="px-2 py-2 align-top">
                                     {{ $lead->assignedUser?->name ?? 'Unassigned' }}

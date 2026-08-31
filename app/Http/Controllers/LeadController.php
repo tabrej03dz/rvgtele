@@ -107,8 +107,344 @@ public function callOnMobile(
 
 
 
-    public function index(Request $request): View
+//     public function index(Request $request): View
+// {
+//     $companyId = $this->companyId($request);
+//     $hasFullAccess = $this->hasFullAccess($request);
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Team Leader Access
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $leaderTeamIds = $this->leaderTeamIds($request);
+
+//     $isTeamLeader =
+//         !$hasFullAccess &&
+//         !empty($leaderTeamIds);
+
+//     $canFilterByEmployee =
+//         $hasFullAccess || $isTeamLeader;
+
+//     $canFilterByTeam =
+//         $hasFullAccess || $isTeamLeader;
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Leads
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $query = $this->filteredLeadQuery($request)
+//         ->with([
+//             'assignedUser:id,name,employee_code,team_id',
+//             'source:id,name',
+//             'status:id,name,color',
+//             'team:id,name',
+//             'stage:id,name,color',
+//             'labels:id,company_id,name,color',
+//         ])
+//         ->addSelect([
+//             'latest_note_body' => Note::query()
+//                 ->select('body')
+//                 ->whereColumn('notes.lead_id', 'leads.id')
+//                 ->latest('notes.id')
+//                 ->limit(1),
+
+//             'latest_note_created_at' => Note::query()
+//                 ->select('created_at')
+//                 ->whereColumn('notes.lead_id', 'leads.id')
+//                 ->latest('notes.id')
+//                 ->limit(1),
+
+//             'latest_note_user_name' => Note::query()
+//                 ->leftJoin(
+//                     'users',
+//                     'users.id',
+//                     '=',
+//                     'notes.user_id'
+//                 )
+//                 ->select('users.name')
+//                 ->whereColumn(
+//                     'notes.lead_id',
+//                     'leads.id'
+//                 )
+//                 ->latest('notes.id')
+//                 ->limit(1),
+//         ]);
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Per Page
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $allowedPerPage = [
+//         25,
+//         50,
+//         100,
+//         200,
+//     ];
+
+//     $perPage = (int) $request->input(
+//         'per_page',
+//         25
+//     );
+
+//     if (!in_array(
+//         $perPage,
+//         $allowedPerPage,
+//         true
+//     )) {
+//         $perPage = 25;
+//     }
+
+//     $leads = $query
+//         ->latest('id')
+//         ->paginate($perPage)
+//         ->withQueryString();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Statuses
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $statuses = LeadStatus::query()
+//         ->where(function (Builder $query) use ($companyId) {
+//             $query
+//                 ->whereNull('company_id')
+//                 ->orWhere(
+//                     'company_id',
+//                     $companyId
+//                 );
+//         })
+//         ->where('is_active', true)
+//         ->orderBy('sort_order')
+//         ->orderBy('name')
+//         ->get();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Call Dispositions
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $dispositions = CallDisposition::query()
+//         ->where(function (Builder $query) use ($companyId) {
+//             $query
+//                 ->whereNull('company_id')
+//                 ->orWhere(
+//                     'company_id',
+//                     $companyId
+//                 );
+//         })
+//         ->where('is_active', true)
+//         ->orderBy('name')
+//         ->get();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Sources
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $sources = LeadSource::query()
+//         ->where(function (Builder $query) use ($companyId) {
+//             $query
+//                 ->whereNull('company_id')
+//                 ->orWhere(
+//                     'company_id',
+//                     $companyId
+//                 );
+//         })
+//         ->orderBy('name')
+//         ->get();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Categories
+//     |--------------------------------------------------------------------------
+//     |
+//     | Separate category table nahi hai.
+//     | Leads table ke category column se distinct values niklenge.
+//     |
+//     */
+
+//     $categories = Lead::query()
+//         ->where('company_id', $companyId)
+//         ->whereNotNull('category')
+//         ->where('category', '<>', '')
+//         ->select('category')
+//         ->distinct()
+//         ->orderBy('category')
+//         ->pluck('category');
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Employees For Filter
+//     |--------------------------------------------------------------------------
+//     */
+
+//     if ($hasFullAccess) {
+
+//         $users = User::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->where('is_active', true)
+//             ->orderBy('name')
+//             ->get([
+//                 'id',
+//                 'name',
+//                 'employee_code',
+//                 'team_id',
+//             ]);
+
+//     } elseif ($isTeamLeader) {
+
+//         $users = User::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->where('is_active', true)
+//             ->where(function (Builder $query) use (
+//                 $request,
+//                 $leaderTeamIds
+//             ) {
+//                 $query
+//                     ->whereKey(
+//                         $request->user()->id
+//                     )
+//                     ->orWhereIn(
+//                         'team_id',
+//                         $leaderTeamIds
+//                     );
+//             })
+//             ->orderBy('name')
+//             ->get([
+//                 'id',
+//                 'name',
+//                 'employee_code',
+//                 'team_id',
+//             ]);
+
+//     } else {
+
+//         $users = collect();
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Teams For Filter
+//     |--------------------------------------------------------------------------
+//     */
+
+//     if ($hasFullAccess) {
+
+//         $teams = Team::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->orderBy('name')
+//             ->get([
+//                 'id',
+//                 'name',
+//             ]);
+
+//     } elseif ($isTeamLeader) {
+
+//         $teams = Team::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->whereIn(
+//                 'id',
+//                 $leaderTeamIds
+//             )
+//             ->orderBy('name')
+//             ->get([
+//                 'id',
+//                 'name',
+//             ]);
+
+//     } else {
+
+//         $teams = collect();
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Labels
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $labels = LeadLabel::query()
+//         ->where(
+//             'company_id',
+//             $companyId
+//         )
+//         ->withCount('leads')
+//         ->orderBy('name')
+//         ->get();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | View
+//     |--------------------------------------------------------------------------
+//     */
+
+//     return view('leads.index', [
+//         'leads' => $leads,
+//         'statuses' => $statuses,
+//         'dispositions' => $dispositions,
+//         'sources' => $sources,
+
+//         // Category list
+//         'categories' => $categories,
+
+//         'perPage' => $perPage,
+//         'users' => $users,
+//         'teams' => $teams,
+//         'labels' => $labels,
+
+//         /*
+//         | Blade access control
+//         */
+
+//         'hasFullAccess' => $hasFullAccess,
+//         'isTeamLeader' => $isTeamLeader,
+//         'canFilterByEmployee' => $canFilterByEmployee,
+//         'canFilterByTeam' => $canFilterByTeam,
+//     ]);
+// }
+
+
+public function index(Request $request): View
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Default Call Disposition
+    |--------------------------------------------------------------------------
+    |
+    | Normal /leads open hone par NO CALL YET default rahega.
+    |
+    | IMPORTANT:
+    | call_disposition=all explicitly diya gaya ho to ALL leads dikhenge.
+    |
+    */
+
+    if (!$request->has('call_disposition')) {
+        $request->merge([
+            'call_disposition' => 'no_call',
+        ]);
+    }
+
     $companyId = $this->companyId($request);
     $hasFullAccess = $this->hasFullAccess($request);
 
@@ -132,11 +468,44 @@ public function callOnMobile(
 
     /*
     |--------------------------------------------------------------------------
-    | Leads
+    | Call Disposition
     |--------------------------------------------------------------------------
     */
 
-    $query = $this->filteredLeadQuery($request)
+    $callDisposition = (string) $request->input(
+        'call_disposition',
+        'no_call'
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prepare Request For Existing Lead Filters
+    |--------------------------------------------------------------------------
+    |
+    | filteredLeadQuery() ke andar agar pehle se call_disposition filtering
+    | hai to usse duplicate/conflict na ho, isliye clone request se
+    | call_disposition hata rahe hain.
+    |
+    | Call disposition ka complete filter niche manually handle hoga.
+    |
+    */
+
+    $filterRequest = clone $request;
+
+    $filterRequest->query->remove('call_disposition');
+    $filterRequest->request->remove('call_disposition');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Base Lead Query
+    |--------------------------------------------------------------------------
+    |
+    | Existing permissions + search + source + employee + team + category
+    | etc. filteredLeadQuery() se hi rahenge.
+    |
+    */
+
+    $query = $this->filteredLeadQuery($filterRequest)
         ->with([
             'assignedUser:id,name,employee_code,team_id',
             'source:id,name',
@@ -146,17 +515,41 @@ public function callOnMobile(
             'labels:id,company_id,name,color',
         ])
         ->addSelect([
+            /*
+            |--------------------------------------------------------------------------
+            | Latest Note
+            |--------------------------------------------------------------------------
+            */
+
             'latest_note_body' => Note::query()
                 ->select('body')
-                ->whereColumn('notes.lead_id', 'leads.id')
+                ->whereColumn(
+                    'notes.lead_id',
+                    'leads.id'
+                )
                 ->latest('notes.id')
                 ->limit(1),
 
+            /*
+            |--------------------------------------------------------------------------
+            | Latest Note Date
+            |--------------------------------------------------------------------------
+            */
+
             'latest_note_created_at' => Note::query()
                 ->select('created_at')
-                ->whereColumn('notes.lead_id', 'leads.id')
+                ->whereColumn(
+                    'notes.lead_id',
+                    'leads.id'
+                )
                 ->latest('notes.id')
                 ->limit(1),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Latest Note User
+            |--------------------------------------------------------------------------
+            */
 
             'latest_note_user_name' => Note::query()
                 ->leftJoin(
@@ -173,6 +566,83 @@ public function callOnMobile(
                 ->latest('notes.id')
                 ->limit(1),
         ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Call Disposition Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($callDisposition === 'no_call') {
+
+        /*
+        |--------------------------------------------------------------------------
+        | NO CALL YET
+        |--------------------------------------------------------------------------
+        |
+        | Lead ke against abhi tak ek bhi call log nahi hona chahiye.
+        |
+        */
+
+        $query->whereDoesntHave('calls');
+
+    } elseif (
+        $callDisposition !== '' &&
+        $callDisposition !== 'all'
+    ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Specific Latest Call Disposition
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        |
+        | Sirf kisi bhi purani call ka disposition match nahi karenge.
+        | Lead ki LATEST call ka disposition hi selected disposition hona
+        | chahiye.
+        |
+        */
+
+        $dispositionId = (int) $callDisposition;
+
+        $query->whereHas('calls', function (Builder $callQuery) use ($dispositionId) {
+
+            $callQuery
+                ->where(
+                    'call_disposition_id',
+                    $dispositionId
+                )
+                ->where(
+                    'call_logs.id',
+                    '=',
+                    function ($subQuery) {
+                        $subQuery
+                            ->selectRaw('MAX(cl2.id)')
+                            ->from('call_logs as cl2')
+                            ->whereColumn(
+                                'cl2.lead_id',
+                                'call_logs.lead_id'
+                            );
+                    }
+                );
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ALL
+    |--------------------------------------------------------------------------
+    |
+    | call_disposition=all par intentionally koi call filter nahi lagega.
+    |
+    | Isliye:
+    |
+    | /leads?call_disposition=all
+    |
+    | = all accessible leads.
+    |
+    */
 
     /*
     |--------------------------------------------------------------------------
@@ -200,8 +670,14 @@ public function callOnMobile(
         $perPage = 25;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Leads Pagination
+    |--------------------------------------------------------------------------
+    */
+
     $leads = $query
-        ->latest('id')
+        ->latest('leads.id')
         ->paginate($perPage)
         ->withQueryString();
 
@@ -268,14 +744,21 @@ public function callOnMobile(
     |--------------------------------------------------------------------------
     |
     | Separate category table nahi hai.
-    | Leads table ke category column se distinct values niklenge.
+    | Leads table ke category column se distinct category niklegi.
     |
     */
 
     $categories = Lead::query()
-        ->where('company_id', $companyId)
+        ->where(
+            'company_id',
+            $companyId
+        )
         ->whereNotNull('category')
-        ->where('category', '<>', '')
+        ->where(
+            'category',
+            '<>',
+            ''
+        )
         ->select('category')
         ->distinct()
         ->orderBy('category')
@@ -289,12 +772,21 @@ public function callOnMobile(
 
     if ($hasFullAccess) {
 
+        /*
+        |--------------------------------------------------------------------------
+        | Admin / Full Access
+        |--------------------------------------------------------------------------
+        */
+
         $users = User::query()
             ->where(
                 'company_id',
                 $companyId
             )
-            ->where('is_active', true)
+            ->where(
+                'is_active',
+                true
+            )
             ->orderBy('name')
             ->get([
                 'id',
@@ -305,12 +797,29 @@ public function callOnMobile(
 
     } elseif ($isTeamLeader) {
 
+        /*
+        |--------------------------------------------------------------------------
+        | Team Leader
+        |--------------------------------------------------------------------------
+        |
+        | Team leader ko:
+        |
+        | - khud ka user
+        | - apni teams ke employees
+        |
+        | filter me milenge.
+        |
+        */
+
         $users = User::query()
             ->where(
                 'company_id',
                 $companyId
             )
-            ->where('is_active', true)
+            ->where(
+                'is_active',
+                true
+            )
             ->where(function (Builder $query) use (
                 $request,
                 $leaderTeamIds
@@ -334,6 +843,12 @@ public function callOnMobile(
 
     } else {
 
+        /*
+        |--------------------------------------------------------------------------
+        | Normal Employee
+        |--------------------------------------------------------------------------
+        */
+
         $users = collect();
     }
 
@@ -344,6 +859,12 @@ public function callOnMobile(
     */
 
     if ($hasFullAccess) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Full Access
+        |--------------------------------------------------------------------------
+        */
 
         $teams = Team::query()
             ->where(
@@ -357,6 +878,12 @@ public function callOnMobile(
             ]);
 
     } elseif ($isTeamLeader) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Team Leader Teams
+        |--------------------------------------------------------------------------
+        */
 
         $teams = Team::query()
             ->where(
@@ -374,6 +901,12 @@ public function callOnMobile(
             ]);
 
     } else {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normal Employee
+        |--------------------------------------------------------------------------
+        */
 
         $teams = collect();
     }
@@ -400,21 +933,55 @@ public function callOnMobile(
     */
 
     return view('leads.index', [
+
+        /*
+        |--------------------------------------------------------------------------
+        | Main Data
+        |--------------------------------------------------------------------------
+        */
+
         'leads' => $leads,
+
+        /*
+        |--------------------------------------------------------------------------
+        | Filters
+        |--------------------------------------------------------------------------
+        */
+
         'statuses' => $statuses,
         'dispositions' => $dispositions,
         'sources' => $sources,
-
-        // Category list
         'categories' => $categories,
 
+        /*
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
+
         'perPage' => $perPage,
+
+        /*
+        |--------------------------------------------------------------------------
+        | Users / Teams
+        |--------------------------------------------------------------------------
+        */
+
         'users' => $users,
         'teams' => $teams,
+
+        /*
+        |--------------------------------------------------------------------------
+        | Labels
+        |--------------------------------------------------------------------------
+        */
+
         'labels' => $labels,
 
         /*
-        | Blade access control
+        |--------------------------------------------------------------------------
+        | Blade Access Control
+        |--------------------------------------------------------------------------
         */
 
         'hasFullAccess' => $hasFullAccess,
@@ -423,7 +990,6 @@ public function callOnMobile(
         'canFilterByTeam' => $canFilterByTeam,
     ]);
 }
-
     /*
     |--------------------------------------------------------------------------
     | Create Lead Form
