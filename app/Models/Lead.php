@@ -97,14 +97,27 @@ class Lead extends Model
         );
     }
 
-
-
-
     public function labels()
-{
-    return $this->belongsToMany(
-        LeadLabel::class,
-        'lead_label_lead'
-    )->withTimestamps();
-}
+    {
+        return $this->belongsToMany(
+            LeadLabel::class,
+            'lead_label_lead'
+        )->withTimestamps();
+    }
+
+    public function latestCall()
+    {
+        return $this->hasOne(CallLog::class)->latestOfMany();
+    }
+
+    public function latestNote()
+    {
+        return $this->hasOne(Note::class)->latestOfMany();
+    }
+
+    public function latestFollowUp()
+    {
+        return $this->hasOne(FollowUp::class)->latestOfMany();
+    }
+    
 }
