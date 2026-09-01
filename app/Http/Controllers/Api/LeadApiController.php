@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Services\MobileCallService;
 use Throwable;
+use App\Models\CallLog;
+use App\Models\FollowUp;
 
 
 class LeadApiController extends Controller
@@ -127,7 +129,7 @@ public function callOnMobile(
 
     private array $fullAccessRoles = ['super_admin', 'admin'];
 
-    public function index(Request $request): JsonResponse
+    public function indexOld(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
@@ -170,6 +172,297 @@ public function callOnMobile(
 
         return $this->success($leads, 'Leads fetched successfully.');
     }
+
+
+
+    public function index(Request $request): JsonResponse
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Default Call Filter
+    |--------------------------------------------------------------------------
+    |
+    | call_disposition नहीं भेजने पर केवल ऐसी leads आएंगी जिन पर अभी
+    | तक कोई call log नहीं बना है।
+    |
+    | call_disposition=all भेजने पर सभी accessible leads आएंगी।
+    |
+    */
+
+    if (!$request->has('call_disposition')) {
+        $request->merge([
+            'call_disposition' => 'no_call',
+        ]);
+    }
+
+    $validated = $request->validate([
+        'search' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
+
+        'status' => [
+            'nullable',
+            'integer',
+        ],
+
+        'source' => [
+            'nullable',
+            'integer',
+        ],
+
+        'category' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
+
+        'assigned_to' => [
+            'nullable',
+            'string',
+        ],
+
+        'team_id' => [
+            'nullable',
+            'integer',
+        ],
+
+        'priority' => [
+            'nullable',
+            Rule::in([
+                'low',
+                'normal',
+                'high',
+                'urgent',
+                'hot',
+            ]),
+        ],
+
+        'temperature' => [
+            'nullable',
+            Rule::in([
+                'cold',
+                'warm',
+                'hot',
+            ]),
+        ],
+
+        /*
+         * Allowed values:
+         * no_call
+         * all
+         * disposition ID जैसे 1, 2, 3
+         */
+        'call_disposition' => [
+            'nullable',
+            'string',
+            'max:50',
+        ],
+
+        'label_id' => [
+            'nullable',
+            'integer',
+        ],
+
+        'demo_send' => [
+            'nullable',
+            'boolean',
+        ],
+
+        'lead_send' => [
+            'nullable',
+            Rule::in([
+                'today',
+                'all',
+            ]),
+        ],
+
+        'created_filter' => [
+            'nullable',
+            Rule::in([
+                'today',
+            ]),
+        ],
+
+        'date_from' => [
+            'nullable',
+            'date',
+        ],
+
+        'date_to' => [
+            'nullable',
+            'date',
+            'after_or_equal:date_from',
+        ],
+
+        'per_page' => [
+            'nullable',
+            'integer',
+            Rule::in([
+                10,
+                25,
+                50,
+                100,
+                200,
+            ]),
+        ],
+    ]);
+
+    $callDisposition = (string) (
+        $validated['call_disposition']
+        ?? 'no_call'
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filter Request
+    |--------------------------------------------------------------------------
+    |
+    | filteredLeadQuery() के अंदर मौजूद call disposition filter हटाकर
+    | नीचे नया complete filter लगाया जाएगा।
+    |
+    */
+
+    $filterRequest = clone $request;
+
+    $filterRequest->query->remove(
+        'call_disposition'
+    );
+
+    $filterRequest->request->remove(
+        'call_disposition'
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Base Lead Query
+    |--------------------------------------------------------------------------
+    */
+
+    $query = $this->filteredLeadQuery(
+        $filterRequest
+    )
+        ->with([
+            'assignedUser:id,name,email,employee_code,team_id',
+            'source:id,name',
+            'status:id,name,color',
+            'team:id,name',
+            'stage:id,name,color',
+            'labels:id,company_id,name,color',
+        ])
+        ->addSelect([
+            'latest_note_body' => Note::query()
+                ->select('body')
+                ->whereColumn(
+                    'notes.lead_id',
+                    'leads.id'
+                )
+                ->latest('notes.id')
+                ->limit(1),
+
+            'latest_note_created_at' => Note::query()
+                ->select('created_at')
+                ->whereColumn(
+                    'notes.lead_id',
+                    'leads.id'
+                )
+                ->latest('notes.id')
+                ->limit(1),
+
+            'latest_note_user_name' => Note::query()
+                ->leftJoin(
+                    'users',
+                    'users.id',
+                    '=',
+                    'notes.user_id'
+                )
+                ->select('users.name')
+                ->whereColumn(
+                    'notes.lead_id',
+                    'leads.id'
+                )
+                ->latest('notes.id')
+                ->limit(1),
+        ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Call Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($callDisposition === 'no_call') {
+        /*
+         * जिन leads पर एक भी call log नहीं है।
+         */
+        $query->whereDoesntHave('calls');
+    } elseif ($callDisposition === 'all') {
+        /*
+         * सभी accessible leads.
+         * कोई call filter नहीं लगेगा।
+         */
+    } elseif (ctype_digit($callDisposition)) {
+        /*
+         * केवल वही leads जिनकी latest call का disposition
+         * selected disposition है।
+         */
+
+        $dispositionId = (int) $callDisposition;
+
+        $query->whereHas(
+            'calls',
+            function (
+                Builder $callQuery
+            ) use ($dispositionId) {
+                $callQuery
+                    ->where(
+                        'call_disposition_id',
+                        $dispositionId
+                    )
+                    ->whereRaw(
+                        'call_logs.id = (
+                            SELECT MAX(cl2.id)
+                            FROM call_logs AS cl2
+                            WHERE cl2.lead_id = call_logs.lead_id
+                        )'
+                    );
+            }
+        );
+    } else {
+        /*
+         * गलत call_disposition value पर empty result.
+         */
+        $query->whereRaw('1 = 0');
+    }
+
+    $perPage = (int) (
+        $validated['per_page'] ?? 25
+    );
+
+    $leads = $query
+        ->latest('leads.id')
+        ->paginate($perPage);
+
+    /*
+     * Response में applied filter भी मिलेगा।
+     */
+    $leads->setCollection(
+        $leads->getCollection()->map(
+            function ($lead) use ($callDisposition) {
+                $lead->applied_call_filter =
+                    $callDisposition;
+
+                return $lead;
+            }
+        )
+    );
+
+    return $this->success(
+        $leads,
+        'Leads fetched successfully.'
+    );
+}
 
     public function options(Request $request): JsonResponse
     {
@@ -936,6 +1229,219 @@ public function communicationHistory(
             ],
         ],
     ]);
+}
+
+
+
+
+
+public function saveCallResult(
+    Request $request,
+    Lead $lead
+): JsonResponse {
+    $this->guard($request, $lead);
+
+    $companyId = $this->companyId($request);
+    $userId = (int) $request->user()->id;
+
+    /*
+     * Flutter compatibility:
+     * दोनों field names स्वीकार किए जाएंगे।
+     */
+    if (
+        !$request->filled('call_disposition_id')
+        && $request->filled('disposition_id')
+    ) {
+        $request->merge([
+            'call_disposition_id' =>
+                $request->input('disposition_id'),
+        ]);
+    }
+
+    if (
+        !$request->filled('follow_up_at')
+        && $request->filled('next_follow_up_at')
+    ) {
+        $request->merge([
+            'follow_up_at' =>
+                $request->input('next_follow_up_at'),
+        ]);
+    }
+
+    $request->validate([
+        'call_disposition_id' => [
+            'required',
+            'integer',
+        ],
+    ]);
+
+    /*
+     * केवल global या current company disposition allow करें।
+     */
+    $disposition = CallDisposition::query()
+        ->whereKey(
+            (int) $request->input(
+                'call_disposition_id'
+            )
+        )
+        ->where('is_active', true)
+        ->where(function (Builder $query) use ($companyId) {
+            $query
+                ->whereNull('company_id')
+                ->orWhere('company_id', $companyId);
+        })
+        ->firstOrFail();
+
+    $validated = $request->validate([
+        'call_disposition_id' => [
+            'required',
+            'integer',
+        ],
+
+        'remarks' => [
+            $disposition->requires_remarks
+                ? 'required'
+                : 'nullable',
+            'string',
+            'max:3000',
+        ],
+
+        'follow_up_at' => [
+            $disposition->requires_follow_up
+                ? 'required'
+                : 'nullable',
+            'nullable',
+            'date',
+            'after:now',
+        ],
+
+        'duration_seconds' => [
+            'nullable',
+            'integer',
+            'min:0',
+        ],
+    ], [
+        'remarks.required' =>
+            "Remarks are required for {$disposition->name}.",
+
+        'follow_up_at.required' =>
+            "Follow-up date and time are required for {$disposition->name}.",
+
+        'follow_up_at.after' =>
+            'Follow-up date and time must be in the future.',
+    ]);
+
+    $remarks = trim(
+        (string) ($validated['remarks'] ?? '')
+    );
+
+    $followUpAt =
+        $validated['follow_up_at'] ?? null;
+
+    $durationSeconds = (int) (
+        $validated['duration_seconds'] ?? 0
+    );
+
+    $result = DB::transaction(function () use (
+        $lead,
+        $companyId,
+        $userId,
+        $disposition,
+        $remarks,
+        $followUpAt,
+        $durationSeconds
+    ) {
+        /*
+         * Call log save करें।
+         */
+        $callLog = CallLog::create([
+            'company_id' => $companyId,
+            'lead_id' => $lead->id,
+            'user_id' => $userId,
+
+            'call_disposition_id' =>
+                $disposition->id,
+
+            'direction' => 'outgoing',
+
+            'started_at' => now()->subSeconds(
+                $durationSeconds
+            ),
+
+            'ended_at' => now(),
+
+            'duration_seconds' =>
+                $durationSeconds,
+
+            'remarks' =>
+                $remarks !== '' ? $remarks : null,
+        ]);
+
+        $followUp = null;
+
+        /*
+         * Date/time आया है तो follow_ups table में record बनाएँ।
+         */
+        if (!empty($followUpAt)) {
+            $assignedTo = $lead->assigned_to
+                ? (int) $lead->assigned_to
+                : $userId;
+
+            $followUp = FollowUp::create([
+                'company_id' => $companyId,
+                'lead_id' => $lead->id,
+                'assigned_to' => $assignedTo,
+                'created_by' => $userId,
+
+                'type' => 'phone',
+
+                'scheduled_at' => $followUpAt,
+
+                'reminder_notified_at' => null,
+
+                'priority' => 'normal',
+                'status' => 'pending',
+
+                'notes' => $remarks !== ''
+                    ? $remarks
+                    : "Follow-up created from {$disposition->name} call disposition.",
+            ]);
+
+            /*
+             * Lead पर next follow-up भी update करें।
+             */
+            $lead->update([
+                'last_contact_at' => now(),
+                'next_follow_up_at' => $followUpAt,
+            ]);
+        } else {
+            $lead->update([
+                'last_contact_at' => now(),
+            ]);
+        }
+
+        return [
+            'call_log' => $callLog->fresh([
+                'disposition',
+                'user',
+            ]),
+
+            'follow_up' => $followUp?->fresh([
+                'assignedUser',
+                'lead',
+            ]),
+
+            'lead' => $lead->fresh(),
+        ];
+    });
+
+    return $this->success(
+        $result,
+        $result['follow_up']
+            ? 'Call result and follow-up saved successfully.'
+            : 'Call result saved successfully.',
+        201
+    );
 }
 
 
