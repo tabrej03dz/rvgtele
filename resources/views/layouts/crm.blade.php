@@ -164,6 +164,43 @@
     .crm-logout:hover { background: #fff5f5; border-color: #fecaca; }
     .crm-logout svg { width: 17px; height: 17px; }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Responsive Sidebar
+    |--------------------------------------------------------------------------
+    | Desktop:
+    | - Sidebar default visible rahega.
+    | - Hamburger click par sidebar left side me completely hide hoga.
+    | - Main content full width le lega.
+    |
+    | Mobile / Tablet:
+    | - Existing off-canvas behaviour same rahega.
+    */
+    .crm-sidebar,
+    .crm-main {
+        transition:
+            transform .25s ease,
+            margin-left .25s ease;
+    }
+
+    @media (min-width: 1024px) {
+        .crm-sidebar {
+            transform: translateX(0);
+        }
+
+        .crm-sidebar.is-collapsed {
+            transform: translateX(-100%);
+        }
+
+        .crm-main {
+            margin-left: 18rem;
+        }
+
+        .crm-main.is-sidebar-expanded {
+            margin-left: 0 !important;
+        }
+    }
+
     @media (max-width: 1023px) {
         .crm-sidebar {
             position: fixed !important;
@@ -707,7 +744,7 @@
 
     <div id="crmSidebarBackdrop" class="crm-sidebar-backdrop fixed inset-0 z-50 hidden bg-slate-950/60 backdrop-blur-sm lg:hidden"></div>
 
-    <main class="min-w-0 flex-1 lg:ml-72">
+    <main id="crmMain" class="crm-main min-w-0 flex-1 lg:ml-72">
 
 
         {{-- ===================================================== --}}
@@ -735,7 +772,7 @@
             {{-- Company / Branch --}}
 
             <div class="flex min-w-0 items-center gap-4">
-                <button type="button" id="crmSidebarToggle" class="crm-icon-button" aria-label="Open navigation">
+                <button type="button" id="crmSidebarToggle" class="crm-icon-button" aria-label="Hide navigation" aria-expanded="true">
                     <i data-lucide="menu"></i>
                 </button>
 
@@ -1268,16 +1305,96 @@ document.addEventListener('DOMContentLoaded', function () {
     const crmSidebar = document.getElementById('crmSidebar');
     const crmSidebarToggle = document.getElementById('crmSidebarToggle');
     const crmSidebarBackdrop = document.getElementById('crmSidebarBackdrop');
-    const closeCrmSidebar = () => {
+    const crmMain = document.getElementById('crmMain');
+
+    const desktopSidebarPreferenceKey = 'crm_desktop_sidebar_collapsed';
+
+    const isDesktopScreen = () => window.matchMedia('(min-width: 1024px)').matches;
+
+    const closeMobileSidebar = () => {
         crmSidebar?.classList.remove('is-open');
         crmSidebarBackdrop?.classList.remove('is-open');
+        document.body.classList.remove('overflow-hidden');
     };
+
+    const setDesktopSidebarCollapsed = (collapsed, savePreference = true) => {
+        if (!crmSidebar || !crmMain) {
+            return;
+        }
+
+        crmSidebar.classList.toggle('is-collapsed', collapsed);
+        crmMain.classList.toggle('is-sidebar-expanded', collapsed);
+
+        crmSidebarToggle?.setAttribute(
+            'aria-label',
+            collapsed ? 'Show navigation' : 'Hide navigation'
+        );
+
+        crmSidebarToggle?.setAttribute(
+            'aria-expanded',
+            collapsed ? 'false' : 'true'
+        );
+
+        if (savePreference) {
+            localStorage.setItem(
+                desktopSidebarPreferenceKey,
+                collapsed ? '1' : '0'
+            );
+        }
+    };
+
+    const syncSidebarForCurrentScreen = () => {
+        if (isDesktopScreen()) {
+            // Mobile classes desktop par carry na hon.
+            closeMobileSidebar();
+
+            const collapsed =
+                localStorage.getItem(desktopSidebarPreferenceKey) === '1';
+
+            setDesktopSidebarCollapsed(collapsed, false);
+            return;
+        }
+
+        // Desktop collapse classes mobile par carry na hon.
+        crmSidebar?.classList.remove('is-collapsed');
+        crmMain?.classList.remove('is-sidebar-expanded');
+
+        crmSidebarToggle?.setAttribute('aria-label', 'Open navigation');
+        crmSidebarToggle?.setAttribute('aria-expanded', 'false');
+    };
+
     crmSidebarToggle?.addEventListener('click', () => {
-        crmSidebar?.classList.toggle('is-open');
-        crmSidebarBackdrop?.classList.toggle('is-open');
+        if (isDesktopScreen()) {
+            const collapsed = !crmSidebar?.classList.contains('is-collapsed');
+            setDesktopSidebarCollapsed(collapsed);
+            return;
+        }
+
+        const willOpen = !crmSidebar?.classList.contains('is-open');
+
+        crmSidebar?.classList.toggle('is-open', willOpen);
+        crmSidebarBackdrop?.classList.toggle('is-open', willOpen);
+        document.body.classList.toggle('overflow-hidden', willOpen);
+
+        crmSidebarToggle?.setAttribute(
+            'aria-expanded',
+            willOpen ? 'true' : 'false'
+        );
     });
-    crmSidebarBackdrop?.addEventListener('click', closeCrmSidebar);
-    crmSidebar?.querySelectorAll('a').forEach(link => link.addEventListener('click', closeCrmSidebar));
+
+    crmSidebarBackdrop?.addEventListener('click', closeMobileSidebar);
+
+    crmSidebar?.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+            if (!isDesktopScreen()) {
+                closeMobileSidebar();
+            }
+        });
+    });
+
+    window.addEventListener('resize', syncSidebarForCurrentScreen);
+
+    syncSidebarForCurrentScreen();
 
     const reminderUrl = @json(route('followups.reminders'));
     const sidebarNearestUrl = @json(route('followups.nearest'));
