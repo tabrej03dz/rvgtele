@@ -44,6 +44,10 @@ Route::get(
         Route::post('/{lead}/labels', 'addLabel');
         Route::delete('/{lead}/labels/{label}', 'removeLabel');
 
+        Route::post(
+    '/{lead}/call-result',
+    'saveCallResult'
+);
 
     });
 
