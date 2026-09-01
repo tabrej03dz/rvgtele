@@ -358,8 +358,113 @@
     @media (max-width: 700px) {
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
+
+    /* QUICK FEEDBACK BUTTON + MODAL */
+    .feedback-action {
+        color:#6d28d9 !important;
+        background:#f5f3ff !important;
+        border-color:#ddd6fe !important;
+        padding:0 8px !important;
+        width:auto !important;
+    }
+    .feedback-action span { font-size:9px; font-weight:800; }
+
+    .quick-modal-backdrop {
+        position:fixed; inset:0; z-index:100;
+        display:flex; align-items:center; justify-content:center;
+        padding:16px; background:rgba(15,23,42,.60);
+        backdrop-filter:blur(2px);
+    }
+    .quick-modal {
+        width:100%; max-width:760px; max-height:92vh;
+        overflow:hidden; border-radius:16px; background:#fff;
+        box-shadow:0 30px 80px rgba(15,23,42,.30);
+    }
+    .quick-modal-head {
+        display:flex; align-items:flex-start; justify-content:space-between;
+        gap:14px; padding:16px 18px; border-bottom:1px solid #e8ecf2;
+    }
+    .quick-modal-body {
+        max-height:calc(92vh - 80px); overflow-y:auto;
+        padding:16px; background:#f8fafc;
+    }
+    .quick-summary {
+        display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:8px; margin-bottom:12px;
+    }
+    .quick-summary-card {
+        border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:10px;
+    }
+    .quick-summary-label {
+        font-size:8px; font-weight:800; color:#98a2b3; text-transform:uppercase;
+    }
+    .quick-summary-value {
+        margin-top:3px; font-size:11px; font-weight:800; color:#1f2937;
+        overflow-wrap:anywhere;
+    }
+    .quick-top-actions, .quick-tabs, .quick-form-actions {
+        display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+    }
+    .quick-top-actions { margin-bottom:12px; }
+    .quick-tabs { margin-bottom:12px; }
+    .quick-tab, .quick-btn {
+        min-height:35px; display:inline-flex; align-items:center; justify-content:center;
+        gap:6px; border:1px solid #dfe4ea; border-radius:8px; background:#fff;
+        padding:0 11px; color:#475467; font-size:9px; font-weight:800; cursor:pointer;
+        text-decoration:none;
+    }
+    .quick-tab.active {
+        border-color:#7c3aed; background:#f5f3ff; color:#6d28d9;
+    }
+    .quick-btn-green { border-color:#059669; background:#059669; color:#fff; }
+    .quick-btn-blue { border-color:#2563eb; background:#2563eb; color:#fff; }
+    .quick-btn-violet { border-color:#6d28d9; background:#6d28d9; color:#fff; }
+    .quick-btn-dark { border-color:#334155; background:#334155; color:#fff; }
+    .quick-panel {
+        border:1px solid #e5e7eb; border-radius:12px; background:#fff; padding:14px;
+    }
+    .quick-grid {
+        display:grid; grid-template-columns:1fr 1fr; gap:11px;
+    }
+    .quick-field label {
+        display:block; margin-bottom:5px; color:#475569; font-size:10px; font-weight:800;
+    }
+    .quick-field input, .quick-field select, .quick-field textarea {
+        width:100%; border:1px solid #d8dee8; border-radius:8px;
+        background:#fff; color:#1e293b; font-size:11px; outline:none;
+    }
+    .quick-field input, .quick-field select { min-height:38px; padding:0 10px; }
+    .quick-field textarea { min-height:90px; padding:9px 10px; resize:vertical; }
+    .quick-field input:focus, .quick-field select:focus, .quick-field textarea:focus {
+        border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,.10);
+    }
+    .quick-form-actions { justify-content:flex-end; margin-top:12px; }
+    .quick-status {
+        border:1px solid #e5e7eb; border-radius:9px; background:#f8fafc; padding:11px;
+    }
+    @media (max-width:700px) {
+        .quick-summary { grid-template-columns:repeat(2,1fr); }
+        .quick-grid { grid-template-columns:1fr; }
+    }
+
 </style>
 @endonce
+
+@php
+    /*
+    |--------------------------------------------------------------------------
+    | DEMO DISPOSITION
+    |--------------------------------------------------------------------------
+    |
+    | Call Disposition table me jiska name "demo" hai,
+    | uska ID automatically use hoga.
+    |
+    */
+
+    $demoDisposition = $dispositions->first(function ($disposition) {
+        return strtolower(trim($disposition->name)) === 'demo';
+    });
+@endphp
 
 @php
     /*
@@ -439,74 +544,8 @@
 
 <div
     class="lead-board space-y-4"
-    x-data="{
-        sendingCall: null,
-
-        showNewFilters: {{ request()->hasAny([
-            'new_category',
-            'new_source',
-            'new_city',
-            'new_priority',
-            'new_assigned_to',
-            'new_date_filter',
-            'new_demo_status',
-            'new_label_id'
-        ]) ? 'true' : 'false' }},
-
-        showDialedFilters: {{ request()->hasAny([
-            'dialed_category',
-            'dialed_source',
-            'dialed_city',
-            'dialed_priority',
-            'dialed_assigned_to',
-            'dialed_date_filter',
-            'dialed_demo_status',
-            'dialed_label_id'
-        ]) ? 'true' : 'false' }},
-
-        showConnectedFilters: {{ request()->hasAny([
-            'connected_category',
-            'connected_source',
-            'connected_city',
-            'connected_priority',
-            'connected_assigned_to',
-            'connected_date_filter',
-            'connected_demo_status',
-            'connected_label_id'
-        ]) ? 'true' : 'false' }},
-
-        async sendCall(leadId) {
-            if (this.sendingCall) return;
-
-            this.sendingCall = leadId;
-
-            try {
-                const token = document.querySelector('meta[name=csrf-token]')?.content;
-
-                const response = await fetch(`/leads/${leadId}/call-on-mobile`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': token || '',
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({}),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok || !data.status) {
-                    throw new Error(data.message || 'Unable to send call.');
-                }
-
-                alert(data.message || 'Call sent to mobile.');
-            } catch (error) {
-                alert(error.message || 'Unable to send call.');
-            } finally {
-                this.sendingCall = null;
-            }
-        }
-    }"
+    x-data="leadIndexBoard()"
+    @keydown.escape.window="feedbackOpen = false"
 >
 
     {{-- HEADER --}}
@@ -858,10 +897,195 @@
                 {{-- LEADS LIST --}}
                 <div class="lead-list">
                     @forelse($sectionLeads as $lead)
-                        @include('leads.partials.board-card', [
-                            'lead' => $lead,
-                            'type' => $sectionKey,
-                        ])
+                        @php
+                            $latestCall = $lead->latestCall;
+                            $latestRemark = $latestCall?->remarks
+                                ?? $latestCall?->remark
+                                ?? $latestCall?->auto_remarks
+                                ?? null;
+                            $latestFeedback = $latestRemark ?: $lead->latest_note_body;
+
+                            $duration = $latestCall?->duration_seconds
+                                ?? $latestCall?->duration
+                                ?? $latestCall?->call_duration
+                                ?? null;
+
+                            $durationText = null;
+                            if (is_numeric($duration)) {
+                                $duration = (int) $duration;
+                                $durationText = str_pad((string) intdiv($duration, 60), 2, '0', STR_PAD_LEFT)
+                                    . 'm '
+                                    . str_pad((string) ($duration % 60), 2, '0', STR_PAD_LEFT)
+                                    . 's';
+                            } elseif (is_string($duration) && trim($duration) !== '') {
+                                $durationText = $duration;
+                            }
+
+                            $displayName = $lead->company_name ?: $lead->name ?: 'Unnamed Lead';
+                            $initials = collect(preg_split('/\s+/', trim($lead->name ?: $lead->company_name ?: 'Lead')))
+                                ->filter()->take(2)
+                                ->map(fn($word) => mb_strtoupper(mb_substr($word, 0, 1)))
+                                ->implode('');
+
+                            $avatarClass = match($sectionKey) {
+                                'new' => 'avatar-new',
+                                'dialed' => 'avatar-dialed',
+                                default => 'avatar-connected',
+                            };
+
+                            $cardClass = match($sectionKey) {
+                                'new' => 'new-card',
+                                'dialed' => 'dialed-card',
+                                default => 'connected-card',
+                            };
+
+                            $leadUrl = route('leads.show', array_merge(
+                                ['lead' => $lead->id],
+                                request()->except(['new_page','dialed_page','connected_page'])
+                            ));
+
+                            $whatsappNumber = preg_replace('/\D+/', '', (string) ($lead->whatsapp_number ?: $lead->mobile));
+
+                            $popupLead = [
+                                'id' => (int) $lead->id,
+                                'name' => $lead->name ?: 'No Name',
+                                'business' => $lead->company_name ?: '',
+                                'mobile' => $lead->mobile ?: '',
+                                'whatsapp' => $whatsappNumber,
+                                'city' => $lead->city ?: '',
+                                'state' => $lead->state ?: '',
+                                'category' => $lead->category ?: '',
+                                'demoSent' => (bool) $lead->demo_send,
+                                'showUrl' => $leadUrl,
+                                'callStoreUrl' => route('calls.store', $lead),
+                                'noteStoreUrl' => route('leads.notes', $lead),
+                                'demoUpdateUrl' => route('leads.update', $lead),
+
+                                'demoCallUrl' => route('calls.store', $lead),
+                            ];
+                        @endphp
+
+                        <div class="lead-card {{ $cardClass }}">
+                            <div class="lead-top">
+                                <div class="lead-profile">
+                                    <div class="lead-avatar {{ $avatarClass }}">{{ $initials ?: 'L' }}</div>
+
+                                    <div class="min-w-0">
+                                        <a href="{{ $leadUrl }}" class="lead-name">{{ $displayName }}</a>
+
+                                        <div class="lead-meta">
+                                            <i data-lucide="phone"></i>
+                                            <span>{{ $lead->mobile ?: 'No Mobile' }}</span>
+                                        </div>
+
+                                        @if($lead->city || $lead->state)
+                                            <div class="lead-meta">
+                                                <i data-lucide="map-pin"></i>
+                                                <span>{{ collect([$lead->city,$lead->state])->filter()->implode(', ') }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="lead-right">
+                                    @if($sectionKey === 'new')
+                                        <div class="lead-badge text-emerald-600">New</div>
+                                        <div class="call-state text-slate-500">No call yet</div>
+                                    @else
+                                        @if($latestCall?->created_at)
+                                            <div class="call-time">
+                                                <i data-lucide="clock"></i>
+                                                <span>
+                                                    {{ $latestCall->created_at->isToday()
+                                                        ? 'Today '.$latestCall->created_at->format('h:i A')
+                                                        : $latestCall->created_at->format('d M, h:i A') }}
+                                                </span>
+                                            </div>
+                                        @endif
+
+                                        @if($sectionKey === 'dialed')
+                                            <div class="call-state text-orange-600">
+                                                {{ $latestCall?->disposition?->name ?: 'Dialed' }}
+                                            </div>
+                                        @else
+                                            <div class="call-state text-emerald-600">
+                                                {{ $durationText ? '☎ '.$durationText : 'Connected' }}
+                                            </div>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if($sectionKey !== 'new')
+                                <div class="feedback-row">
+                                    Last Feedback:
+                                    <span class="feedback-value">{{ $latestFeedback ?: 'No feedback entered' }}</span>
+                                </div>
+                            @endif
+
+                            @if($lead->next_follow_up_at)
+                                <div class="followup-row">
+                                    <i data-lucide="calendar-clock"></i>
+                                    <span>
+                                        Next Follow-up:
+                                        <strong>{{ \Illuminate\Support\Carbon::parse($lead->next_follow_up_at)->format('d M, h:i A') }}</strong>
+                                    </span>
+                                </div>
+                            @endif
+
+                            @if($lead->demo_send)
+                                <div class="mt-2 flex justify-end">
+                                    <span class="demo-sent"><i data-lucide="video"></i> Demo Sent</span>
+                                </div>
+                            @endif
+
+                            <div class="card-bottom">
+                                <div>
+                                    @if($lead->category)
+                                        <span class="category-tag">{{ $lead->category }}</span>
+                                    @endif
+                                </div>
+
+                                <div class="action-group">
+                                    @if($lead->mobile)
+                                        <button
+                                            type="button"
+                                            class="round-action call-action"
+                                            title="Call from registered mobile"
+                                            @click="sendCall({{ (int) $lead->id }})"
+                                            :disabled="sendingCall === {{ (int) $lead->id }}"
+                                        >
+                                            <i data-lucide="phone"></i>
+                                        </button>
+                                    @endif
+
+                                    @if($whatsappNumber)
+                                        <button
+                                            type="button"
+                                            class="round-action whatsapp-action"
+                                            title="Open WhatsApp Web"
+                                            @click="openWhatsApp(@js($whatsappNumber))"
+                                        >
+                                            <i data-lucide="message-circle"></i>
+                                        </button>
+                                    @endif
+
+                                    <button
+                                        type="button"
+                                        class="round-action feedback-action"
+                                        title="Feedback & Actions"
+                                        @click='openFeedback(@json($popupLead))'
+                                    >
+                                        <i data-lucide="message-square-text"></i>
+                                        <span>Feedback</span>
+                                    </button>
+
+                                    <a href="{{ $leadUrl }}" class="round-action open-action" title="Open full lead">
+                                        <i data-lucide="external-link"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     @empty
                         <div class="empty-board">
                             {{ $section['empty'] }}
@@ -893,6 +1117,603 @@
         </div>
     </div>
 
+    {{-- QUICK FEEDBACK / ALL ACTIONS MODAL --}}
+    <div
+        x-show="feedbackOpen"
+        x-cloak
+        class="quick-modal-backdrop"
+        @click.self="feedbackOpen = false"
+    >
+        <div class="quick-modal" role="dialog" aria-modal="true">
+            <div class="quick-modal-head">
+                <div class="min-w-0">
+                    <div class="text-[9px] font-extrabold uppercase tracking-wide text-violet-600">
+                        Quick Lead Actions
+                    </div>
+                    <div class="mt-1 truncate text-lg font-extrabold text-slate-900"
+                         x-text="selectedLead.business || selectedLead.name || 'Lead'"></div>
+                    <div class="mt-1 flex flex-wrap gap-3 text-[10px] text-slate-500">
+                        <span x-text="selectedLead.mobile || 'No mobile'"></span>
+                        <span x-show="selectedLead.city" x-text="selectedLead.city"></span>
+                        <span x-show="selectedLead.category" x-text="selectedLead.category"></span>
+                    </div>
+                </div>
+
+                <button type="button" class="quick-btn !h-9 !min-h-9 !w-9 !p-0" @click="feedbackOpen=false">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="quick-modal-body">
+                <div class="quick-summary">
+                    <div class="quick-summary-card">
+                        <div class="quick-summary-label">Lead</div>
+                        <div class="quick-summary-value" x-text="selectedLead.name || '—'"></div>
+                    </div>
+                    <div class="quick-summary-card">
+                        <div class="quick-summary-label">Business</div>
+                        <div class="quick-summary-value" x-text="selectedLead.business || '—'"></div>
+                    </div>
+                    <div class="quick-summary-card">
+                        <div class="quick-summary-label">Mobile</div>
+                        <div class="quick-summary-value" x-text="selectedLead.mobile || '—'"></div>
+                    </div>
+                    <div class="quick-summary-card">
+                        <div class="quick-summary-label">Demo</div>
+                        <div class="quick-summary-value"
+                             :class="selectedLead.demoSent ? 'text-emerald-600' : 'text-slate-500'"
+                             x-text="selectedLead.demoSent ? 'Demo Sent' : 'Not Sent'"></div>
+                    </div>
+                </div>
+
+                <div class="quick-top-actions">
+                    <button
+                        type="button"
+                        class="quick-btn quick-btn-green"
+                        @click="sendCall(selectedLead.id)"
+                        :disabled="!selectedLead.id || sendingCall === selectedLead.id"
+                    >
+                        <i data-lucide="phone"></i>
+                        Call on Mobile
+                    </button>
+
+                    <button
+                        type="button"
+                        class="quick-btn quick-btn-blue"
+                        @click="openWhatsApp(selectedLead.whatsapp)"
+                        :disabled="!selectedLead.whatsapp"
+                    >
+                        <i data-lucide="message-circle"></i>
+                        WhatsApp Web
+                    </button>
+
+                    <a :href="selectedLead.showUrl || '#'" class="quick-btn">
+                        <i data-lucide="external-link"></i>
+                        Full Lead
+                    </a>
+                </div>
+
+                <div class="quick-tabs">
+                    @can('calls.create')
+                        <button type="button" class="quick-tab"
+                                :class="feedbackTab==='call' ? 'active' : ''"
+                                @click="feedbackTab='call'">
+                            <i data-lucide="phone-call"></i> Save Feedback
+                        </button>
+                    @endcan
+
+                    @can('leads.update')
+                        <button type="button" class="quick-tab"
+                                :class="feedbackTab==='demo' ? 'active' : ''"
+                                @click="feedbackTab='demo'">
+                            <i data-lucide="video"></i> Demo
+                        </button>
+                    @endcan
+
+                    @can('leads.notes.create')
+                        <button type="button" class="quick-tab"
+                                :class="feedbackTab==='note' ? 'active' : ''"
+                                @click="feedbackTab='note'">
+                            <i data-lucide="notebook-pen"></i> Add Note
+                        </button>
+                    @endcan
+                </div>
+
+                @can('calls.create')
+                    <div x-show="feedbackTab==='call'" x-cloak class="quick-panel">
+                        <form method="POST" :action="selectedLead.callStoreUrl">
+                            @csrf
+
+                            <div class="quick-grid">
+                                <div class="quick-field">
+                                    <label>Call Result <span class="text-rose-500">*</span></label>
+                                    <select
+                                        name="call_disposition_id"
+                                        required
+                                        x-model="callForm.dispositionId"
+                                        @change="dispositionChanged($event)"
+                                    >
+                                        <option value="">Select call result</option>
+                                        @foreach($dispositions as $disposition)
+                                            <option
+                                                value="{{ $disposition->id }}"
+                                                data-requires-remarks="{{ $disposition->requires_remarks ? '1' : '0' }}"
+                                                data-requires-follow-up="{{ $disposition->requires_follow_up ? '1' : '0' }}"
+                                                data-auto-remarks="{{ e($disposition->auto_remarks ?? '') }}"
+                                                data-next-followup="{{ $disposition->next_followup ?? '' }}"
+                                            >
+                                                {{ $disposition->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="quick-field">
+                                    <label>Call Duration</label>
+                                    <input type="number" min="0" name="duration_seconds"
+                                           x-model="callForm.duration"
+                                           placeholder="Seconds">
+                                </div>
+
+                                <div class="quick-field md:col-span-2" x-show="callForm.showRemarks" x-cloak>
+                                    <label>
+                                        Remarks
+                                        <span x-show="callForm.remarksRequired" class="text-rose-500">*</span>
+                                    </label>
+                                    <textarea
+                                        name="remarks"
+                                        x-model="callForm.remarks"
+                                        :required="callForm.remarksRequired"
+                                        placeholder="Customer ne kya kaha..."
+                                    ></textarea>
+                                </div>
+
+                                <div class="quick-field md:col-span-2" x-show="callForm.showFollowup" x-cloak>
+                                    <label>
+                                        Next Follow-up
+                                        <span x-show="callForm.followupRequired" class="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        name="follow_up_at"
+                                        x-model="callForm.followupAt"
+                                        :required="callForm.followupRequired"
+                                        min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="quick-form-actions">
+                                <button type="button" class="quick-btn" @click="feedbackOpen=false">Cancel</button>
+                                <button type="submit" class="quick-btn quick-btn-green">
+                                    <i data-lucide="save"></i> Save Feedback
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+
+                @can('leads.update')
+
+                    <div
+                        x-show="feedbackTab === 'demo'"
+                        x-cloak
+                        class="quick-panel"
+                    >
+
+                        @if($demoDisposition)
+
+                            <form
+                                method="POST"
+                                :action="selectedLead.demoCallUrl"
+                            >
+
+                                @csrf
+
+
+                                {{-- =====================================================
+                                    AUTOMATIC DEMO DISPOSITION
+                                ====================================================== --}}
+
+                                <input
+                                    type="hidden"
+                                    name="call_disposition_id"
+                                    value="{{ $demoDisposition->id }}"
+                                >
+
+
+                                {{-- Controller ko batayega ki Demo bhi mark karna hai --}}
+                                <input
+                                    type="hidden"
+                                    name="mark_demo_send"
+                                    value="1"
+                                >
+
+
+                                {{-- Optional default remark --}}
+                                <input
+                                    type="hidden"
+                                    name="remarks"
+                                    value="Demo Sent"
+                                >
+
+
+                                {{-- Duration optional --}}
+                                <input
+                                    type="hidden"
+                                    name="duration_seconds"
+                                    value="0"
+                                >
+
+
+                                <div class="quick-status">
+
+                                    <div
+                                        class="
+                                            text-[9px]
+                                            font-bold
+                                            text-slate-500
+                                        "
+                                    >
+                                        DEMO ACTION
+                                    </div>
+
+
+                                    <div
+                                        class="
+                                            mt-1
+                                            text-sm
+                                            font-extrabold
+                                            text-violet-700
+                                        "
+                                    >
+                                        Demo Send
+                                    </div>
+
+
+                                    <div
+                                        class="
+                                            mt-2
+                                            text-[10px]
+                                            leading-5
+                                            text-slate-500
+                                        "
+                                    >
+                                        Is button par click karte hi
+
+                                        <strong>
+                                            "{{ $demoDisposition->name }}"
+                                        </strong>
+
+                                        disposition ke saath call log save hoga
+                                        aur lead ka Demo Sent status bhi update hoga.
+                                    </div>
+
+                                </div>
+
+
+                                <div class="mt-3 rounded-lg border border-violet-100 bg-violet-50 p-3">
+
+                                    <div
+                                        class="
+                                            flex
+                                            items-center
+                                            justify-between
+                                            gap-3
+                                        "
+                                    >
+
+                                        <div>
+
+                                            <div
+                                                class="
+                                                    text-[9px]
+                                                    font-bold
+                                                    uppercase
+                                                    text-violet-500
+                                                "
+                                            >
+                                                Disposition
+                                            </div>
+
+                                            <div
+                                                class="
+                                                    mt-1
+                                                    text-sm
+                                                    font-extrabold
+                                                    text-violet-800
+                                                "
+                                            >
+                                                {{ $demoDisposition->name }}
+                                            </div>
+
+                                        </div>
+
+
+                                        <div class="text-right">
+
+                                            <div
+                                                class="
+                                                    text-[9px]
+                                                    font-bold
+                                                    uppercase
+                                                    text-slate-400
+                                                "
+                                            >
+                                                Demo Status
+                                            </div>
+
+                                            <div
+                                                class="
+                                                    mt-1
+                                                    text-sm
+                                                    font-extrabold
+                                                "
+                                                :class="
+                                                    selectedLead.demoSent
+                                                        ? 'text-emerald-600'
+                                                        : 'text-slate-600'
+                                                "
+                                                x-text="
+                                                    selectedLead.demoSent
+                                                        ? 'Already Sent'
+                                                        : 'Not Sent'
+                                                "
+                                            ></div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="quick-form-actions">
+
+                                    <button
+                                        type="button"
+                                        class="quick-btn"
+                                        @click="feedbackOpen = false"
+                                    >
+                                        Cancel
+                                    </button>
+
+
+                                    <button
+                                        type="submit"
+                                        class="
+                                            quick-btn
+                                            quick-btn-violet
+                                        "
+                                    >
+
+                                        <i data-lucide="video"></i>
+
+                                        <span>
+                                            Send Demo
+                                        </span>
+
+                                    </button>
+
+                                </div>
+
+                            </form>
+
+
+                        @else
+
+                            <div
+                                class="
+                                    rounded-lg
+                                    border
+                                    border-rose-200
+                                    bg-rose-50
+                                    p-4
+                                    text-xs
+                                    font-bold
+                                    text-rose-700
+                                "
+                            >
+                                "demo" naam ka Call Disposition nahi mila.
+
+                                Call Disposition master me pehle
+                                <strong>demo</strong>
+                                disposition create karein.
+                            </div>
+
+                        @endif
+
+                    </div>
+
+                @endcan
+
+                @can('leads.notes.create')
+                    <div x-show="feedbackTab==='note'" x-cloak class="quick-panel">
+                        <form method="POST" :action="selectedLead.noteStoreUrl">
+                            @csrf
+
+                            <div class="quick-field">
+                                <label>Internal Note <span class="text-rose-500">*</span></label>
+                                <textarea
+                                    name="body"
+                                    required
+                                    x-model="noteBody"
+                                    placeholder="Customer discussion, requirement ya internal note..."
+                                ></textarea>
+                            </div>
+
+                            <div class="quick-form-actions">
+                                <button type="button" class="quick-btn" @click="feedbackOpen=false">Cancel</button>
+                                <button type="submit" class="quick-btn quick-btn-dark">
+                                    <i data-lucide="plus"></i> Add Note
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+            </div>
+        </div>
+    </div>
+
 </div>
+
+
+<script>
+    function leadIndexBoard() {
+        return {
+            sendingCall: null,
+            feedbackOpen: false,
+            feedbackTab: 'call',
+            selectedLead: {
+                id:null, name:'', business:'', mobile:'', whatsapp:'',
+                city:'', state:'', category:'', demoSent:false,
+                showUrl:'', callStoreUrl:'', noteStoreUrl:'', demoUpdateUrl:''
+            },
+            noteBody: '',
+            callForm: {
+                dispositionId:'', duration:'', remarks:'', followupAt:'',
+                showRemarks:false, remarksRequired:false,
+                showFollowup:false, followupRequired:false
+            },
+
+            showNewFilters: {{ request()->hasAny([
+                'new_category','new_source','new_city','new_priority',
+                'new_assigned_to','new_date_filter','new_demo_status','new_label_id'
+            ]) ? 'true' : 'false' }},
+
+            showDialedFilters: {{ request()->hasAny([
+                'dialed_category','dialed_source','dialed_city','dialed_priority',
+                'dialed_assigned_to','dialed_date_filter','dialed_demo_status','dialed_label_id'
+            ]) ? 'true' : 'false' }},
+
+            showConnectedFilters: {{ request()->hasAny([
+                'connected_category','connected_source','connected_city','connected_priority',
+                'connected_assigned_to','connected_date_filter','connected_demo_status','connected_label_id'
+            ]) ? 'true' : 'false' }},
+
+            openFeedback(lead) {
+                this.selectedLead = { ...this.selectedLead, ...lead };
+                this.feedbackTab = 'call';
+                this.noteBody = '';
+                this.callForm = {
+                    dispositionId:'', duration:'', remarks:'', followupAt:'',
+                    showRemarks:false, remarksRequired:false,
+                    showFollowup:false, followupRequired:false
+                };
+                this.feedbackOpen = true;
+
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            },
+
+            datetimeLocalAfterMinutes(minutes) {
+                const value = Number(minutes);
+                if (!Number.isFinite(value) || value <= 0) return '';
+
+                const d = new Date(Date.now() + value * 60 * 1000);
+                const pad = n => String(n).padStart(2,'0');
+
+                return d.getFullYear() + '-'
+                    + pad(d.getMonth()+1) + '-'
+                    + pad(d.getDate()) + 'T'
+                    + pad(d.getHours()) + ':'
+                    + pad(d.getMinutes());
+            },
+
+            dispositionChanged(event) {
+                const option = event.target.options[event.target.selectedIndex];
+
+                if (!option || !option.value) {
+                    this.callForm.remarks = '';
+                    this.callForm.followupAt = '';
+                    this.callForm.showRemarks = false;
+                    this.callForm.remarksRequired = false;
+                    this.callForm.showFollowup = false;
+                    this.callForm.followupRequired = false;
+                    return;
+                }
+
+                const requiresRemarks = option.dataset.requiresRemarks === '1';
+                const requiresFollowUp = option.dataset.requiresFollowUp === '1';
+                const autoRemarks = String(option.dataset.autoRemarks || '').trim();
+                const nextMinutes = Number(option.dataset.nextFollowup || 0);
+                const hasAutoFollowup = Number.isFinite(nextMinutes) && nextMinutes > 0;
+
+                this.callForm.remarks = autoRemarks;
+                this.callForm.remarksRequired = requiresRemarks;
+                this.callForm.showRemarks = requiresRemarks || autoRemarks !== '';
+
+                this.callForm.followupAt = hasAutoFollowup
+                    ? this.datetimeLocalAfterMinutes(nextMinutes)
+                    : '';
+
+                this.callForm.followupRequired = requiresFollowUp || hasAutoFollowup;
+                this.callForm.showFollowup = requiresFollowUp || hasAutoFollowup;
+            },
+
+            async sendCall(leadId) {
+                if (!leadId || this.sendingCall) return;
+
+                this.sendingCall = leadId;
+
+                try {
+                    const token = document.querySelector('meta[name=csrf-token]')?.content || '';
+
+                    const response = await fetch(`/leads/${leadId}/call-on-mobile`, {
+                        method:'POST',
+                        headers:{
+                            'X-CSRF-TOKEN':token,
+                            'Accept':'application/json',
+                            'Content-Type':'application/json'
+                        },
+                        body:JSON.stringify({})
+                    });
+
+                    let data = {};
+                    try { data = await response.json(); } catch(e) {}
+
+                    if (!response.ok || !data.status) {
+                        throw new Error(data.message || 'Unable to send call to mobile.');
+                    }
+
+                    alert(data.message || 'Call sent to mobile successfully.');
+                } catch(error) {
+                    alert(error.message || 'Unable to send call to mobile.');
+                } finally {
+                    this.sendingCall = null;
+                }
+            },
+
+            openWhatsApp(number) {
+                const clean = String(number || '').replace(/\D/g,'');
+
+                if (!clean) {
+                    alert('WhatsApp number is missing.');
+                    return;
+                }
+
+                const url = `https://web.whatsapp.com/send?phone=${encodeURIComponent(clean)}`;
+
+                /*
+                 * Named window: CRM se pehli baar WhatsApp khulne ke baad
+                 * next clicks same WhatsApp Web tab/window ko reuse karenge.
+                 * Login na ho to WhatsApp Web login/QR screen khud kholega.
+                 */
+                const w = window.open(url, 'rvg_whatsapp_web');
+
+                if (w) {
+                    w.focus();
+                } else {
+                    alert('Browser popup blocked hai. Popups allow karke dobara try karein.');
+                }
+            }
+        };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) window.lucide.createIcons();
+    });
+</script>
 
 @endsection

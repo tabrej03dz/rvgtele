@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CallLogController extends Controller
 {
@@ -50,76 +52,370 @@ class CallLogController extends Controller
     |
     */
 
+    // public function store(
+    //     Request $request,
+    //     Lead $lead
+    // ): RedirectResponse {
+    //     $companyId = (int) $request->user()->company_id;
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Company Guard
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     abort_unless(
+    //         (int) $lead->company_id === $companyId,
+    //         403,
+    //         'Unauthorized lead access.'
+    //     );
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | First validate selected disposition
+    //     |--------------------------------------------------------------------------
+    //     |
+    //     | Global dispositions (company_id NULL) ya current company ke
+    //     | dispositions hi allow honge.
+    //     |
+    //     */
+
+    //     $request->validate([
+    //         'call_disposition_id' => [
+    //             'required',
+    //             'integer',
+
+    //             Rule::exists(
+    //                 'call_dispositions',
+    //                 'id'
+    //             )->where(
+    //                 function ($query) use ($companyId) {
+    //                     $query
+    //                         ->where('is_active', true)
+    //                         ->where(
+    //                             function ($subQuery) use ($companyId) {
+    //                                 $subQuery
+    //                                     ->whereNull('company_id')
+    //                                     ->orWhere(
+    //                                         'company_id',
+    //                                         $companyId
+    //                                     );
+    //                             }
+    //                         );
+    //                 }
+    //             ),
+    //         ],
+    //     ]);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Load disposition settings
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     $disposition = CallDisposition::query()
+    //         ->whereKey(
+    //             (int) $request->call_disposition_id
+    //         )
+    //         ->where('is_active', true)
+    //         ->where(
+    //             function (Builder $query) use ($companyId) {
+    //                 $query
+    //                     ->whereNull('company_id')
+    //                     ->orWhere(
+    //                         'company_id',
+    //                         $companyId
+    //                     );
+    //             }
+    //         )
+    //         ->firstOrFail();
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Dynamic Validation
+    //     |--------------------------------------------------------------------------
+    //     |
+    //     | requires_remarks = true
+    //     |     => Remarks required
+    //     |
+    //     | requires_follow_up = true
+    //     |     => Follow-up date/time required
+    //     |
+    //     */
+
+    //     $validated = $request->validate([
+    //         'duration_seconds' => [
+    //             'nullable',
+    //             'integer',
+    //             'min:0',
+    //         ],
+
+    //         'remarks' => [
+    //             $disposition->requires_remarks
+    //                 ? 'required'
+    //                 : 'nullable',
+    //             'string',
+    //             'max:3000',
+    //         ],
+
+    //         'follow_up_at' => [
+    //             $disposition->requires_follow_up
+    //                 ? 'required'
+    //                 : 'nullable',
+    //             'date',
+    //             'after:now',
+    //         ],
+    //     ], [
+    //         'remarks.required' =>
+    //             "Remarks are required for {$disposition->name} disposition.",
+
+    //         'follow_up_at.required' =>
+    //             "Follow-up date and time are required for {$disposition->name} disposition.",
+
+    //         'follow_up_at.after' =>
+    //             'Follow-up date and time must be in the future.',
+    //     ]);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Normalize Values
+    //     |--------------------------------------------------------------------------
+    //     |
+    //     | Agar disposition remarks/follow-up demand nahi karta to browser se
+    //     | accidentally aayi stale values ko ignore karenge.
+    //     |
+    //     */
+
+    //     $remarks = $disposition->requires_remarks
+    //         ? trim((string) ($validated['remarks'] ?? ''))
+    //         : null;
+
+    //     $followUpAt = $disposition->requires_follow_up
+    //         ? ($validated['follow_up_at'] ?? null)
+    //         : null;
+
+    //     $durationSeconds =
+    //         (int) ($validated['duration_seconds'] ?? 0);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Create Call Log
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     CallLog::create([
+    //         'company_id' =>
+    //             $companyId,
+
+    //         'lead_id' =>
+    //             $lead->id,
+
+    //         'user_id' =>
+    //             $request->user()->id,
+
+    //         'call_disposition_id' =>
+    //             $disposition->id,
+
+    //         'started_at' =>
+    //             now()->subSeconds(
+    //                 $durationSeconds
+    //             ),
+
+    //         'ended_at' =>
+    //             now(),
+
+    //         'duration_seconds' =>
+    //             $durationSeconds,
+
+    //         'remarks' =>
+    //             $remarks,
+    //     ]);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Update Lead Last Contact
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     $lead->update([
+    //         'last_contact_at' => now(),
+    //     ]);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Create Follow-up Only When Disposition Requires It
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     if (
+    //         $disposition->requires_follow_up
+    //         &&
+    //         !empty($followUpAt)
+    //     ) {
+    //         FollowUp::create([
+    //             'company_id' =>
+    //                 $companyId,
+
+    //             'lead_id' =>
+    //                 $lead->id,
+
+    //             'assigned_to' =>
+    //                 $lead->assigned_to
+    //                 ?: $request->user()->id,
+
+    //             'created_by' =>
+    //                 $request->user()->id,
+
+    //             'scheduled_at' =>
+    //                 $followUpAt,
+
+    //             'notes' =>
+    //                 $remarks
+    //                 ?: "Follow-up created from {$disposition->name} call disposition.",
+
+    //             'status' =>
+    //                 'pending',
+    //         ]);
+
+    //         $lead->update([
+    //             'next_follow_up_at' =>
+    //                 $followUpAt,
+    //         ]);
+    //     } else {
+    //         /*
+    //         |--------------------------------------------------------------------------
+    //         | Non-follow-up disposition
+    //         |--------------------------------------------------------------------------
+    //         |
+    //         | Existing future follow-up history ko delete nahi karenge.
+    //         | Sirf current call se naya follow-up create nahi hoga.
+    //         |
+    //         */
+    //     }
+
+    //     return back()->with(
+    //         'success',
+    //         $disposition->requires_follow_up
+    //             ? 'Call result and follow-up saved successfully.'
+    //             : 'Call result saved successfully.'
+    //     );
+    // }
+
+
+
     public function store(
-        Request $request,
-        Lead $lead
-    ): RedirectResponse {
-        $companyId = (int) $request->user()->company_id;
+    Request $request,
+    Lead $lead
+): RedirectResponse {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Company Guard
-        |--------------------------------------------------------------------------
-        */
+    $companyId =
+        (int) $request->user()->company_id;
 
-        abort_unless(
-            (int) $lead->company_id === $companyId,
-            403,
-            'Unauthorized lead access.'
-        );
 
-        /*
-        |--------------------------------------------------------------------------
-        | First validate selected disposition
-        |--------------------------------------------------------------------------
-        |
-        | Global dispositions (company_id NULL) ya current company ke
-        | dispositions hi allow honge.
-        |
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | Company Guard
+    |--------------------------------------------------------------------------
+    */
 
-        $request->validate([
-            'call_disposition_id' => [
-                'required',
-                'integer',
+    abort_unless(
+        (int) $lead->company_id === $companyId,
+        403,
+        'Unauthorized lead access.'
+    );
 
-                Rule::exists(
-                    'call_dispositions',
-                    'id'
-                )->where(
-                    function ($query) use ($companyId) {
-                        $query
-                            ->where('is_active', true)
-                            ->where(
-                                function ($subQuery) use ($companyId) {
-                                    $subQuery
-                                        ->whereNull('company_id')
-                                        ->orWhere(
-                                            'company_id',
-                                            $companyId
-                                        );
-                                }
-                            );
-                    }
-                ),
-            ],
-        ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Load disposition settings
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | First Validate Selected Disposition
+    |--------------------------------------------------------------------------
+    |
+    | Global disposition:
+    | company_id = NULL
+    |
+    | OR
+    |
+    | Current company's disposition.
+    |
+    */
 
-        $disposition = CallDisposition::query()
-            ->whereKey(
-                (int) $request->call_disposition_id
-            )
-            ->where('is_active', true)
-            ->where(
-                function (Builder $query) use ($companyId) {
+    $request->validate([
+
+        'call_disposition_id' => [
+            'required',
+            'integer',
+
+            Rule::exists(
+                'call_dispositions',
+                'id'
+            )->where(
+                function ($query) use ($companyId) {
+
                     $query
-                        ->whereNull('company_id')
+                        ->where(
+                            'is_active',
+                            true
+                        )
+                        ->where(
+                            function ($subQuery) use (
+                                $companyId
+                            ) {
+
+                                $subQuery
+                                    ->whereNull(
+                                        'company_id'
+                                    )
+                                    ->orWhere(
+                                        'company_id',
+                                        $companyId
+                                    );
+                            }
+                        );
+                }
+            ),
+        ],
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Special Flag From Demo Send Button
+        |--------------------------------------------------------------------------
+        */
+
+        'mark_demo_send' => [
+            'nullable',
+            'boolean',
+        ],
+
+    ]);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load Disposition
+    |--------------------------------------------------------------------------
+    */
+
+    $disposition =
+        CallDisposition::query()
+            ->whereKey(
+                (int) $request->input(
+                    'call_disposition_id'
+                )
+            )
+            ->where(
+                'is_active',
+                true
+            )
+            ->where(
+                function (Builder $query) use (
+                    $companyId
+                ) {
+
+                    $query
+                        ->whereNull(
+                            'company_id'
+                        )
                         ->orWhere(
                             'company_id',
                             $companyId
@@ -128,42 +424,102 @@ class CallLogController extends Controller
             )
             ->firstOrFail();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dynamic Validation
-        |--------------------------------------------------------------------------
-        |
-        | requires_remarks = true
-        |     => Remarks required
-        |
-        | requires_follow_up = true
-        |     => Follow-up date/time required
-        |
-        */
 
-        $validated = $request->validate([
+    /*
+    |--------------------------------------------------------------------------
+    | Is This Demo Send Request?
+    |--------------------------------------------------------------------------
+    */
+
+    $markDemoSend =
+        $request->boolean(
+            'mark_demo_send'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Security Check
+    |--------------------------------------------------------------------------
+    |
+    | Frontend hidden input badla ja sakta hai.
+    |
+    | Isliye agar mark_demo_send=1 hai to backend par bhi verify karenge
+    | ki selected disposition ka naam actually "demo" hi hai.
+    |
+    */
+
+    if ($markDemoSend) {
+
+        $normalizedDispositionName =
+            strtolower(
+                trim(
+                    (string) $disposition->name
+                )
+            );
+
+        if ($normalizedDispositionName !== 'demo') {
+
+            throw ValidationException::withMessages([
+
+                'call_disposition_id' =>
+                    'Demo Send action ke liye Demo disposition required hai.',
+
+            ]);
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dynamic Validation
+    |--------------------------------------------------------------------------
+    |
+    | Normal Call:
+    | requires_remarks ke according remarks required.
+    |
+    | Demo:
+    | remark backend khud "Demo Sent" set karega.
+    |
+    */
+
+    $validated =
+        $request->validate([
+
             'duration_seconds' => [
                 'nullable',
                 'integer',
                 'min:0',
             ],
 
+
             'remarks' => [
-                $disposition->requires_remarks
+
+                (
+                    $disposition->requires_remarks
+                    &&
+                    !$markDemoSend
+                )
                     ? 'required'
                     : 'nullable',
+
                 'string',
                 'max:3000',
             ],
 
+
             'follow_up_at' => [
+
                 $disposition->requires_follow_up
                     ? 'required'
                     : 'nullable',
+
                 'date',
                 'after:now',
             ],
+
         ], [
+
             'remarks.required' =>
                 "Remarks are required for {$disposition->name} disposition.",
 
@@ -172,130 +528,496 @@ class CallLogController extends Controller
 
             'follow_up_at.after' =>
                 'Follow-up date and time must be in the future.',
+
         ]);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Duration
+    |--------------------------------------------------------------------------
+    */
+
+    $durationSeconds =
+        max(
+            0,
+            (int) (
+                $validated[
+                    'duration_seconds'
+                ] ?? 0
+            )
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Remarks
+    |--------------------------------------------------------------------------
+    |
+    | DEMO SEND:
+    | always "Demo Sent"
+    |
+    | Normal required remarks:
+    | user-entered remarks
+    |
+    | Non-required disposition:
+    | auto_remarks use kar sakte hain agar disposition me configured hai.
+    |
+    */
+
+    if ($markDemoSend) {
+
+        $remarks =
+            trim(
+                (string) (
+                    $disposition->auto_remarks
+                    ?: 'Demo Sent'
+                )
+            );
+
+    } elseif ($disposition->requires_remarks) {
+
+        $remarks =
+            trim(
+                (string) (
+                    $validated['remarks']
+                    ?? ''
+                )
+            );
+
+    } else {
 
         /*
         |--------------------------------------------------------------------------
-        | Normalize Values
+        | Non-required Remarks
         |--------------------------------------------------------------------------
         |
-        | Agar disposition remarks/follow-up demand nahi karta to browser se
-        | accidentally aayi stale values ko ignore karenge.
+        | User ke stale form data ko ignore karenge.
+        | Agar disposition me auto_remarks configured hai to wahi save hoga.
         |
         */
 
-        $remarks = $disposition->requires_remarks
-            ? trim((string) ($validated['remarks'] ?? ''))
+        $remarks =
+            filled(
+                $disposition->auto_remarks
+            )
+                ? trim(
+                    (string)
+                    $disposition->auto_remarks
+                )
+                : null;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Follow-up
+    |--------------------------------------------------------------------------
+    */
+
+    $followUpAt =
+        $disposition->requires_follow_up
+            ? (
+                $validated[
+                    'follow_up_at'
+                ] ?? null
+            )
             : null;
 
-        $followUpAt = $disposition->requires_follow_up
-            ? ($validated['follow_up_at'] ?? null)
-            : null;
 
-        $durationSeconds =
-            (int) ($validated['duration_seconds'] ?? 0);
+    /*
+    |--------------------------------------------------------------------------
+    | Database Transaction
+    |--------------------------------------------------------------------------
+    |
+    | CallLog + Lead + FollowUp sab ek saath successful honge.
+    |
+    | Beech me error aaya to sab rollback.
+    |
+    */
 
-        /*
-        |--------------------------------------------------------------------------
-        | Create Call Log
-        |--------------------------------------------------------------------------
-        */
-
-        CallLog::create([
-            'company_id' =>
-                $companyId,
-
-            'lead_id' =>
-                $lead->id,
-
-            'user_id' =>
-                $request->user()->id,
-
-            'call_disposition_id' =>
-                $disposition->id,
-
-            'started_at' =>
-                now()->subSeconds(
-                    $durationSeconds
-                ),
-
-            'ended_at' =>
-                now(),
-
-            'duration_seconds' =>
-                $durationSeconds,
-
-            'remarks' =>
-                $remarks,
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Update Lead Last Contact
-        |--------------------------------------------------------------------------
-        */
-
-        $lead->update([
-            'last_contact_at' => now(),
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Create Follow-up Only When Disposition Requires It
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $disposition->requires_follow_up
-            &&
-            !empty($followUpAt)
+    DB::transaction(
+        function () use (
+            $request,
+            $lead,
+            $companyId,
+            $disposition,
+            $durationSeconds,
+            $remarks,
+            $followUpAt,
+            $markDemoSend
         ) {
-            FollowUp::create([
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create Call Log
+            |--------------------------------------------------------------------------
+            */
+
+            CallLog::create([
+
                 'company_id' =>
                     $companyId,
 
                 'lead_id' =>
                     $lead->id,
 
-                'assigned_to' =>
-                    $lead->assigned_to
-                    ?: $request->user()->id,
-
-                'created_by' =>
+                'user_id' =>
                     $request->user()->id,
 
-                'scheduled_at' =>
-                    $followUpAt,
+                'call_disposition_id' =>
+                    $disposition->id,
 
-                'notes' =>
-                    $remarks
-                    ?: "Follow-up created from {$disposition->name} call disposition.",
+                'started_at' =>
+                    now()->subSeconds(
+                        $durationSeconds
+                    ),
 
-                'status' =>
-                    'pending',
+                'ended_at' =>
+                    now(),
+
+                'duration_seconds' =>
+                    $durationSeconds,
+
+                'remarks' =>
+                    $remarks,
+
             ]);
 
-            $lead->update([
-                'next_follow_up_at' =>
-                    $followUpAt,
-            ]);
-        } else {
+
             /*
             |--------------------------------------------------------------------------
-            | Non-follow-up disposition
+            | Lead Update Data
+            |--------------------------------------------------------------------------
+            */
+
+            $leadUpdateData = [
+
+                'last_contact_at' =>
+                    now(),
+
+            ];
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Demo Send
             |--------------------------------------------------------------------------
             |
-            | Existing future follow-up history ko delete nahi karenge.
-            | Sirf current call se naya follow-up create nahi hoga.
+            | Demo button se aaya:
+            |
+            | call_logs:
+            | disposition = Demo
+            |
+            | leads:
+            | demo_send = 1
+            | demo_sent_at = current datetime
             |
             */
+
+            if ($markDemoSend) {
+
+                $leadUpdateData[
+                    'demo_send'
+                ] = true;
+
+                $leadUpdateData[
+                    'demo_sent_at'
+                ] = now();
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Lead
+            |--------------------------------------------------------------------------
+            */
+
+            $lead->update(
+                $leadUpdateData
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create Follow-up
+            |--------------------------------------------------------------------------
+            |
+            | Sirf disposition explicitly follow-up require kare tab.
+            |
+            */
+
+            if (
+                $disposition->requires_follow_up
+                &&
+                !empty($followUpAt)
+            ) {
+
+                FollowUp::create([
+
+                    'company_id' =>
+                        $companyId,
+
+                    'lead_id' =>
+                        $lead->id,
+
+                    'assigned_to' =>
+                        $lead->assigned_to
+                        ?: $request->user()->id,
+
+                    'created_by' =>
+                        $request->user()->id,
+
+                    'scheduled_at' =>
+                        $followUpAt,
+
+                    'notes' =>
+                        $remarks
+                        ?: "Follow-up created from {$disposition->name} call disposition.",
+
+                    'status' =>
+                        'pending',
+
+                ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Update Lead Follow-up
+                |--------------------------------------------------------------------------
+                */
+
+                $lead->update([
+
+                    'next_follow_up_at' =>
+                        $followUpAt,
+
+                ]);
+            }
+
         }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Success Response
+    |--------------------------------------------------------------------------
+    */
+
+    if ($markDemoSend) {
 
         return back()->with(
             'success',
-            $disposition->requires_follow_up
-                ? 'Call result and follow-up saved successfully.'
-                : 'Call result saved successfully.'
+            'Demo Sent successfully. Demo disposition and call log have also been saved.'
         );
     }
+
+
+    if ($disposition->requires_follow_up) {
+
+        return back()->with(
+            'success',
+            'Call result and follow-up saved successfully.'
+        );
+    }
+
+
+    return back()->with(
+        'success',
+        'Call result saved successfully.'
+    );
+}
+
+
+public function storeDemo(
+    Request $request,
+    Lead $lead
+): RedirectResponse {
+
+    $companyId =
+        (int) $request->user()->company_id;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company Guard
+    |--------------------------------------------------------------------------
+    */
+
+    abort_unless(
+        (int) $lead->company_id === $companyId,
+        403,
+        'Unauthorized lead access.'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find Demo Disposition
+    |--------------------------------------------------------------------------
+    |
+    | Current company ka "demo" disposition pehle prefer karenge.
+    | Agar company-specific nahi hai to global disposition use hoga.
+    |
+    */
+
+    $demoDisposition =
+        CallDisposition::query()
+            ->where(
+                'is_active',
+                true
+            )
+            ->whereRaw(
+                'LOWER(TRIM(name)) = ?',
+                ['demo']
+            )
+            ->where(
+                function (Builder $query) use (
+                    $companyId
+                ) {
+
+                    $query
+                        ->where(
+                            'company_id',
+                            $companyId
+                        )
+                        ->orWhereNull(
+                            'company_id'
+                        );
+                }
+            )
+            ->orderByRaw(
+                'CASE
+                    WHEN company_id = ? THEN 0
+                    ELSE 1
+                END',
+                [$companyId]
+            )
+            ->first();
+
+
+    if (!$demoDisposition) {
+
+        return back()
+            ->withErrors([
+                'demo' =>
+                    'Demo disposition not found. Please create an active "demo" disposition first.',
+            ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Do Not Save Duplicate Demo Again
+    |--------------------------------------------------------------------------
+    */
+
+    if ($lead->demo_send) {
+
+        return back()->with(
+            'success',
+            'Demo is already marked as sent for this lead.'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Transaction
+    |--------------------------------------------------------------------------
+    */
+
+    DB::transaction(
+        function () use (
+            $request,
+            $lead,
+            $companyId,
+            $demoDisposition
+        ) {
+
+            $now = now();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create Demo Call Log
+            |--------------------------------------------------------------------------
+            */
+
+            CallLog::create([
+
+                'company_id' =>
+                    $companyId,
+
+                'lead_id' =>
+                    $lead->id,
+
+                'user_id' =>
+                    $request->user()->id,
+
+                'call_disposition_id' =>
+                    $demoDisposition->id,
+
+                'started_at' =>
+                    $now,
+
+                'ended_at' =>
+                    $now,
+
+                'duration_seconds' =>
+                    0,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Important
+                |--------------------------------------------------------------------------
+                |
+                | Demo disposition requires_remarks false ho tab bhi
+                | Demo Sent remark save hoga.
+                |
+                */
+
+                'remarks' =>
+                    filled(
+                        $demoDisposition->auto_remarks
+                    )
+                        ? trim(
+                            (string)
+                            $demoDisposition->auto_remarks
+                        )
+                        : 'Demo Sent',
+
+            ]);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Demo Sent On Lead
+            |--------------------------------------------------------------------------
+            */
+
+            $lead->update([
+
+                'demo_send' =>
+                    true,
+
+                'demo_sent_at' =>
+                    $now,
+
+                'last_contact_at' =>
+                    $now,
+
+            ]);
+
+        }
+    );
+
+
+    return back()->with(
+        'success',
+        'Demo Sent successfully and Demo disposition saved in call log.'
+    );
+}
 }
