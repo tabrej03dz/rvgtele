@@ -27,7 +27,7 @@ use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\DemoCityController;
-
+use App\Http\Controllers\ManageLeadController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
 
 
@@ -161,6 +161,8 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::post('/leads/bulk-assign', [LeadController::class, 'bulkAssign'])->middleware('permission:leads.assign')->name('leads.bulk-assign');
     Route::post('/leads/{lead}/assign', [LeadController::class, 'assign'])->middleware('permission:leads.assign')->name('leads.assign');
     Route::post('/leads/{lead}/notes', [LeadController::class, 'note'])->middleware('permission:leads.notes.create')->name('leads.notes');
+
+    Route::get('manage/leads', [ManageLeadController::class, 'index'])->middleware('permission:leads.view')->name('manage.leads.index');
 
     // Leads CRUD
     Route::get('/leads', [LeadController::class, 'index'])->middleware('permission:leads.view')->name('leads.index');

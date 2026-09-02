@@ -22,7 +22,7 @@ use App\Services\MobileCallService;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
-class LeadController extends Controller
+class ManageLeadController extends Controller
 {
 
 
@@ -764,6 +764,25 @@ public function index(Request $request): View
         ->orderBy('category')
         ->pluck('category');
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cities
+    |--------------------------------------------------------------------------
+    |
+    | Leads table ke city column se distinct city list filter ke liye.
+    |
+    */
+
+    $cities = Lead::query()
+        ->where('company_id', $companyId)
+        ->whereNotNull('city')
+        ->where('city', '<>', '')
+        ->select('city')
+        ->distinct()
+        ->orderBy('city')
+        ->pluck('city');
+
     /*
     |--------------------------------------------------------------------------
     | Employees For Filter
@@ -932,7 +951,7 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     */
 
-    return view('leads.index', [
+    return view('manage-leads.index', [
 
         /*
         |--------------------------------------------------------------------------
@@ -952,6 +971,7 @@ public function index(Request $request): View
         'dispositions' => $dispositions,
         'sources' => $sources,
         'categories' => $categories,
+        'cities' => $cities,
 
         /*
         |--------------------------------------------------------------------------
@@ -1819,6 +1839,7 @@ public function index(Request $request): View
                 'lead_ids' => [
                     'nullable',
                     'array',
+                    'min:1',
                     'required_if:assignment_scope,selected',
                 ],
 
@@ -1901,6 +1922,12 @@ public function index(Request $request): View
                     'integer',
                 ],
 
+                'city' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
                 'filter_assigned_to' => [
                     'nullable',
                     'string',
@@ -1940,7 +1967,7 @@ public function index(Request $request): View
                         mixed $value,
                         \Closure $fail
                     ) use ($companyId) {
-                        if ($value === 'no_call') {
+                        if (in_array((string) $value, ['no_call', 'all'], true)) {
                             return;
                         }
 
@@ -2035,6 +2062,10 @@ public function index(Request $request): View
 
                     'source' =>
                     $validated['source']
+                        ?? null,
+
+                    'city' =>
+                    $validated['city']
                         ?? null,
 
                     'assigned_to' =>
@@ -2506,6 +2537,18 @@ public function index(Request $request): View
             'category',
             $category
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | City
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('city')) {
+        $city = trim((string) $request->input('city'));
+
+        $query->where('city', $city);
     }
 
     /*

@@ -361,6 +361,13 @@
                     ],
 
                     [
+                        'Manage Leads',
+                        'manage.leads.index',
+                        'manage.leads.*',
+                        'manage.leads.view'
+                    ],
+
+                    [
                         'Data',
                         'data.index',
                         'data.*',
@@ -527,6 +534,7 @@
                 'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard',
                 'data.index' => 'database',
                 'leads.index' => 'users',
+                'manage.leads.index' => 'users',
                 'demo-cities.index' => 'gallery-vertical-end',
                 
                 'pipeline.index' => 'workflow',
