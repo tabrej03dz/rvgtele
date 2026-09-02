@@ -6,6 +6,7 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CallDispositionController;
 use App\Http\Controllers\CallLogController;
 use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -274,6 +275,11 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     $crud('tasks', 'tasks', TaskController::class, 'tasks');
     $crud('orders', 'orders', OrderController::class, 'orders');
     $crud('payments', 'payments', PaymentController::class, 'payments');
+
+    Route::resource(
+        'categories',
+        CategoryController::class
+    );
 
     Route::prefix('settings')->name('crm-settings.')->group(function () use ($crud) {
         $crud(

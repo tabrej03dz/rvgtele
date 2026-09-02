@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\DemoCity;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -235,18 +236,23 @@ class DemoCityController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function create(
-        Request $request
-    ) {
+public function create(Request $request)
+{
+    $companyId = $this->companyId($request);
 
-        $this->companyId(
-            $request
-        );
+    $categories = Category::query()
+        ->where('company_id', $companyId)
+        ->orderBy('name')
+        ->get([
+            'id',
+            'name',
+        ]);
 
-        return view(
-            'demo-cities.create'
-        );
-    }
+    return view(
+        'demo-cities.create',
+        compact('categories')
+    );
+}
 
 
     /*
@@ -281,6 +287,19 @@ class DemoCityController extends Controller
                         $companyId
                     )
                 ),
+            ],
+
+            'category_id' => [
+                'required',
+                'integer',
+                Rule::exists('categories', 'id')
+                    ->where(
+                        fn ($query) =>
+                        $query->where(
+                            'company_id',
+                            $companyId
+                        )
+                    ),
             ],
 
 
@@ -331,6 +350,8 @@ class DemoCityController extends Controller
             'name' => trim(
                 $validated['name']
             ),
+
+            'category_id' => $validated['category_id'],
 
             'company_id' => $companyId,
 
@@ -461,17 +482,26 @@ class DemoCityController extends Controller
         Request $request,
         DemoCity $demoCity
     ) {
-
         $demoCity = $this->cityForCompany(
             $request,
             $demoCity
         );
 
+        $companyId = $this->companyId($request);
+
+        $categories = Category::query()
+            ->where('company_id', $companyId)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+            ]);
 
         return view(
             'demo-cities.edit',
             compact(
-                'demoCity'
+                'demoCity',
+                'categories'
             )
         );
     }
@@ -522,6 +552,19 @@ class DemoCityController extends Controller
                     ),
             ],
 
+            'category_id' => [
+                'required',
+                'integer',
+
+                Rule::exists('categories', 'id')
+                    ->where(
+                        fn ($query) =>
+                        $query->where(
+                            'company_id',
+                            $companyId
+                        )
+                    ),
+            ],
 
             'media_files' => [
                 'nullable',
@@ -621,7 +664,7 @@ class DemoCityController extends Controller
             'name' => trim(
                 $validated['name']
             ),
-
+            'category_id' => $validated['category_id'],
             'media' => array_values(
                 $media
             ),

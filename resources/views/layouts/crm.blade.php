@@ -736,6 +736,42 @@
 
             @endforeach
 
+            @if(
+                    auth()->user()->can('categories.view')
+                    ||
+                    auth()->user()->can('categories.create')
+                )
+                    <a
+                        href="{{ route('categories.index') }}"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2.5
+                            text-sm font-medium
+                            {{ request()->routeIs('categories.*')
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            }}"
+                    >
+
+                        <svg
+                            class="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M4 6h16M4 12h16M4 18h10"
+                            />
+                        </svg>
+
+                        <span>
+                            Categories
+                        </span>
+
+                    </a>
+                @endif
+
             <div class="rounded-xl border border-white/10 bg-white/[.07] p-3 text-white shadow-lg">
                 <div class="flex items-center gap-3">
                     <div class="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
