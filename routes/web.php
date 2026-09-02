@@ -25,6 +25,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
+use App\Http\Controllers\DemoCityController;
 
 Route::view('/', 'welcome')->name('home');
 
@@ -226,6 +227,33 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update')->name('employees.update');
     Route::patch('/employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update');
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.delete')->name('employees.destroy');
+
+
+    Route::resource('demo-cities', DemoCityController::class);
+
+    Route::prefix('demo-cities/{demoCity}')
+        ->name('demo-cities.')
+        ->group(function () {
+
+            // Media
+            Route::post('media', [DemoCityController::class, 'uploadMedia'])
+                ->name('media.upload');
+
+            Route::get('media/{mediaId}/download', [DemoCityController::class, 'downloadMedia'])
+                ->name('media.download');
+
+            Route::delete('media/{mediaId}', [DemoCityController::class, 'destroyMedia'])
+                ->name('media.destroy');
+
+            // ZIP
+            Route::post('zip', [DemoCityController::class, 'uploadZip'])
+                ->name('zip.upload');
+
+            Route::get('download-all', [DemoCityController::class, 'downloadAll'])
+                ->name('download-all');
+    });
+
+
 
     // Generic CRUD registrar.
     $crud = static function (string $uri, string $routeName, string $controller, string $permission, string $parameter = 'item'): void {

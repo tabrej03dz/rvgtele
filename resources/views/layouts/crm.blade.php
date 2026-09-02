@@ -388,6 +388,19 @@
                         'calls.view'
                     ],
 
+                     /*
+                    |--------------------------------------------------------------------------
+                    | Demo Management
+                    |--------------------------------------------------------------------------
+                    */
+
+                    [
+                        'Demo Cities',
+                        'demo-cities.index',
+                        'demo-cities.*',
+                        'demo-cities.view'
+                    ],
+
                 ],
 
                 'Organization' => [
@@ -505,7 +518,10 @@
             $menuIcons = [
                 'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard',
                 'data.index' => 'database',
-                'leads.index' => 'users', 'pipeline.index' => 'workflow',
+                'leads.index' => 'users',
+                'demo-cities.index' => 'gallery-vertical-end',
+                
+                'pipeline.index' => 'workflow',
                 'followups.index' => 'phone-forwarded', 'calls.index' => 'phone',
                 'employees.index' => 'user-round', 'branches.index' => 'map-pin',
                 'teams.index' => 'users-round', 'access-control.index' => 'shield-check',
