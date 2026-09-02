@@ -168,6 +168,10 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::patch('/leads/{lead}', [LeadController::class, 'update'])->middleware('permission:leads.update');
     Route::delete('/leads/{lead}', [LeadController::class, 'destroy'])->middleware('permission:leads.delete')->name('leads.destroy');
 
+    Route::post(
+        '/leads/{lead}/send-demo',
+        [CallLogController::class, 'storeDemo']
+    )->name('leads.demo.store');
     // Calls
     Route::get('/calls', [CallLogController::class, 'index'])->middleware('permission:calls.view')->name('calls.index');
     Route::post('/leads/{lead}/calls', [CallLogController::class, 'store'])->middleware('permission:calls.create')->name('calls.store');

@@ -786,6 +786,25 @@ public function index(Request $request): View
 
                 /*
                 |--------------------------------------------------------------------------
+                | Latest Call ID
+                |--------------------------------------------------------------------------
+                |
+                | Dialed / Connected columns ko latest call activity ke basis
+                | par descending order me dikhane ke liye.
+                |
+                */
+
+                'latest_call_id' => CallLog::query()
+                    ->select('id')
+                    ->whereColumn(
+                        'call_logs.lead_id',
+                        'leads.id'
+                    )
+                    ->latest('call_logs.id')
+                    ->limit(1),
+
+                /*
+                |--------------------------------------------------------------------------
                 | Latest Note Body
                 |--------------------------------------------------------------------------
                 */
@@ -1016,7 +1035,7 @@ public function index(Request $request): View
     $newLeads = $prepareQuery(
         clone $newQuery
     )
-        ->latest('leads.id')
+        ->orderByDesc('leads.id')
         ->paginate(
             $boardLimit,
             ['*'],
@@ -1028,7 +1047,8 @@ public function index(Request $request): View
     $dialedLeads = $prepareQuery(
         clone $dialedQuery
     )
-        ->latest('leads.id')
+        ->orderByDesc('latest_call_id')
+        ->orderByDesc('leads.id')
         ->paginate(
             $boardLimit,
             ['*'],
@@ -1040,7 +1060,8 @@ public function index(Request $request): View
     $connectedLeads = $prepareQuery(
         clone $connectedQuery
     )
-        ->latest('leads.id')
+        ->orderByDesc('latest_call_id')
+        ->orderByDesc('leads.id')
         ->paginate(
             $boardLimit,
             ['*'],
@@ -4276,6 +4297,7 @@ public function index(Request $request): View
         'priority',
         'assigned_to',
         'date_filter',
+        'disposition_id',
         'demo_status',
         'label_id',
     ];
@@ -4499,6 +4521,98 @@ private function applyBoardFilters(
                     );
 
                 break;
+        }
+    }
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Latest Call Disposition
+    |--------------------------------------------------------------------------
+    |
+    | "none" = lead ke against koi call log/disposition nahi.
+    |
+    | Numeric ID = lead ki LATEST call ka disposition selected ID hona chahiye.
+    | Sirf kisi purani call ka disposition match nahi kiya jayega.
+    |
+    */
+
+    $dispositionKey =
+        $section . '_disposition_id';
+
+    if ($request->filled($dispositionKey)) {
+
+        $dispositionValue =
+            (string) $request->input(
+                $dispositionKey
+            );
+
+        if ($dispositionValue === 'none') {
+
+            $query->whereDoesntHave('calls');
+
+        } elseif (
+            ctype_digit($dispositionValue)
+            &&
+            (int) $dispositionValue > 0
+        ) {
+
+            $dispositionId =
+                (int) $dispositionValue;
+
+            $validDisposition =
+                CallDisposition::query()
+                    ->whereKey($dispositionId)
+                    ->where('is_active', true)
+                    ->where(
+                        function (Builder $dispositionQuery) use (
+                            $companyId
+                        ) {
+                            $dispositionQuery
+                                ->whereNull('company_id')
+                                ->orWhere(
+                                    'company_id',
+                                    $companyId
+                                );
+                        }
+                    )
+                    ->exists();
+
+            if ($validDisposition) {
+
+                $query->whereHas(
+                    'calls',
+                    function (Builder $calls) use (
+                        $dispositionId
+                    ) {
+
+                        $calls
+                            ->where(
+                                'call_disposition_id',
+                                $dispositionId
+                            )
+                            ->where(
+                                'call_logs.id',
+                                '=',
+                                function ($subQuery) {
+
+                                    $subQuery
+                                        ->selectRaw(
+                                            'MAX(cl2.id)'
+                                        )
+                                        ->from(
+                                            'call_logs as cl2'
+                                        )
+                                        ->whereColumn(
+                                            'cl2.lead_id',
+                                            'call_logs.lead_id'
+                                        );
+                                }
+                            );
+                    }
+                );
+            }
         }
     }
 
