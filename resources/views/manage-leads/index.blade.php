@@ -310,7 +310,7 @@
 <div class="modal" id="bulkAssignModal" aria-hidden="true">
     <div class="modal-card">
         <div class="modal-title-row"><h3>Bulk Assign</h3><button type="button" class="modal-close">×</button></div>
-        <form method="POST" action="{{ route('leads.bulk-assign') }}" class="selected-form bulk-selection-form" id="bulkAssignForm">@csrf
+        <form method="POST" action="{{ route('manage.leads.bulk-assign') }}" class="selected-form bulk-selection-form" id="bulkAssignForm">@csrf
             <input type="hidden" name="bulk_action" value="assign">
             <input type="hidden" name="assignment_scope" value="selected">
             <div class="selected-inputs"></div>
@@ -324,7 +324,7 @@
 <div class="modal" id="bulkUnassignModal" aria-hidden="true">
     <div class="modal-card">
         <div class="modal-title-row"><h3>Bulk Unassign</h3><button type="button" class="modal-close">×</button></div>
-        <form method="POST" action="{{ route('leads.bulk-assign') }}" class="selected-form bulk-selection-form" id="bulkUnassignForm">@csrf
+        <form method="POST" action="{{ route('manage.leads.bulk-assign') }}" class="selected-form bulk-selection-form" id="bulkUnassignForm">@csrf
             <input type="hidden" name="bulk_action" value="unassign">
             <input type="hidden" name="assignment_scope" value="selected">
             <div class="selected-inputs"></div>

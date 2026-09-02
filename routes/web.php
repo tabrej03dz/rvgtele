@@ -162,7 +162,23 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::post('/leads/{lead}/assign', [LeadController::class, 'assign'])->middleware('permission:leads.assign')->name('leads.assign');
     Route::post('/leads/{lead}/notes', [LeadController::class, 'note'])->middleware('permission:leads.notes.create')->name('leads.notes');
 
-    Route::get('manage/leads', [ManageLeadController::class, 'index'])->middleware('permission:leads.view')->name('manage.leads.index');
+    // Route::get('manage/leads', [ManageLeadController::class, 'index'])->middleware('permission:leads.view')->name('manage.leads.index');
+
+    // Manage Leads
+    Route::get(
+        '/manage/leads',
+        [ManageLeadController::class, 'index']
+    )
+    ->middleware('permission:leads.view')
+    ->name('manage.leads.index');
+
+    Route::post(
+        '/manage/leads/bulk-assign',
+        [ManageLeadController::class, 'bulkAssign']
+    )
+    ->middleware('permission:leads.assign')
+    ->name('manage.leads.bulk-assign');
+
 
     // Leads CRUD
     Route::get('/leads', [LeadController::class, 'index'])->middleware('permission:leads.view')->name('leads.index');

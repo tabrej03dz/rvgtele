@@ -25,23 +25,11 @@ use Throwable;
 class ManageLeadController extends Controller
 {
 
-
-
-
 public function callOnMobile(
     Request $request,
     Lead $lead,
     MobileCallService $mobileCallService
 ): JsonResponse {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Existing Lead Security
-    |--------------------------------------------------------------------------
-    |
-    | Aapke current controller ka wahi guard reuse hoga.
-    |
-    */
 
     $this->guard(
         $request,
@@ -87,357 +75,13 @@ public function callOnMobile(
     }
 }
 
-
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | FULL ACCESS ROLES
-    |--------------------------------------------------------------------------
-    |
-    | In roles ko company ki saari leads dikhengi.
-    |
-    */
-
     private array $fullAccessRoles = [
         'super_admin',
         'admin',
     ];
 
-
-
-//     public function index(Request $request): View
-// {
-//     $companyId = $this->companyId($request);
-//     $hasFullAccess = $this->hasFullAccess($request);
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Team Leader Access
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $leaderTeamIds = $this->leaderTeamIds($request);
-
-//     $isTeamLeader =
-//         !$hasFullAccess &&
-//         !empty($leaderTeamIds);
-
-//     $canFilterByEmployee =
-//         $hasFullAccess || $isTeamLeader;
-
-//     $canFilterByTeam =
-//         $hasFullAccess || $isTeamLeader;
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Leads
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $query = $this->filteredLeadQuery($request)
-//         ->with([
-//             'assignedUser:id,name,employee_code,team_id',
-//             'source:id,name',
-//             'status:id,name,color',
-//             'team:id,name',
-//             'stage:id,name,color',
-//             'labels:id,company_id,name,color',
-//         ])
-//         ->addSelect([
-//             'latest_note_body' => Note::query()
-//                 ->select('body')
-//                 ->whereColumn('notes.lead_id', 'leads.id')
-//                 ->latest('notes.id')
-//                 ->limit(1),
-
-//             'latest_note_created_at' => Note::query()
-//                 ->select('created_at')
-//                 ->whereColumn('notes.lead_id', 'leads.id')
-//                 ->latest('notes.id')
-//                 ->limit(1),
-
-//             'latest_note_user_name' => Note::query()
-//                 ->leftJoin(
-//                     'users',
-//                     'users.id',
-//                     '=',
-//                     'notes.user_id'
-//                 )
-//                 ->select('users.name')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
-//         ]);
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Per Page
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $allowedPerPage = [
-//         25,
-//         50,
-//         100,
-//         200,
-//     ];
-
-//     $perPage = (int) $request->input(
-//         'per_page',
-//         25
-//     );
-
-//     if (!in_array(
-//         $perPage,
-//         $allowedPerPage,
-//         true
-//     )) {
-//         $perPage = 25;
-//     }
-
-//     $leads = $query
-//         ->latest('id')
-//         ->paginate($perPage)
-//         ->withQueryString();
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Statuses
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $statuses = LeadStatus::query()
-//         ->where(function (Builder $query) use ($companyId) {
-//             $query
-//                 ->whereNull('company_id')
-//                 ->orWhere(
-//                     'company_id',
-//                     $companyId
-//                 );
-//         })
-//         ->where('is_active', true)
-//         ->orderBy('sort_order')
-//         ->orderBy('name')
-//         ->get();
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Call Dispositions
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $dispositions = CallDisposition::query()
-//         ->where(function (Builder $query) use ($companyId) {
-//             $query
-//                 ->whereNull('company_id')
-//                 ->orWhere(
-//                     'company_id',
-//                     $companyId
-//                 );
-//         })
-//         ->where('is_active', true)
-//         ->orderBy('name')
-//         ->get();
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Sources
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $sources = LeadSource::query()
-//         ->where(function (Builder $query) use ($companyId) {
-//             $query
-//                 ->whereNull('company_id')
-//                 ->orWhere(
-//                     'company_id',
-//                     $companyId
-//                 );
-//         })
-//         ->orderBy('name')
-//         ->get();
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Categories
-//     |--------------------------------------------------------------------------
-//     |
-//     | Separate category table nahi hai.
-//     | Leads table ke category column se distinct values niklenge.
-//     |
-//     */
-
-//     $categories = Lead::query()
-//         ->where('company_id', $companyId)
-//         ->whereNotNull('category')
-//         ->where('category', '<>', '')
-//         ->select('category')
-//         ->distinct()
-//         ->orderBy('category')
-//         ->pluck('category');
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Employees For Filter
-//     |--------------------------------------------------------------------------
-//     */
-
-//     if ($hasFullAccess) {
-
-//         $users = User::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->where('is_active', true)
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//                 'employee_code',
-//                 'team_id',
-//             ]);
-
-//     } elseif ($isTeamLeader) {
-
-//         $users = User::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->where('is_active', true)
-//             ->where(function (Builder $query) use (
-//                 $request,
-//                 $leaderTeamIds
-//             ) {
-//                 $query
-//                     ->whereKey(
-//                         $request->user()->id
-//                     )
-//                     ->orWhereIn(
-//                         'team_id',
-//                         $leaderTeamIds
-//                     );
-//             })
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//                 'employee_code',
-//                 'team_id',
-//             ]);
-
-//     } else {
-
-//         $users = collect();
-//     }
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Teams For Filter
-//     |--------------------------------------------------------------------------
-//     */
-
-//     if ($hasFullAccess) {
-
-//         $teams = Team::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//             ]);
-
-//     } elseif ($isTeamLeader) {
-
-//         $teams = Team::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->whereIn(
-//                 'id',
-//                 $leaderTeamIds
-//             )
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//             ]);
-
-//     } else {
-
-//         $teams = collect();
-//     }
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Labels
-//     |--------------------------------------------------------------------------
-//     */
-
-//     $labels = LeadLabel::query()
-//         ->where(
-//             'company_id',
-//             $companyId
-//         )
-//         ->withCount('leads')
-//         ->orderBy('name')
-//         ->get();
-
-//     /*
-//     |--------------------------------------------------------------------------
-//     | View
-//     |--------------------------------------------------------------------------
-//     */
-
-//     return view('leads.index', [
-//         'leads' => $leads,
-//         'statuses' => $statuses,
-//         'dispositions' => $dispositions,
-//         'sources' => $sources,
-
-//         // Category list
-//         'categories' => $categories,
-
-//         'perPage' => $perPage,
-//         'users' => $users,
-//         'teams' => $teams,
-//         'labels' => $labels,
-
-//         /*
-//         | Blade access control
-//         */
-
-//         'hasFullAccess' => $hasFullAccess,
-//         'isTeamLeader' => $isTeamLeader,
-//         'canFilterByEmployee' => $canFilterByEmployee,
-//         'canFilterByTeam' => $canFilterByTeam,
-//     ]);
-// }
-
-
 public function index(Request $request): View
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Default Call Disposition
-    |--------------------------------------------------------------------------
-    |
-    | Normal /leads open hone par NO CALL YET default rahega.
-    |
-    | IMPORTANT:
-    | call_disposition=all explicitly diya gaya ho to ALL leads dikhenge.
-    |
-    */
 
     if (!$request->has('call_disposition')) {
         $request->merge([
@@ -447,12 +91,6 @@ public function index(Request $request): View
 
     $companyId = $this->companyId($request);
     $hasFullAccess = $this->hasFullAccess($request);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Team Leader Access
-    |--------------------------------------------------------------------------
-    */
 
     $leaderTeamIds = $this->leaderTeamIds($request);
 
@@ -466,44 +104,15 @@ public function index(Request $request): View
     $canFilterByTeam =
         $hasFullAccess || $isTeamLeader;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Call Disposition
-    |--------------------------------------------------------------------------
-    */
-
     $callDisposition = (string) $request->input(
         'call_disposition',
         'no_call'
     );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Prepare Request For Existing Lead Filters
-    |--------------------------------------------------------------------------
-    |
-    | filteredLeadQuery() ke andar agar pehle se call_disposition filtering
-    | hai to usse duplicate/conflict na ho, isliye clone request se
-    | call_disposition hata rahe hain.
-    |
-    | Call disposition ka complete filter niche manually handle hoga.
-    |
-    */
-
     $filterRequest = clone $request;
 
     $filterRequest->query->remove('call_disposition');
     $filterRequest->request->remove('call_disposition');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Base Lead Query
-    |--------------------------------------------------------------------------
-    |
-    | Existing permissions + search + source + employee + team + category
-    | etc. filteredLeadQuery() se hi rahenge.
-    |
-    */
 
     $query = $this->filteredLeadQuery($filterRequest)
         ->with([
@@ -515,11 +124,6 @@ public function index(Request $request): View
             'labels:id,company_id,name,color',
         ])
         ->addSelect([
-            /*
-            |--------------------------------------------------------------------------
-            | Latest Note
-            |--------------------------------------------------------------------------
-            */
 
             'latest_note_body' => Note::query()
                 ->select('body')
@@ -530,12 +134,6 @@ public function index(Request $request): View
                 ->latest('notes.id')
                 ->limit(1),
 
-            /*
-            |--------------------------------------------------------------------------
-            | Latest Note Date
-            |--------------------------------------------------------------------------
-            */
-
             'latest_note_created_at' => Note::query()
                 ->select('created_at')
                 ->whereColumn(
@@ -544,12 +142,6 @@ public function index(Request $request): View
                 )
                 ->latest('notes.id')
                 ->limit(1),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Latest Note User
-            |--------------------------------------------------------------------------
-            */
 
             'latest_note_user_name' => Note::query()
                 ->leftJoin(
@@ -567,22 +159,7 @@ public function index(Request $request): View
                 ->limit(1),
         ]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Call Disposition Filter
-    |--------------------------------------------------------------------------
-    */
-
     if ($callDisposition === 'no_call') {
-
-        /*
-        |--------------------------------------------------------------------------
-        | NO CALL YET
-        |--------------------------------------------------------------------------
-        |
-        | Lead ke against abhi tak ek bhi call log nahi hona chahiye.
-        |
-        */
 
         $query->whereDoesntHave('calls');
 
@@ -590,19 +167,6 @@ public function index(Request $request): View
         $callDisposition !== '' &&
         $callDisposition !== 'all'
     ) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Specific Latest Call Disposition
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        |
-        | Sirf kisi bhi purani call ka disposition match nahi karenge.
-        | Lead ki LATEST call ka disposition hi selected disposition hona
-        | chahiye.
-        |
-        */
 
         $dispositionId = (int) $callDisposition;
 
@@ -629,27 +193,6 @@ public function index(Request $request): View
         });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ALL
-    |--------------------------------------------------------------------------
-    |
-    | call_disposition=all par intentionally koi call filter nahi lagega.
-    |
-    | Isliye:
-    |
-    | /leads?call_disposition=all
-    |
-    | = all accessible leads.
-    |
-    */
-
-    /*
-    |--------------------------------------------------------------------------
-    | Per Page
-    |--------------------------------------------------------------------------
-    */
-
     $allowedPerPage = [
         25,
         50,
@@ -670,22 +213,10 @@ public function index(Request $request): View
         $perPage = 25;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Leads Pagination
-    |--------------------------------------------------------------------------
-    */
-
     $leads = $query
         ->latest('leads.id')
         ->paginate($perPage)
         ->withQueryString();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Statuses
-    |--------------------------------------------------------------------------
-    */
 
     $statuses = LeadStatus::query()
         ->where(function (Builder $query) use ($companyId) {
@@ -701,12 +232,6 @@ public function index(Request $request): View
         ->orderBy('name')
         ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Call Dispositions
-    |--------------------------------------------------------------------------
-    */
-
     $dispositions = CallDisposition::query()
         ->where(function (Builder $query) use ($companyId) {
             $query
@@ -720,12 +245,6 @@ public function index(Request $request): View
         ->orderBy('name')
         ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Sources
-    |--------------------------------------------------------------------------
-    */
-
     $sources = LeadSource::query()
         ->where(function (Builder $query) use ($companyId) {
             $query
@@ -737,16 +256,6 @@ public function index(Request $request): View
         })
         ->orderBy('name')
         ->get();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Categories
-    |--------------------------------------------------------------------------
-    |
-    | Separate category table nahi hai.
-    | Leads table ke category column se distinct category niklegi.
-    |
-    */
 
     $categories = Lead::query()
         ->where(
@@ -764,16 +273,6 @@ public function index(Request $request): View
         ->orderBy('category')
         ->pluck('category');
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cities
-    |--------------------------------------------------------------------------
-    |
-    | Leads table ke city column se distinct city list filter ke liye.
-    |
-    */
-
     $cities = Lead::query()
         ->where('company_id', $companyId)
         ->whereNotNull('city')
@@ -783,19 +282,7 @@ public function index(Request $request): View
         ->orderBy('city')
         ->pluck('city');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Employees For Filter
-    |--------------------------------------------------------------------------
-    */
-
     if ($hasFullAccess) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Admin / Full Access
-        |--------------------------------------------------------------------------
-        */
 
         $users = User::query()
             ->where(
@@ -815,20 +302,6 @@ public function index(Request $request): View
             ]);
 
     } elseif ($isTeamLeader) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Team Leader
-        |--------------------------------------------------------------------------
-        |
-        | Team leader ko:
-        |
-        | - khud ka user
-        | - apni teams ke employees
-        |
-        | filter me milenge.
-        |
-        */
 
         $users = User::query()
             ->where(
@@ -862,28 +335,10 @@ public function index(Request $request): View
 
     } else {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Normal Employee
-        |--------------------------------------------------------------------------
-        */
-
         $users = collect();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Teams For Filter
-    |--------------------------------------------------------------------------
-    */
-
     if ($hasFullAccess) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Full Access
-        |--------------------------------------------------------------------------
-        */
 
         $teams = Team::query()
             ->where(
@@ -897,12 +352,6 @@ public function index(Request $request): View
             ]);
 
     } elseif ($isTeamLeader) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Team Leader Teams
-        |--------------------------------------------------------------------------
-        */
 
         $teams = Team::query()
             ->where(
@@ -921,20 +370,8 @@ public function index(Request $request): View
 
     } else {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Normal Employee
-        |--------------------------------------------------------------------------
-        */
-
         $teams = collect();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Labels
-    |--------------------------------------------------------------------------
-    */
 
     $labels = LeadLabel::query()
         ->where(
@@ -945,27 +382,9 @@ public function index(Request $request): View
         ->orderBy('name')
         ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | View
-    |--------------------------------------------------------------------------
-    */
-
     return view('manage-leads.index', [
 
-        /*
-        |--------------------------------------------------------------------------
-        | Main Data
-        |--------------------------------------------------------------------------
-        */
-
         'leads' => $leads,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Filters
-        |--------------------------------------------------------------------------
-        */
 
         'statuses' => $statuses,
         'dispositions' => $dispositions,
@@ -973,36 +392,12 @@ public function index(Request $request): View
         'categories' => $categories,
         'cities' => $cities,
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pagination
-        |--------------------------------------------------------------------------
-        */
-
         'perPage' => $perPage,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Users / Teams
-        |--------------------------------------------------------------------------
-        */
 
         'users' => $users,
         'teams' => $teams,
 
-        /*
-        |--------------------------------------------------------------------------
-        | Labels
-        |--------------------------------------------------------------------------
-        */
-
         'labels' => $labels,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Blade Access Control
-        |--------------------------------------------------------------------------
-        */
 
         'hasFullAccess' => $hasFullAccess,
         'isTeamLeader' => $isTeamLeader,
@@ -1010,11 +405,6 @@ public function index(Request $request): View
         'canFilterByTeam' => $canFilterByTeam,
     ]);
 }
-    /*
-    |--------------------------------------------------------------------------
-    | Create Lead Form
-    |--------------------------------------------------------------------------
-    */
 
     public function create(Request $request): View
     {
@@ -1024,44 +414,18 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Store Lead
-    |--------------------------------------------------------------------------
-    */
-
     public function store(
         Request $request
     ): RedirectResponse {
-
 
         $companyId = $this->companyId($request);
 
         $validated = $this->validateData($request);
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normal Employee
-        |--------------------------------------------------------------------------
-        |
-        | Employee agar Lead create karta hai to Lead automatically usi ko
-        | assign hogi.
-        |
-        | Wo manually kisi aur employee ko assign nahi kar sakta.
-        |
-        */
-
         if (!$this->hasFullAccess($request)) {
             $validated['assigned_to'] =
                 (int) $request->user()->id;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Default Pipeline Stage
-        |--------------------------------------------------------------------------
-        */
 
         if (empty($validated['pipeline_stage_id'])) {
             $validated['pipeline_stage_id'] =
@@ -1091,12 +455,6 @@ public function index(Request $request): View
                     $validated
                 );
 
-                /*
-                |--------------------------------------------------------------------------
-                | Assignment History
-                |--------------------------------------------------------------------------
-                */
-
                 if (!empty($validated['assigned_to'])) {
                     $this->createAssignmentHistory(
                         lead: $lead,
@@ -1125,22 +483,11 @@ public function index(Request $request): View
             );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Detail
-    |--------------------------------------------------------------------------
-    */
-
     public function show(
         Request $request,
         Lead $lead
     ):
      View {
-
-
-        /*
-        | Employee doosre employee ki lead URL se open nahi kar sakta.
-        */
 
         $this->guard(
             $request,
@@ -1168,34 +515,9 @@ public function index(Request $request): View
         $companyId =
             $this->companyId($request);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Preserve Listing Filters
-        |--------------------------------------------------------------------------
-        |
-        | Lead list se jo bhi GET filters aaye hain unko detail page, Previous,
-        | Next aur Back navigation me preserve rakhenge. `page` intentionally
-        | hata rahe hain, kyunki Previous/Next poore filtered result set par chalega.
-        |
-        */
-
         $navigationParams = $request->except([
             'page',
         ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Previous / Next Lead Navigation
-        |--------------------------------------------------------------------------
-        |
-        | Same filteredLeadQuery() reuse ho rahi hai, isliye navigation exactly
-        | usi filtered result set ke andar rahegi jo Leads listing par tha.
-        |
-        | Listing order: latest('id') => ID DESC
-        | Previous = current row se upar wali/newer lead = higher ID
-        | Next     = current row se neeche wali/older lead = lower ID
-        |
-        */
 
         $navigationQuery =
             $this->filteredLeadQuery($request);
@@ -1218,15 +540,6 @@ public function index(Request $request): View
                 'name',
             ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Assignment Dropdown
-        |--------------------------------------------------------------------------
-        |
-        | Sirf Admin/Super Admin ko employee list denge.
-        |
-        */
-
         $users = $this->hasFullAccess($request)
             ? User::query()
             ->where(
@@ -1244,12 +557,6 @@ public function index(Request $request): View
                 'employee_code',
             ])
             : collect();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Dispositions
-        |--------------------------------------------------------------------------
-        */
 
         $dispositions =
             \App\Models\CallDisposition::query()
@@ -1303,12 +610,6 @@ public function index(Request $request): View
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Edit Lead
-    |--------------------------------------------------------------------------
-    */
-
     public function edit(
         Request $request,
         Lead $lead
@@ -1327,8 +628,6 @@ public function index(Request $request): View
         );
     }
 
-
-
     public function update(
     Request $request,
     Lead $lead
@@ -1337,23 +636,6 @@ public function index(Request $request): View
         $request,
         $lead
     );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Demo Send Quick Update
-    |--------------------------------------------------------------------------
-    |
-    | demo_send_only request aane par normal lead edit validation run nahi hogi.
-    |
-    | demo_send = 1:
-    | - Lead ko demo sent mark karenge.
-    | - Agar pehle demo_sent_at nahi hai to current timestamp save hoga.
-    |
-    | demo_send = 0:
-    | - Demo Send mark remove hoga.
-    | - demo_sent_at bhi NULL kar diya jayega.
-    |
-    */
 
     if ($request->boolean('demo_send_only')) {
 
@@ -1366,33 +648,15 @@ public function index(Request $request): View
 
         $isDemoSend = (bool) $demoValidated['demo_send'];
 
-        /*
-        |--------------------------------------------------------------------------
-        | Mark As Demo Send
-        |--------------------------------------------------------------------------
-        */
-
         if ($isDemoSend) {
 
             $lead->demo_send = true;
 
-            /*
-             * First demo send date preserve karenge.
-             *
-             * Agar lead already demo send hai aur button dobara press hua,
-             * to old demo_sent_at change nahi hoga.
-             */
             if (empty($lead->demo_sent_at)) {
                 $lead->demo_sent_at = now();
             }
 
         } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Remove Demo Send
-            |--------------------------------------------------------------------------
-            */
 
             $lead->demo_send = false;
             $lead->demo_sent_at = null;
@@ -1408,22 +672,10 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Normal Lead Update
-    |--------------------------------------------------------------------------
-    */
-
     $validated = $this->validateData(
         $request,
         $lead
     );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Employee Cannot Change Owner
-    |--------------------------------------------------------------------------
-    */
 
     if (!$this->hasFullAccess($request)) {
         $validated['assigned_to'] =
@@ -1444,21 +696,10 @@ public function index(Request $request): View
             $newAssignedUserId,
             $request
         ) {
-            /*
-            |--------------------------------------------------------------------------
-            | Update Lead
-            |--------------------------------------------------------------------------
-            */
 
             $lead->update(
                 $validated
             );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Admin Changed Assignment From Edit Form
-            |--------------------------------------------------------------------------
-            */
 
             if (
                 $this->hasFullAccess($request)
@@ -1502,15 +743,6 @@ public function index(Request $request): View
             'Lead updated successfully.'
         );
 }
-
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Labels
-    |--------------------------------------------------------------------------
-    */
 
     public function storeLabel(Request $request): RedirectResponse
     {
@@ -1595,7 +827,6 @@ public function index(Request $request): View
             'label_action' => ['required', Rule::in(['add', 'remove'])],
         ]);
 
-        // Always start from the current user's access scope.
         $accessRequest = new Request();
         $accessRequest->setUserResolver(fn () => $request->user());
 
@@ -1646,15 +877,6 @@ public function index(Request $request): View
         return back()->with('success', 'Label deleted successfully.');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Delete Lead
-    |--------------------------------------------------------------------------
-    |
-    | Sirf Admin/Super Admin.
-    |
-    */
-
     public function destroy(
         Request $request,
         Lead $lead
@@ -1678,458 +900,223 @@ public function index(Request $request): View
             );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Single Assignment
-    |--------------------------------------------------------------------------
-    |
-    | Sirf Admin/Super Admin.
-    |
-    */
-
     public function assign(
         Request $request,
         Lead $lead
     ): RedirectResponse {
-        $this->ensureFullAccess(
-            $request
-        );
+        $this->ensureFullAccess($request);
+        $this->guardCompany($request, $lead);
 
-        $this->guardCompany(
-            $request,
-            $lead
-        );
+        $companyId = $this->companyId($request);
 
-        $companyId =
-            $this->companyId($request);
+        $validated = $request->validate([
+            'assigned_to' => [
+                'required',
+                'integer',
+                Rule::exists('users', 'id')->where(
+                    fn ($query) => $query
+                        ->where('company_id', $companyId)
+                        ->where('is_active', true)
+                ),
+            ],
+            'reason' => [
+                'required',
+                'string',
+                'max:500',
+            ],
+        ]);
 
-        $validated =
-            $request->validate([
-                'assigned_to' => [
-                    'required',
-                    'integer',
-
-                    Rule::exists(
-                        'users',
-                        'id'
-                    )->where(
-                        function ($query) use (
-                            $companyId
-                        ) {
-                            $query
-                                ->where(
-                                    'company_id',
-                                    $companyId
-                                )
-                                ->where(
-                                    'is_active',
-                                    true
-                                );
-                        }
-                    ),
-                ],
-
-                'reason' => [
-                    'required',
-                    'string',
-                    'max:500',
-                ],
-            ]);
-
-        $oldAssignedUserId =
-            $lead->assigned_to;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Already same employee
-        |--------------------------------------------------------------------------
-        */
+        $oldAssignedUserId = $lead->assigned_to;
+        $newAssignedUserId = (int) $validated['assigned_to'];
+        $automaticStatusId = $this->automaticAssignedStatusId($companyId);
 
         if (
-            (int) $oldAssignedUserId ===
-            (int) $validated['assigned_to']
+            (int) $oldAssignedUserId === $newAssignedUserId
+            && (int) $lead->lead_status_id === $automaticStatusId
         ) {
             return back()->with(
                 'error',
-                'Lead is already assigned to this employee.'
+                'Lead already has this employee and automatic assigned status.'
             );
         }
 
-        DB::transaction(
-            function () use (
-                $lead,
-                $validated,
-                $oldAssignedUserId,
-                $request,
-                $companyId
-            ) {
-                $lead->update([
-                    'assigned_to' =>
-                    $validated['assigned_to'],
-                ]);
+        DB::transaction(function () use (
+            $lead,
+            $oldAssignedUserId,
+            $newAssignedUserId,
+            $automaticStatusId,
+            $validated,
+            $request,
+            $companyId
+        ) {
+            $lead->forceFill([
+                'assigned_to' => $newAssignedUserId,
+                'lead_status_id' => $automaticStatusId,
+            ])->save();
 
+            if ((int) $oldAssignedUserId !== $newAssignedUserId) {
                 $this->createAssignmentHistory(
                     lead: $lead,
-
                     previousUserId: $oldAssignedUserId
                         ? (int) $oldAssignedUserId
                         : null,
-
-                    newUserId: (int) $validated['assigned_to'],
-
+                    newUserId: $newAssignedUserId,
                     assignedBy: (int) $request->user()->id,
-
                     reason: $validated['reason'],
-
                     companyId: $companyId
                 );
             }
-        );
+        });
 
         return back()->with(
             'success',
-            'Lead assigned successfully.'
+            'Lead assigned successfully and status changed automatically.'
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Bulk Assignment
-    |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    | Employee direct POST request bhejkar bhi bulk assignment nahi kar sakta.
-    |
-    */
 
     public function bulkAssign(
         Request $request
     ): RedirectResponse {
-        /*
-        |--------------------------------------------------------------------------
-        | ROLE SECURITY
-        |--------------------------------------------------------------------------
-        */
+        $this->ensureFullAccess($request);
 
-        $this->ensureFullAccess(
-            $request
-        );
+        $companyId = $this->companyId($request);
 
-        $companyId =
-            $this->companyId($request);
+        $validated = $request->validate([
+            'bulk_action' => [
+                'required',
+                Rule::in(['assign', 'unassign']),
+            ],
+            'assignment_scope' => [
+                'required',
+                Rule::in(['selected', 'filtered']),
+            ],
+            'lead_ids' => [
+                'nullable',
+                'array',
+                'min:1',
+                'required_if:assignment_scope,selected',
+            ],
+            'lead_ids.*' => [
+                'integer',
+                Rule::exists('leads', 'id')->where(
+                    fn ($query) => $query
+                        ->where('company_id', $companyId)
+                        ->whereNull('deleted_at')
+                ),
+            ],
+            'assigned_to' => [
+                'nullable',
+                'required_if:bulk_action,assign',
+                'integer',
+                Rule::exists('users', 'id')->where(
+                    fn ($query) => $query
+                        ->where('company_id', $companyId)
+                        ->where('is_active', true)
+                ),
+            ],
+            'reason' => [
+                'required',
+                'string',
+                'max:500',
+            ],
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => [
+                'nullable',
+                'integer',
+                Rule::exists('lead_statuses', 'id')->where(
+                    fn ($query) => $query
+                        ->where(function ($subQuery) use ($companyId) {
+                            $subQuery
+                                ->whereNull('company_id')
+                                ->orWhere('company_id', $companyId);
+                        })
+                        ->where('is_active', true)
+                ),
+            ],
+            'source' => ['nullable', 'integer'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'filter_assigned_to' => ['nullable', 'string'],
+            'team_id' => ['nullable', 'integer'],
+            'priority' => [
+                'nullable',
+                Rule::in(['low', 'normal', 'high', 'urgent', 'hot']),
+            ],
+            'temperature' => [
+                'nullable',
+                Rule::in(['cold', 'warm', 'hot']),
+            ],
+            'call_disposition' => [
+                'nullable',
+                function (
+                    string $attribute,
+                    mixed $value,
+                    \Closure $fail
+                ) use ($companyId) {
+                    if (in_array((string) $value, ['no_call', 'all'], true)) {
+                        return;
+                    }
 
-        $validated =
-            $request->validate([
-                'bulk_action' => [
-                    'required',
-                    Rule::in([
-                        'assign',
-                        'unassign',
-                    ]),
-                ],
+                    if (
+                        !ctype_digit((string) $value)
+                        || !CallDisposition::query()
+                            ->whereKey((int) $value)
+                            ->where(function (Builder $query) use ($companyId) {
+                                $query
+                                    ->whereNull('company_id')
+                                    ->orWhere('company_id', $companyId);
+                            })
+                            ->where('is_active', true)
+                            ->exists()
+                    ) {
+                        $fail('The selected call disposition is invalid.');
+                    }
+                },
+            ],
+            'demo_send' => ['nullable', 'boolean'],
+            'per_page' => [
+                'nullable',
+                'integer',
+                Rule::in([25, 50, 100, 200]),
+            ],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => [
+                'nullable',
+                'date',
+                'after_or_equal:date_from',
+            ],
+            'label_id_filter' => ['nullable', 'integer'],
+        ]);
 
-                'assignment_scope' => [
-                    'required',
-                    Rule::in([
-                        'selected',
-                        'filtered',
-                    ]),
-                ],
-
-                'lead_ids' => [
-                    'nullable',
-                    'array',
-                    'min:1',
-                    'required_if:assignment_scope,selected',
-                ],
-
-                'lead_ids.*' => [
-                    'integer',
-
-                    Rule::exists(
-                        'leads',
-                        'id'
-                    )->where(
-                        function ($query) use (
-                            $companyId
-                        ) {
-                            $query
-                                ->where(
-                                    'company_id',
-                                    $companyId
-                                )
-                                ->whereNull(
-                                    'deleted_at'
-                                );
-                        }
-                    ),
-                ],
-
-                /*
-                | Employee sirf ASSIGN action me required hai.
-                | UNASSIGN me assigned_to null rahega.
-                */
-                'assigned_to' => [
-                    'nullable',
-                    'required_if:bulk_action,assign',
-                    'integer',
-
-                    Rule::exists(
-                        'users',
-                        'id'
-                    )->where(
-                        function ($query) use (
-                            $companyId
-                        ) {
-                            $query
-                                ->where(
-                                    'company_id',
-                                    $companyId
-                                )
-                                ->where(
-                                    'is_active',
-                                    true
-                                );
-                        }
-                    ),
-                ],
-
-                'reason' => [
-                    'required',
-                    'string',
-                    'max:500',
-                ],
-
-                /*
-                |--------------------------------------------------------------------------
-                | Current Filters
-                |--------------------------------------------------------------------------
-                */
-
-                'search' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'status' => [
-                    'nullable',
-                    'integer',
-                ],
-
-                'source' => [
-                    'nullable',
-                    'integer',
-                ],
-
-                'city' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'filter_assigned_to' => [
-                    'nullable',
-                    'string',
-                ],
-
-                'team_id' => [
-                    'nullable',
-                    'integer',
-                ],
-
-                'priority' => [
-                    'nullable',
-
-                    Rule::in([
-                        'low',
-                        'normal',
-                        'high',
-                        'urgent',
-                        'hot',
-                    ]),
-                ],
-
-                'temperature' => [
-                    'nullable',
-
-                    Rule::in([
-                        'cold',
-                        'warm',
-                        'hot',
-                    ]),
-                ],
-
-                'call_disposition' => [
-                    'nullable',
-                    function (
-                        string $attribute,
-                        mixed $value,
-                        \Closure $fail
-                    ) use ($companyId) {
-                        if (in_array((string) $value, ['no_call', 'all'], true)) {
-                            return;
-                        }
-
-                        if (
-                            !ctype_digit((string) $value)
-                            ||
-                            !CallDisposition::query()
-                                ->whereKey((int) $value)
-                                ->where(function (Builder $query) use ($companyId) {
-                                    $query
-                                        ->whereNull('company_id')
-                                        ->orWhere('company_id', $companyId);
-                                })
-                                ->where('is_active', true)
-                                ->exists()
-                        ) {
-                            $fail('The selected call disposition is invalid.');
-                        }
-                    },
-                ],
-
-                'demo_send' => [
-                    'nullable',
-                    'boolean',
-                ],
-
-                'per_page' => [
-                    'nullable',
-                    'integer',
-                    Rule::in([
-                        25,
-                        50,
-                        100,
-                        200,
-                    ]),
-                ],
-
-                'date_from' => [
-                    'nullable',
-                    'date',
-                ],
-
-                'date_to' => [
-                    'nullable',
-                    'date',
-                    'after_or_equal:date_from',
-                ],
-
-                'label_id_filter' => [
-                    'nullable',
-                    'integer',
-                ],
+        if ($validated['assignment_scope'] === 'selected') {
+            $targetQuery = Lead::query()
+                ->where('company_id', $companyId)
+                ->whereIn('id', $validated['lead_ids'] ?? []);
+        } else {
+            $filterRequest = new Request([
+                'search' => $validated['search'] ?? null,
+                'status' => $validated['status'] ?? null,
+                'source' => $validated['source'] ?? null,
+                'city' => $validated['city'] ?? null,
+                'assigned_to' => $validated['filter_assigned_to'] ?? null,
+                'team_id' => $validated['team_id'] ?? null,
+                'priority' => $validated['priority'] ?? null,
+                'temperature' => $validated['temperature'] ?? null,
+                'call_disposition' => $validated['call_disposition'] ?? null,
+                'demo_send' => $validated['demo_send'] ?? null,
+                'per_page' => $validated['per_page'] ?? null,
+                'date_from' => $validated['date_from'] ?? null,
+                'date_to' => $validated['date_to'] ?? null,
+                'label_id' => $validated['label_id_filter'] ?? null,
             ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Selected Leads
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $validated['assignment_scope'] ===
-            'selected'
-        ) {
-            $targetQuery =
-                Lead::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->whereIn(
-                    'id',
-                    $validated['lead_ids']
-                        ?? []
-                );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Filtered Leads
-        |--------------------------------------------------------------------------
-        */ else {
-            $filterRequest =
-                new Request([
-                    'search' =>
-                    $validated['search']
-                        ?? null,
-
-                    'status' =>
-                    $validated['status']
-                        ?? null,
-
-                    'source' =>
-                    $validated['source']
-                        ?? null,
-
-                    'city' =>
-                    $validated['city']
-                        ?? null,
-
-                    'assigned_to' =>
-                    $validated['filter_assigned_to']
-                        ?? null,
-
-                    'team_id' =>
-                    $validated['team_id']
-                        ?? null,
-
-                    'priority' =>
-                    $validated['priority']
-                        ?? null,
-
-                    'temperature' =>
-                    $validated['temperature']
-                        ?? null,
-
-                    'call_disposition' =>
-                    $validated['call_disposition']
-                        ?? null,
-
-                    'demo_send' =>
-                    $validated['demo_send']
-                        ?? null,
-
-                    'per_page' =>
-                    $validated['per_page']
-                        ?? null,
-
-                    'date_from' =>
-                    $validated['date_from']
-                        ?? null,
-
-                    'date_to' =>
-                    $validated['date_to']
-                        ?? null,
-
-                    'label_id' =>
-                    $validated['label_id_filter']
-                        ?? null,
-                ]);
-
             $filterRequest->setUserResolver(
-                fn() =>
-                $request->user()
+                fn () => $request->user()
             );
 
-            $targetQuery =
-                $this->filteredLeadQuery(
-                    $filterRequest
-                );
+            $targetQuery = $this->filteredLeadQuery($filterRequest);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Count
-        |--------------------------------------------------------------------------
-        */
-
-        $totalLeads =
-            (clone $targetQuery)->count();
-
-        if ($totalLeads < 1) {
+        if ((clone $targetQuery)->count() < 1) {
             return back()->with(
                 'error',
                 $validated['bulk_action'] === 'unassign'
@@ -2138,38 +1125,14 @@ public function index(Request $request): View
             );
         }
 
-        $bulkAction =
-            $validated['bulk_action'];
-
-        $assignedBy =
-            (int) $request->user()->id;
-
-        $reason =
-            $validated['reason'];
-
+        $assignedBy = (int) $request->user()->id;
+        $reason = $validated['reason'];
         $updatedCount = 0;
         $skippedCount = 0;
 
-        /*
-        |--------------------------------------------------------------------------
-        | BULK UNASSIGN
-        |--------------------------------------------------------------------------
-        |
-        | Galat employee ko assigned leads ka owner remove kar denge.
-        | assigned_to = NULL hone ke baad lead "Unassigned" ho jayegi.
-        |
-        | Existing LeadAssignment history helper new_user_id ko required int
-        | maanta hai, isliye unassign par invalid history row create nahi karte.
-        |
-        */
-
-        if ($bulkAction === 'unassign') {
+        if ($validated['bulk_action'] === 'unassign') {
             $targetQuery
-                ->select([
-                    'id',
-                    'company_id',
-                    'assigned_to',
-                ])
+                ->select(['id', 'company_id', 'assigned_to'])
                 ->orderBy('id')
                 ->chunkById(
                     200,
@@ -2177,26 +1140,24 @@ public function index(Request $request): View
                         &$updatedCount,
                         &$skippedCount
                     ) {
-                        DB::transaction(
-                            function () use (
-                                $leads,
-                                &$updatedCount,
-                                &$skippedCount
-                            ) {
-                                foreach ($leads as $lead) {
-                                    if (empty($lead->assigned_to)) {
-                                        $skippedCount++;
-                                        continue;
-                                    }
-
-                                    $lead->update([
-                                        'assigned_to' => null,
-                                    ]);
-
-                                    $updatedCount++;
+                        DB::transaction(function () use (
+                            $leads,
+                            &$updatedCount,
+                            &$skippedCount
+                        ) {
+                            foreach ($leads as $lead) {
+                                if (empty($lead->assigned_to)) {
+                                    $skippedCount++;
+                                    continue;
                                 }
+
+                                $lead->forceFill([
+                                    'assigned_to' => null,
+                                ])->save();
+
+                                $updatedCount++;
                             }
-                        );
+                        });
                     }
                 );
 
@@ -2206,104 +1167,89 @@ public function index(Request $request): View
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | BULK ASSIGN
-        |--------------------------------------------------------------------------
-        */
-
-        $newUserId =
-            (int) $validated['assigned_to'];
+        $newUserId = (int) $validated['assigned_to'];
+        $automaticStatusId = $this->automaticAssignedStatusId($companyId);
+        $statusUpdatedCount = 0;
 
         $targetQuery
             ->select([
                 'id',
                 'company_id',
                 'assigned_to',
+                'lead_status_id',
             ])
             ->orderBy('id')
             ->chunkById(
                 200,
-
                 function ($leads) use (
                     $newUserId,
+                    $automaticStatusId,
                     $assignedBy,
                     $reason,
                     $companyId,
                     &$updatedCount,
+                    &$statusUpdatedCount,
                     &$skippedCount
                 ) {
-                    DB::transaction(
-                        function () use (
-                            $leads,
-                            $newUserId,
-                            $assignedBy,
-                            $reason,
-                            $companyId,
-                            &$updatedCount,
-                            &$skippedCount
-                        ) {
-                            foreach (
-                                $leads as $lead
-                            ) {
-                                $previousUserId =
-                                    $lead->assigned_to;
+                    DB::transaction(function () use (
+                        $leads,
+                        $newUserId,
+                        $automaticStatusId,
+                        $assignedBy,
+                        $reason,
+                        $companyId,
+                        &$updatedCount,
+                        &$statusUpdatedCount,
+                        &$skippedCount
+                    ) {
+                        foreach ($leads as $lead) {
+                            $previousUserId = $lead->assigned_to;
+                            $previousStatusId = $lead->lead_status_id;
 
-                                /*
-                                | Already same employee
-                                */
+                            $ownerChanged =
+                                (int) $previousUserId !== $newUserId;
 
-                                if (
-                                    (int) $previousUserId ===
-                                    $newUserId
-                                ) {
-                                    $skippedCount++;
+                            $statusChanged =
+                                (int) $previousStatusId !== $automaticStatusId;
 
-                                    continue;
-                                }
+                            if (!$ownerChanged && !$statusChanged) {
+                                $skippedCount++;
+                                continue;
+                            }
 
-                                $lead->update([
-                                    'assigned_to' =>
-                                    $newUserId,
-                                ]);
+                            $lead->forceFill([
+                                'assigned_to' => $newUserId,
+                                'lead_status_id' => $automaticStatusId,
+                            ])->save();
 
+                            if ($ownerChanged) {
                                 $this->createAssignmentHistory(
                                     lead: $lead,
-
                                     previousUserId: $previousUserId
                                         ? (int) $previousUserId
                                         : null,
-
                                     newUserId: $newUserId,
-
                                     assignedBy: $assignedBy,
-
                                     reason: $reason,
-
                                     companyId: $companyId
                                 );
 
                                 $updatedCount++;
                             }
+
+                            if ($statusChanged) {
+                                $statusUpdatedCount++;
+                            }
                         }
-                    );
+                    });
                 }
             );
 
         return back()->with(
             'success',
-            "{$updatedCount} leads assigned successfully. {$skippedCount} already assigned leads skipped."
+            "{$updatedCount} lead owner(s) updated and {$statusUpdatedCount} lead status(es) changed automatically. {$skippedCount} unchanged lead(s) skipped."
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Add Note
-    |--------------------------------------------------------------------------
-    |
-    | Employee apni assigned Lead par note add kar sakta hai.
-    |
-    */
 
     public function note(
         Request $request,
@@ -2340,8 +1286,6 @@ public function index(Request $request): View
         );
     }
 
-
-
     private function filteredLeadQuery(
     Request $request
 ): Builder {
@@ -2349,34 +1293,11 @@ public function index(Request $request): View
     $user = $request->user();
     $hasFullAccess = $this->hasFullAccess($request);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Base Query
-    |--------------------------------------------------------------------------
-    */
-
     $query = Lead::query()
         ->where(
             'company_id',
             $companyId
         );
-
-    /*
-    |--------------------------------------------------------------------------
-    | ROLE BASED LEAD ACCESS
-    |--------------------------------------------------------------------------
-    |
-    | Admin / Super Admin:
-    | Company ki saari leads.
-    |
-    | Team Leader:
-    | 1. Khud ko assigned leads
-    | 2. Apni teams ke employees ko assigned leads.
-    |
-    | Employee:
-    | Sirf khud ko assigned leads.
-    |
-    */
 
     $leaderTeamIds = [];
 
@@ -2384,12 +1305,6 @@ public function index(Request $request): View
 
         $leaderTeamIds =
             $this->leaderTeamIds($request);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normal Employee
-        |--------------------------------------------------------------------------
-        */
 
         if (empty($leaderTeamIds)) {
 
@@ -2399,12 +1314,6 @@ public function index(Request $request): View
             );
 
         } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Team Leader
-            |--------------------------------------------------------------------------
-            */
 
             $query->where(
                 function (Builder $accessQuery) use (
@@ -2434,12 +1343,6 @@ public function index(Request $request): View
             );
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
 
     if ($request->filled('search')) {
 
@@ -2495,24 +1398,25 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Status
-    |--------------------------------------------------------------------------
-    */
-
     if ($request->filled('status')) {
-        $query->where(
-            'lead_status_id',
-            $request->input('status')
-        );
-    }
+        $statusId = (int) $request->input('status');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Source
-    |--------------------------------------------------------------------------
-    */
+        $validStatus = LeadStatus::query()
+            ->whereKey($statusId)
+            ->where(function (Builder $statusQuery) use ($companyId) {
+                $statusQuery
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('is_active', true)
+            ->exists();
+
+        if ($validStatus) {
+            $query->where('lead_status_id', $statusId);
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+    }
 
     if ($request->filled('source')) {
         $query->where(
@@ -2520,12 +1424,6 @@ public function index(Request $request): View
             $request->input('source')
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Category
-    |--------------------------------------------------------------------------
-    */
 
     if ($request->filled('category')) {
 
@@ -2539,23 +1437,11 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | City
-    |--------------------------------------------------------------------------
-    */
-
     if ($request->filled('city')) {
         $city = trim((string) $request->input('city'));
 
         $query->where('city', $city);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Assigned Employee Filter
-    |--------------------------------------------------------------------------
-    */
 
     $isTeamLeader =
         !$hasFullAccess &&
@@ -2570,17 +1456,7 @@ public function index(Request $request): View
         $assignedTo =
             (string) $request->input('assigned_to');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Unassigned
-        |--------------------------------------------------------------------------
-        */
-
         if ($assignedTo === 'unassigned') {
-
-            /*
-             * Unassigned lead sirf Admin/Super Admin ko accessible.
-             */
 
             if ($hasFullAccess) {
 
@@ -2590,19 +1466,10 @@ public function index(Request $request): View
 
             } else {
 
-                /*
-                 * Team Leader unassigned leads nahi dekh sakta.
-                 */
                 $query->whereRaw('1 = 0');
             }
 
         } elseif (ctype_digit($assignedTo)) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Specific Employee
-            |--------------------------------------------------------------------------
-            */
 
             $query->where(
                 'assigned_to',
@@ -2611,23 +1478,9 @@ public function index(Request $request): View
 
         } else {
 
-            /*
-             * Invalid assigned_to URL value.
-             */
-
             $query->whereRaw('1 = 0');
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Team Filter
-    |--------------------------------------------------------------------------
-    |
-    | Lead par direct team_id ho ya assigned employee ke users.team_id se
-    | relation mile, dono cases ko support karta hai.
-    |
-    */
 
     if ($request->filled('team_id')) {
 
@@ -2662,12 +1515,6 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Priority
-    |--------------------------------------------------------------------------
-    */
-
     if ($request->filled('priority')) {
 
         $priority =
@@ -2693,12 +1540,6 @@ public function index(Request $request): View
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Temperature
-    |--------------------------------------------------------------------------
-    */
-
     if ($request->filled('temperature')) {
 
         $temperature =
@@ -2722,31 +1563,12 @@ public function index(Request $request): View
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Latest Call Disposition
-    |--------------------------------------------------------------------------
-    |
-    | no_call:
-    | Lead par abhi koi call nahi.
-    |
-    | Numeric ID:
-    | Lead ka latest call selected disposition wala hona chahiye.
-    |
-    */
-
     if ($request->filled('call_disposition')) {
 
         $callDisposition =
             (string) $request->input(
                 'call_disposition'
             );
-
-        /*
-        |--------------------------------------------------------------------------
-        | No Call Yet
-        |--------------------------------------------------------------------------
-        */
 
         if ($callDisposition === 'no_call') {
 
@@ -2755,12 +1577,6 @@ public function index(Request $request): View
             );
 
         } elseif (ctype_digit($callDisposition)) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Selected Disposition
-            |--------------------------------------------------------------------------
-            */
 
             $dispositionId =
                 (int) $callDisposition;
@@ -2831,12 +1647,6 @@ public function index(Request $request): View
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Label Filter
-    |--------------------------------------------------------------------------
-    */
-
     if ($request->filled('label_id')) {
 
         $labelId =
@@ -2880,19 +1690,6 @@ public function index(Request $request): View
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Existing Demo Send Tab Filter
-    |--------------------------------------------------------------------------
-    |
-    | Leads page par existing:
-    |
-    | ?demo_send=1
-    |
-    | tab ko same tarah kaam karne denge.
-    |
-    */
-
     if ($request->boolean('demo_send')) {
 
         $query->where(
@@ -2901,31 +1698,12 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard Lead Send Filter
-    |--------------------------------------------------------------------------
-    |
-    | lead_send=today
-    |   Sirf aaj Demo Send hui leads.
-    |
-    | lead_send=all
-    |   Saari Demo Send leads.
-    |
-    */
-
     if ($request->filled('lead_send')) {
 
         $leadSend =
             (string) $request->input(
                 'lead_send'
             );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Today Lead Send
-        |--------------------------------------------------------------------------
-        */
 
         if ($leadSend === 'today') {
 
@@ -2942,12 +1720,6 @@ public function index(Request $request): View
                     today()
                 );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Total Lead Send
-        |--------------------------------------------------------------------------
-        */
-
         } elseif ($leadSend === 'all') {
 
             $query->where(
@@ -2957,25 +1729,11 @@ public function index(Request $request): View
 
         } else {
 
-            /*
-             * Invalid filter manually URL me bheja gaya.
-             */
             $query->whereRaw(
                 '1 = 0'
             );
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | New Today Dashboard Filter
-    |--------------------------------------------------------------------------
-    |
-    | Dashboard se:
-    |
-    | ?created_filter=today
-    |
-    */
 
     if (
         $request->input(
@@ -2988,15 +1746,6 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Date From
-    |--------------------------------------------------------------------------
-    |
-    | Ye lead created_at par filter hai.
-    |
-    */
-
     if ($request->filled('date_from')) {
 
         $query->whereDate(
@@ -3007,12 +1756,6 @@ public function index(Request $request): View
             )
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Date To
-    |--------------------------------------------------------------------------
-    */
 
     if ($request->filled('date_to')) {
 
@@ -3025,20 +1768,8 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Final Query
-    |--------------------------------------------------------------------------
-    */
-
     return $query;
 }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Form Data
-    |--------------------------------------------------------------------------
-    */
 
     private function formData(
         Request $request
@@ -3048,15 +1779,6 @@ public function index(Request $request): View
 
         $hasFullAccess =
             $this->hasFullAccess($request);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Users
-        |--------------------------------------------------------------------------
-        |
-        | Normal employee ko doosra employee choose nahi karna hai.
-        |
-        */
 
         $users = $hasFullAccess
             ? User::query()
@@ -3164,12 +1886,6 @@ public function index(Request $request): View
             $hasFullAccess,
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Validation
-    |--------------------------------------------------------------------------
-    */
 
     private function validateData(
         Request $request,
@@ -3422,12 +2138,6 @@ public function index(Request $request): View
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Pipeline Stage
-    |--------------------------------------------------------------------------
-    */
-
     private function defaultPipelineStageId(
         int $companyId
     ): ?int {
@@ -3458,12 +2168,6 @@ public function index(Request $request): View
             ->orderBy('id')
             ->value('id');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Assignment History
-    |--------------------------------------------------------------------------
-    */
 
     private function createAssignmentHistory(
         Lead $lead,
@@ -3497,11 +2201,46 @@ public function index(Request $request): View
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Company ID
-    |--------------------------------------------------------------------------
-    */
+    private function automaticAssignedStatusId(int $companyId): int
+    {
+        $baseQuery = LeadStatus::query()
+            ->where(function (Builder $query) use ($companyId) {
+                $query
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('is_active', true);
+
+        $preferredNames = [
+            'assigned',
+            'in progress',
+            'working',
+            'open',
+        ];
+
+        foreach ($preferredNames as $name) {
+            $statusId = (clone $baseQuery)
+                ->whereRaw('LOWER(name) = ?', [$name])
+                ->value('id');
+
+            if ($statusId) {
+                return (int) $statusId;
+            }
+        }
+
+        $statusId = (clone $baseQuery)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
+
+        abort_if(
+            !$statusId,
+            422,
+            'No active lead status is available for automatic assignment.'
+        );
+
+        return (int) $statusId;
+    }
 
     private function companyId(
         Request $request
@@ -3509,16 +2248,6 @@ public function index(Request $request): View
         return (int)
         $request->user()->company_id;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Team Leader Team IDs
-    |--------------------------------------------------------------------------
-    |
-    | Actual team leadership teams.leader_id se determine hogi.
-    | Role name team_leader hona required nahi hai.
-    |
-    */
 
     private function leaderTeamIds(
         Request $request
@@ -3543,23 +2272,11 @@ public function index(Request $request): View
             ->all();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Team Leader Check
-    |--------------------------------------------------------------------------
-    */
-
     private function isTeamLeader(
         Request $request
     ): bool {
         return !empty($this->leaderTeamIds($request));
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Full Access Check
-    |--------------------------------------------------------------------------
-    */
 
     private function hasFullAccess(
         Request $request
@@ -3571,12 +2288,6 @@ public function index(Request $request): View
             );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Ensure Admin Access
-    |--------------------------------------------------------------------------
-    */
-
     private function ensureFullAccess(
         Request $request
     ): void {
@@ -3586,12 +2297,6 @@ public function index(Request $request): View
             'You do not have permission to manage lead assignments.'
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Company Guard
-    |--------------------------------------------------------------------------
-    */
 
     private function guardCompany(
         Request $request,
@@ -3605,39 +2310,15 @@ public function index(Request $request): View
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Access Guard
-    |--------------------------------------------------------------------------
-    |
-    | Super Admin/Admin:
-    | company ki lead open kar sakte hain.
-    |
-    | Employee:
-    | sirf assigned lead open kar sakta hai.
-    |
-    */
-
     private function guard(
         Request $request,
         Lead $lead
     ): void {
-        /*
-        |--------------------------------------------------------------------------
-        | Company Check
-        |--------------------------------------------------------------------------
-        */
 
         $this->guardCompany(
             $request,
             $lead
         );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Admin / Super Admin
-        |--------------------------------------------------------------------------
-        */
 
         if ($this->hasFullAccess($request)) {
             return;
@@ -3647,28 +2328,12 @@ public function index(Request $request): View
         $companyId =
             $this->companyId($request);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Own Assigned Lead
-        |--------------------------------------------------------------------------
-        */
-
         if (
             (int) $lead->assigned_to ===
             (int) $user->id
         ) {
             return;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Team Leader Access
-        |--------------------------------------------------------------------------
-        |
-        | Agar login user kisi team ka leader hai aur lead jis employee ko
-        | assigned hai wo employee uski team me hai, to access allowed.
-        |
-        */
 
         $leaderTeamIds =
             $this->leaderTeamIds($request);
@@ -3693,12 +2358,6 @@ public function index(Request $request): View
                 return;
             }
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | No Access
-        |--------------------------------------------------------------------------
-        */
 
         abort(
             403,
