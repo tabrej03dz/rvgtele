@@ -1153,6 +1153,8 @@
                             </select>
                         </div>
 
+                        @if (!($section['title'] == 'New Call'))
+                            
                         {{-- Latest Call Disposition --}}
                         <div class="filter-field">
                             <label>Call Disposition</label>
@@ -1215,6 +1217,8 @@
                                 @endforeach
                             </select>
                         </div>
+                        @endif
+
 
                         {{-- Actions --}}
                         <div class="filter-actions">
