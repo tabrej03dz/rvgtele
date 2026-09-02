@@ -388,6 +388,19 @@
                         'calls.view'
                     ],
 
+                     /*
+                    |--------------------------------------------------------------------------
+                    | Demo Management
+                    |--------------------------------------------------------------------------
+                    */
+
+                    [
+                        'Demo Cities',
+                        'demo-cities.index',
+                        'demo-cities.*',
+                        'demo-cities.view'
+                    ],
+
                 ],
 
                 'Organization' => [
@@ -513,7 +526,10 @@
             $menuIcons = [
                 'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard',
                 'data.index' => 'database',
-                'leads.index' => 'users', 'pipeline.index' => 'workflow',
+                'leads.index' => 'users',
+                'demo-cities.index' => 'gallery-vertical-end',
+                
+                'pipeline.index' => 'workflow',
                 'followups.index' => 'phone-forwarded', 'calls.index' => 'phone',
                 'employees.index' => 'user-round', 'branches.index' => 'map-pin',
                 'teams.index' => 'users-round', 'access-control.index' => 'shield-check',
@@ -727,6 +743,42 @@
                 </div>
 
             @endforeach
+
+            @if(
+                    auth()->user()->can('categories.view')
+                    ||
+                    auth()->user()->can('categories.create')
+                )
+                    <a
+                        href="{{ route('categories.index') }}"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2.5
+                            text-sm font-medium
+                            {{ request()->routeIs('categories.*')
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            }}"
+                    >
+
+                        <svg
+                            class="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M4 6h16M4 12h16M4 18h10"
+                            />
+                        </svg>
+
+                        <span>
+                            Categories
+                        </span>
+
+                    </a>
+                @endif
 
             <div class="rounded-xl border border-white/10 bg-white/[.07] p-3 text-white shadow-lg">
                 <div class="flex items-center gap-3">

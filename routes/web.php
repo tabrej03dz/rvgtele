@@ -6,6 +6,7 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CallDispositionController;
 use App\Http\Controllers\CallLogController;
 use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -25,7 +26,10 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
+use App\Http\Controllers\DemoCityController;
+
 use App\Http\Controllers\WhatsappMessageTemplateController;
+
 
 Route::view('/', 'welcome')->name('home');
 
@@ -228,6 +232,33 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::patch('/employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update');
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.delete')->name('employees.destroy');
 
+
+    Route::resource('demo-cities', DemoCityController::class);
+
+    Route::prefix('demo-cities/{demoCity}')
+        ->name('demo-cities.')
+        ->group(function () {
+
+            // Media
+            Route::post('media', [DemoCityController::class, 'uploadMedia'])
+                ->name('media.upload');
+
+            Route::get('media/{mediaId}/download', [DemoCityController::class, 'downloadMedia'])
+                ->name('media.download');
+
+            Route::delete('media/{mediaId}', [DemoCityController::class, 'destroyMedia'])
+                ->name('media.destroy');
+
+            // ZIP
+            Route::post('zip', [DemoCityController::class, 'uploadZip'])
+                ->name('zip.upload');
+
+            Route::get('download-all', [DemoCityController::class, 'downloadAll'])
+                ->name('download-all');
+    });
+
+
+
     // Generic CRUD registrar.
     $crud = static function (string $uri, string $routeName, string $controller, string $permission, string $parameter = 'item'): void {
         Route::get("/{$uri}", [$controller, 'index'])->middleware("permission:{$permission}.view")->name("{$routeName}.index");
@@ -247,6 +278,11 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     $crud('tasks', 'tasks', TaskController::class, 'tasks');
     $crud('orders', 'orders', OrderController::class, 'orders');
     $crud('payments', 'payments', PaymentController::class, 'payments');
+
+    Route::resource(
+        'categories',
+        CategoryController::class
+    );
 
     Route::prefix('settings')->name('crm-settings.')->group(function () use ($crud) {
         $crud(
