@@ -450,21 +450,7 @@
 </style>
 @endonce
 
-@php
-    /*
-    |--------------------------------------------------------------------------
-    | DEMO DISPOSITION
-    |--------------------------------------------------------------------------
-    |
-    | Call Disposition table me jiska name "demo" hai,
-    | uska ID automatically use hoga.
-    |
-    */
 
-    $demoDisposition = $dispositions->first(function ($disposition) {
-        return strtolower(trim($disposition->name)) === 'demo';
-    });
-@endphp
 
 @php
     /*
@@ -547,6 +533,18 @@
     x-data="leadIndexBoard()"
     @keydown.escape.window="feedbackOpen = false"
 >
+
+    @if(session('success'))
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">
+            {{ $errors->first() }}
+        </div>
+    @endif
 
     {{-- HEADER --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -961,7 +959,7 @@
                                 'noteStoreUrl' => route('leads.notes', $lead),
                                 'demoUpdateUrl' => route('leads.update', $lead),
 
-                                'demoCallUrl' => route('calls.store', $lead),
+                                'demoCallUrl' => route('leads.demo.store', $lead),
                             ];
                         @endphp
 
@@ -1294,237 +1292,87 @@
                 @endcan
 
                 @can('leads.update')
-
                     <div
                         x-show="feedbackTab === 'demo'"
                         x-cloak
                         class="quick-panel"
                     >
+                        <form
+                            method="POST"
+                            :action="selectedLead.demoCallUrl"
+                        >
+                            @csrf
 
-                        @if($demoDisposition)
-
-                            <form
-                                method="POST"
-                                :action="selectedLead.demoCallUrl"
-                            >
-
-                                @csrf
-
-
-                                {{-- =====================================================
-                                    AUTOMATIC DEMO DISPOSITION
-                                ====================================================== --}}
-
-                                <input
-                                    type="hidden"
-                                    name="call_disposition_id"
-                                    value="{{ $demoDisposition->id }}"
-                                >
-
-
-                                {{-- Controller ko batayega ki Demo bhi mark karna hai --}}
-                                <input
-                                    type="hidden"
-                                    name="mark_demo_send"
-                                    value="1"
-                                >
-
-
-                                {{-- Optional default remark --}}
-                                <input
-                                    type="hidden"
-                                    name="remarks"
-                                    value="Demo Sent"
-                                >
-
-
-                                {{-- Duration optional --}}
-                                <input
-                                    type="hidden"
-                                    name="duration_seconds"
-                                    value="0"
-                                >
-
-
-                                <div class="quick-status">
-
-                                    <div
-                                        class="
-                                            text-[9px]
-                                            font-bold
-                                            text-slate-500
-                                        "
-                                    >
-                                        DEMO ACTION
-                                    </div>
-
-
-                                    <div
-                                        class="
-                                            mt-1
-                                            text-sm
-                                            font-extrabold
-                                            text-violet-700
-                                        "
-                                    >
-                                        Demo Send
-                                    </div>
-
-
-                                    <div
-                                        class="
-                                            mt-2
-                                            text-[10px]
-                                            leading-5
-                                            text-slate-500
-                                        "
-                                    >
-                                        Is button par click karte hi
-
-                                        <strong>
-                                            "{{ $demoDisposition->name }}"
-                                        </strong>
-
-                                        disposition ke saath call log save hoga
-                                        aur lead ka Demo Sent status bhi update hoga.
-                                    </div>
-
+                            <div class="quick-status">
+                                <div class="text-[9px] font-bold uppercase text-slate-500">
+                                    Demo Action
                                 </div>
 
+                                <div
+                                    class="mt-1 text-sm font-extrabold"
+                                    :class="selectedLead.demoSent
+                                        ? 'text-emerald-600'
+                                        : 'text-violet-700'"
+                                    x-text="selectedLead.demoSent
+                                        ? 'Demo Already Sent'
+                                        : 'Ready To Send Demo'"
+                                ></div>
 
-                                <div class="mt-3 rounded-lg border border-violet-100 bg-violet-50 p-3">
-
-                                    <div
-                                        class="
-                                            flex
-                                            items-center
-                                            justify-between
-                                            gap-3
-                                        "
-                                    >
-
-                                        <div>
-
-                                            <div
-                                                class="
-                                                    text-[9px]
-                                                    font-bold
-                                                    uppercase
-                                                    text-violet-500
-                                                "
-                                            >
-                                                Disposition
-                                            </div>
-
-                                            <div
-                                                class="
-                                                    mt-1
-                                                    text-sm
-                                                    font-extrabold
-                                                    text-violet-800
-                                                "
-                                            >
-                                                {{ $demoDisposition->name }}
-                                            </div>
-
-                                        </div>
-
-
-                                        <div class="text-right">
-
-                                            <div
-                                                class="
-                                                    text-[9px]
-                                                    font-bold
-                                                    uppercase
-                                                    text-slate-400
-                                                "
-                                            >
-                                                Demo Status
-                                            </div>
-
-                                            <div
-                                                class="
-                                                    mt-1
-                                                    text-sm
-                                                    font-extrabold
-                                                "
-                                                :class="
-                                                    selectedLead.demoSent
-                                                        ? 'text-emerald-600'
-                                                        : 'text-slate-600'
-                                                "
-                                                x-text="
-                                                    selectedLead.demoSent
-                                                        ? 'Already Sent'
-                                                        : 'Not Sent'
-                                                "
-                                            ></div>
-
-                                        </div>
-
-                                    </div>
-
+                                <div class="mt-2 text-[10px] leading-5 text-slate-500">
+                                    <strong>Send Demo</strong> par click karte hi
+                                    lead ka <strong>Demo Sent</strong> status aur
+                                    Call Log me <strong>Demo disposition</strong>
+                                    dono ek hi backend transaction me save honge.
                                 </div>
-
-
-                                <div class="quick-form-actions">
-
-                                    <button
-                                        type="button"
-                                        class="quick-btn"
-                                        @click="feedbackOpen = false"
-                                    >
-                                        Cancel
-                                    </button>
-
-
-                                    <button
-                                        type="submit"
-                                        class="
-                                            quick-btn
-                                            quick-btn-violet
-                                        "
-                                    >
-
-                                        <i data-lucide="video"></i>
-
-                                        <span>
-                                            Send Demo
-                                        </span>
-
-                                    </button>
-
-                                </div>
-
-                            </form>
-
-
-                        @else
-
-                            <div
-                                class="
-                                    rounded-lg
-                                    border
-                                    border-rose-200
-                                    bg-rose-50
-                                    p-4
-                                    text-xs
-                                    font-bold
-                                    text-rose-700
-                                "
-                            >
-                                "demo" naam ka Call Disposition nahi mila.
-
-                                Call Disposition master me pehle
-                                <strong>demo</strong>
-                                disposition create karein.
                             </div>
 
-                        @endif
+                            <div class="mt-3 rounded-lg border border-violet-100 bg-violet-50 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="text-[9px] font-bold uppercase text-violet-500">
+                                            Call Disposition
+                                        </div>
+                                        <div class="mt-1 text-sm font-extrabold text-violet-800">
+                                            Demo
+                                        </div>
+                                    </div>
 
+                                    <div class="text-right">
+                                        <div class="text-[9px] font-bold uppercase text-slate-400">
+                                            Current Demo Status
+                                        </div>
+                                        <div
+                                            class="mt-1 text-sm font-extrabold"
+                                            :class="selectedLead.demoSent
+                                                ? 'text-emerald-600'
+                                                : 'text-slate-600'"
+                                            x-text="selectedLead.demoSent
+                                                ? 'Already Sent'
+                                                : 'Not Sent'"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="quick-form-actions">
+                                <button
+                                    type="button"
+                                    class="quick-btn"
+                                    @click="feedbackOpen = false"
+                                >
+                                    Cancel
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    class="quick-btn quick-btn-violet"
+                                >
+                                    <i data-lucide="video"></i>
+                                    <span>Send Demo</span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
-
                 @endcan
 
                 @can('leads.notes.create')
@@ -1567,7 +1415,7 @@
             selectedLead: {
                 id:null, name:'', business:'', mobile:'', whatsapp:'',
                 city:'', state:'', category:'', demoSent:false,
-                showUrl:'', callStoreUrl:'', noteStoreUrl:'', demoUpdateUrl:''
+                showUrl:'', callStoreUrl:'', noteStoreUrl:'', demoUpdateUrl:'', demoCallUrl:''
             },
             noteBody: '',
             callForm: {
