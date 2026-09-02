@@ -359,92 +359,397 @@
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
-    /* QUICK FEEDBACK BUTTON + MODAL */
+    /* QUICK FEEDBACK BUTTON + PREMIUM MODAL */
     .feedback-action {
-        color:#6d28d9 !important;
+        color:#7c3aed !important;
         background:#f5f3ff !important;
         border-color:#ddd6fe !important;
-        padding:0 8px !important;
+        padding:0 9px !important;
         width:auto !important;
     }
-    .feedback-action span { font-size:9px; font-weight:800; }
+
+    .feedback-action span {
+        font-size:9px;
+        font-weight:800;
+    }
 
     .quick-modal-backdrop {
-        position:fixed; inset:0; z-index:100;
-        display:flex; align-items:center; justify-content:center;
-        padding:16px; background:rgba(15,23,42,.60);
-        backdrop-filter:blur(2px);
+        position:fixed;
+        inset:0;
+        z-index:100;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:18px;
+        background:rgba(15,23,42,.58);
+        backdrop-filter:blur(3px);
     }
+
     .quick-modal {
-        width:100%; max-width:760px; max-height:92vh;
-        overflow:hidden; border-radius:16px; background:#fff;
-        box-shadow:0 30px 80px rgba(15,23,42,.30);
+        width:100%;
+        max-width:800px;
+        max-height:94vh;
+        overflow:hidden;
+        border:1px solid #f4ddb0;
+        border-radius:18px;
+        background:
+            linear-gradient(145deg,#fffef9 0%,#fffaf0 42%,#fff 100%);
+        box-shadow:
+            0 30px 90px rgba(15,23,42,.28),
+            0 0 0 1px rgba(245,185,0,.05);
     }
+
     .quick-modal-head {
-        display:flex; align-items:flex-start; justify-content:space-between;
-        gap:14px; padding:16px 18px; border-bottom:1px solid #e8ecf2;
+        position:relative;
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:14px;
+        padding:20px 24px 15px;
+        border-bottom:0;
+        background:
+            radial-gradient(circle at 92% 10%,rgba(245,185,0,.12),transparent 34%),
+            transparent;
     }
+
+    .quick-modal-tag {
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        min-height:28px;
+        padding:0 10px;
+        border-radius:8px;
+        background:#fff1bf;
+        color:#9a6500;
+        font-size:9px;
+        font-weight:900;
+        text-transform:uppercase;
+        letter-spacing:.03em;
+    }
+
+    .quick-modal-tag svg {
+        width:13px;
+        height:13px;
+    }
+
+    .quick-modal-title {
+        margin-top:8px;
+        color:#111827;
+        font-size:22px;
+        line-height:1.1;
+        font-weight:900;
+        letter-spacing:-.02em;
+    }
+
+    .quick-modal-meta {
+        margin-top:8px;
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:14px;
+        color:#7c6b4d;
+        font-size:10px;
+        font-weight:600;
+    }
+
+    .quick-modal-meta span {
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+    }
+
+    .quick-modal-meta svg {
+        width:13px;
+        height:13px;
+        color:#d99b00;
+    }
+
+    .quick-close {
+        width:42px;
+        height:42px;
+        flex:0 0 42px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border:1px solid #dedede;
+        border-radius:13px;
+        background:#fff;
+        color:#475467;
+        box-shadow:0 4px 12px rgba(15,23,42,.05);
+        cursor:pointer;
+    }
+
+    .quick-close:hover {
+        background:#fff8e8;
+        border-color:#efc95a;
+        color:#111827;
+    }
+
+    .quick-close svg {
+        width:20px;
+        height:20px;
+    }
+
     .quick-modal-body {
-        max-height:calc(92vh - 80px); overflow-y:auto;
-        padding:16px; background:#f8fafc;
+        max-height:calc(94vh - 112px);
+        overflow-y:auto;
+        padding:0 24px 22px;
+        background:transparent;
     }
+
     .quick-summary {
-        display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
-        gap:8px; margin-bottom:12px;
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:10px;
+        margin-bottom:14px;
     }
+
     .quick-summary-card {
-        border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:10px;
+        min-height:86px;
+        display:flex;
+        align-items:center;
+        gap:10px;
+        border:1px solid #eadfc9;
+        border-radius:13px;
+        background:rgba(255,255,255,.88);
+        padding:12px;
+        box-shadow:0 5px 16px rgba(83,63,22,.035);
     }
+
+    .quick-summary-icon {
+        width:38px;
+        height:38px;
+        flex:0 0 38px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:50%;
+        background:#fff4cb;
+        color:#d99b00;
+    }
+
+    .quick-summary-icon svg {
+        width:17px;
+        height:17px;
+    }
+
     .quick-summary-label {
-        font-size:8px; font-weight:800; color:#98a2b3; text-transform:uppercase;
+        font-size:8px;
+        font-weight:900;
+        color:#8a8f98;
+        text-transform:uppercase;
+        letter-spacing:.04em;
     }
+
     .quick-summary-value {
-        margin-top:3px; font-size:11px; font-weight:800; color:#1f2937;
+        margin-top:4px;
+        font-size:11px;
+        line-height:1.35;
+        font-weight:900;
+        color:#1f2937;
         overflow-wrap:anywhere;
     }
-    .quick-top-actions, .quick-tabs, .quick-form-actions {
-        display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+
+    .quick-top-actions {
+        display:grid;
+        grid-template-columns:1fr 1fr 1fr;
+        gap:9px;
+        margin-bottom:10px;
     }
-    .quick-top-actions { margin-bottom:12px; }
-    .quick-tabs { margin-bottom:12px; }
-    .quick-tab, .quick-btn {
-        min-height:35px; display:inline-flex; align-items:center; justify-content:center;
-        gap:6px; border:1px solid #dfe4ea; border-radius:8px; background:#fff;
-        padding:0 11px; color:#475467; font-size:9px; font-weight:800; cursor:pointer;
+
+    .quick-primary-action {
+        min-height:50px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:9px;
+        border:1px solid #f0c333;
+        border-radius:11px;
+        background:linear-gradient(180deg,#ffd22e 0%,#ffc400 100%);
+        color:#171717;
+        font-size:10px;
+        font-weight:900;
+        cursor:pointer;
+        text-decoration:none;
+        box-shadow:0 7px 16px rgba(255,196,0,.15);
+    }
+
+    .quick-primary-action.secondary {
+        background:#fff;
+        border-color:#eccd71;
+        box-shadow:none;
+    }
+
+    .quick-primary-action svg {
+        width:18px;
+        height:18px;
+    }
+
+    .quick-tabs {
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:9px;
+        margin-bottom:12px;
+    }
+
+    .quick-tab {
+        min-height:50px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        border:1px solid #e8cb78;
+        border-radius:11px;
+        background:#fff;
+        padding:0 12px;
+        color:#344054;
+        font-size:10px;
+        font-weight:900;
+        cursor:pointer;
+        text-decoration:none;
+        transition:.15s ease;
+    }
+
+    .quick-tab svg {
+        width:17px;
+        height:17px;
+    }
+
+    .quick-tab.active {
+        border-color:#f1b900;
+        background:#fff8dc;
+        color:#1f2937;
+        box-shadow:inset 0 0 0 1px rgba(241,185,0,.12);
+    }
+
+    .quick-panel {
+        border:1px solid #eadfc9;
+        border-radius:13px;
+        background:rgba(255,255,255,.90);
+        padding:16px;
+    }
+
+    .quick-grid {
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:14px;
+    }
+
+    .quick-field label {
+        display:block;
+        margin-bottom:6px;
+        color:#475569;
+        font-size:10px;
+        font-weight:900;
+    }
+
+    .quick-field input,
+    .quick-field select,
+    .quick-field textarea {
+        width:100%;
+        border:1px solid #d7dde7;
+        border-radius:10px;
+        background:#fff;
+        color:#1e293b;
+        font-size:11px;
+        outline:none;
+    }
+
+    .quick-field input,
+    .quick-field select {
+        min-height:46px;
+        padding:0 12px;
+    }
+
+    .quick-field textarea {
+        min-height:96px;
+        padding:10px 12px;
+        resize:vertical;
+    }
+
+    .quick-field input:focus,
+    .quick-field select:focus,
+    .quick-field textarea:focus {
+        border-color:#f1b900;
+        box-shadow:0 0 0 3px rgba(241,185,0,.12);
+    }
+
+    .quick-form-actions {
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:9px;
+        margin-top:16px;
+    }
+
+    .quick-btn {
+        min-height:42px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:7px;
+        border:1px solid #d8dee7;
+        border-radius:10px;
+        background:#fff;
+        padding:0 15px;
+        color:#475467;
+        font-size:9px;
+        font-weight:900;
+        cursor:pointer;
         text-decoration:none;
     }
-    .quick-tab.active {
-        border-color:#7c3aed; background:#f5f3ff; color:#6d28d9;
+
+    .quick-btn-green {
+        border-color:#059669;
+        background:#059669;
+        color:#fff;
     }
-    .quick-btn-green { border-color:#059669; background:#059669; color:#fff; }
-    .quick-btn-blue { border-color:#2563eb; background:#2563eb; color:#fff; }
-    .quick-btn-violet { border-color:#6d28d9; background:#6d28d9; color:#fff; }
-    .quick-btn-dark { border-color:#334155; background:#334155; color:#fff; }
-    .quick-panel {
-        border:1px solid #e5e7eb; border-radius:12px; background:#fff; padding:14px;
+
+    .quick-btn-blue {
+        border-color:#2563eb;
+        background:#2563eb;
+        color:#fff;
     }
-    .quick-grid {
-        display:grid; grid-template-columns:1fr 1fr; gap:11px;
+
+    .quick-btn-violet {
+        border-color:#f1b900;
+        background:linear-gradient(180deg,#ffd22e 0%,#ffc400 100%);
+        color:#171717;
     }
-    .quick-field label {
-        display:block; margin-bottom:5px; color:#475569; font-size:10px; font-weight:800;
+
+    .quick-btn-dark {
+        border-color:#334155;
+        background:#334155;
+        color:#fff;
     }
-    .quick-field input, .quick-field select, .quick-field textarea {
-        width:100%; border:1px solid #d8dee8; border-radius:8px;
-        background:#fff; color:#1e293b; font-size:11px; outline:none;
-    }
-    .quick-field input, .quick-field select { min-height:38px; padding:0 10px; }
-    .quick-field textarea { min-height:90px; padding:9px 10px; resize:vertical; }
-    .quick-field input:focus, .quick-field select:focus, .quick-field textarea:focus {
-        border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,.10);
-    }
-    .quick-form-actions { justify-content:flex-end; margin-top:12px; }
+
     .quick-status {
-        border:1px solid #e5e7eb; border-radius:9px; background:#f8fafc; padding:11px;
+        border:1px solid #f0dfac;
+        border-radius:10px;
+        background:#fffaf0;
+        padding:12px;
     }
+
     @media (max-width:700px) {
-        .quick-summary { grid-template-columns:repeat(2,1fr); }
-        .quick-grid { grid-template-columns:1fr; }
+        .quick-modal-backdrop {
+            padding:8px;
+        }
+
+        .quick-modal-head,
+        .quick-modal-body {
+            padding-left:14px;
+            padding-right:14px;
+        }
+
+        .quick-summary {
+            grid-template-columns:repeat(2,1fr);
+        }
+
+        .quick-top-actions,
+        .quick-tabs,
+        .quick-grid {
+            grid-template-columns:1fr;
+        }
     }
 
 </style>
@@ -523,6 +828,7 @@
         'priority',
         'assigned_to',
         'date_filter',
+        'disposition_id',
         'demo_status',
         'label_id',
     ];
@@ -847,6 +1153,43 @@
                             </select>
                         </div>
 
+                        {{-- Latest Call Disposition --}}
+                        <div class="filter-field">
+                            <label>Call Disposition</label>
+
+                            <select name="{{ $sectionKey }}_disposition_id">
+                                <option value="">
+                                    All Dispositions
+                                </option>
+
+                                <option
+                                    value="none"
+                                    @selected(
+                                        request(
+                                            $sectionKey . '_disposition_id'
+                                        ) === 'none'
+                                    )
+                                >
+                                    No Disposition / No Call Yet
+                                </option>
+
+                                @foreach($dispositions as $disposition)
+                                    <option
+                                        value="{{ $disposition->id }}"
+                                        @selected(
+                                            (string) request(
+                                                $sectionKey . '_disposition_id'
+                                            )
+                                            ===
+                                            (string) $disposition->id
+                                        )
+                                    >
+                                        {{ $disposition->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
                         {{-- Demo Status --}}
                         <div class="filter-field">
                             <label>Demo Status</label>
@@ -1123,76 +1466,295 @@
         @click.self="feedbackOpen = false"
     >
         <div class="quick-modal" role="dialog" aria-modal="true">
+
             <div class="quick-modal-head">
+
                 <div class="min-w-0">
-                    <div class="text-[9px] font-extrabold uppercase tracking-wide text-violet-600">
+
+                    <div class="quick-modal-tag">
+                        <i data-lucide="zap"></i>
                         Quick Lead Actions
                     </div>
-                    <div class="mt-1 truncate text-lg font-extrabold text-slate-900"
-                         x-text="selectedLead.business || selectedLead.name || 'Lead'"></div>
-                    <div class="mt-1 flex flex-wrap gap-3 text-[10px] text-slate-500">
-                        <span x-text="selectedLead.mobile || 'No mobile'"></span>
-                        <span x-show="selectedLead.city" x-text="selectedLead.city"></span>
-                        <span x-show="selectedLead.category" x-text="selectedLead.category"></span>
+
+                    <div
+                        class="quick-modal-title truncate"
+                        x-text="
+                            selectedLead.business
+                            ||
+                            selectedLead.name
+                            ||
+                            'Lead'
+                        "
+                    ></div>
+
+                    <div class="quick-modal-meta">
+
+                        <span>
+                            <i data-lucide="phone"></i>
+
+                            <span
+                                x-text="
+                                    selectedLead.mobile
+                                    ||
+                                    'No mobile'
+                                "
+                            ></span>
+                        </span>
+
+                        <span x-show="selectedLead.city">
+                            <i data-lucide="map-pin"></i>
+
+                            <span
+                                x-text="selectedLead.city"
+                            ></span>
+                        </span>
+
+                        <span x-show="selectedLead.category">
+                            <i data-lucide="briefcase-business"></i>
+
+                            <span
+                                x-text="selectedLead.category"
+                            ></span>
+                        </span>
+
                     </div>
+
                 </div>
 
-                <button type="button" class="quick-btn !h-9 !min-h-9 !w-9 !p-0" @click="feedbackOpen=false">
+
+                <button
+                    type="button"
+                    class="quick-close"
+                    @click="feedbackOpen = false"
+                    aria-label="Close"
+                >
                     <i data-lucide="x"></i>
                 </button>
+
             </div>
 
+
             <div class="quick-modal-body">
+
                 <div class="quick-summary">
+
                     <div class="quick-summary-card">
-                        <div class="quick-summary-label">Lead</div>
-                        <div class="quick-summary-value" x-text="selectedLead.name || '—'"></div>
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="user"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Lead
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                x-text="
+                                    selectedLead.name
+                                    ||
+                                    '—'
+                                "
+                            ></div>
+                        </div>
+
                     </div>
+
+
                     <div class="quick-summary-card">
-                        <div class="quick-summary-label">Business</div>
-                        <div class="quick-summary-value" x-text="selectedLead.business || '—'"></div>
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="briefcase-business"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Business
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                x-text="
+                                    selectedLead.business
+                                    ||
+                                    '—'
+                                "
+                            ></div>
+                        </div>
+
                     </div>
+
+
                     <div class="quick-summary-card">
-                        <div class="quick-summary-label">Mobile</div>
-                        <div class="quick-summary-value" x-text="selectedLead.mobile || '—'"></div>
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="smartphone"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Mobile
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                x-text="
+                                    selectedLead.mobile
+                                    ||
+                                    '—'
+                                "
+                            ></div>
+                        </div>
+
                     </div>
+
+
                     <div class="quick-summary-card">
-                        <div class="quick-summary-label">Demo</div>
-                        <div class="quick-summary-value"
-                             :class="selectedLead.demoSent ? 'text-emerald-600' : 'text-slate-500'"
-                             x-text="selectedLead.demoSent ? 'Demo Sent' : 'Not Sent'"></div>
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="video"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Demo
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                :class="
+                                    selectedLead.demoSent
+                                        ? 'text-emerald-600'
+                                        : 'text-slate-700'
+                                "
+                                x-text="
+                                    selectedLead.demoSent
+                                        ? 'Demo Sent'
+                                        : 'Not Sent'
+                                "
+                            ></div>
+                        </div>
+
                     </div>
+
                 </div>
 
+
                 <div class="quick-top-actions">
+
                     <button
                         type="button"
-                        class="quick-btn quick-btn-green"
+                        class="quick-primary-action"
                         @click="sendCall(selectedLead.id)"
-                        :disabled="!selectedLead.id || sendingCall === selectedLead.id"
+                        :disabled="
+                            !selectedLead.id
+                            ||
+                            sendingCall === selectedLead.id
+                        "
                     >
                         <i data-lucide="phone"></i>
                         Call on Mobile
                     </button>
 
+
                     <button
                         type="button"
-                        class="quick-btn quick-btn-blue"
-                        @click="openWhatsApp(selectedLead.whatsapp)"
-                        :disabled="!selectedLead.whatsapp"
+                        class="quick-primary-action"
+                        @click="
+                            openWhatsApp(
+                                selectedLead.whatsapp
+                            )
+                        "
+                        :disabled="
+                            !selectedLead.whatsapp
+                        "
                     >
                         <i data-lucide="message-circle"></i>
                         WhatsApp Web
                     </button>
 
-                    <a :href="selectedLead.showUrl || '#'" class="quick-btn">
+
+                    <a
+                        :href="
+                            selectedLead.showUrl
+                            ||
+                            '#'
+                        "
+                        class="
+                            quick-primary-action
+                            secondary
+                        "
+                    >
                         <i data-lucide="external-link"></i>
                         Full Lead
                     </a>
+
                 </div>
 
+
                 <div class="quick-tabs">
+
                     @can('calls.create')
+                        <button
+                            type="button"
+                            class="quick-tab"
+                            :class="
+                                feedbackTab === 'call'
+                                    ? 'active'
+                                    : ''
+                            "
+                            @click="
+                                feedbackTab = 'call'
+                            "
+                        >
+                            <i data-lucide="star"></i>
+                            Save Feedback
+                        </button>
+                    @endcan
+
+
+                    @can('leads.update')
+                        <button
+                            type="button"
+                            class="quick-tab"
+                            :class="
+                                feedbackTab === 'demo'
+                                    ? 'active'
+                                    : ''
+                            "
+                            @click="
+                                feedbackTab = 'demo'
+                            "
+                        >
+                            <i data-lucide="video"></i>
+                            Demo
+                        </button>
+                    @endcan
+
+
+                    @can('leads.notes.create')
+                        <button
+                            type="button"
+                            class="quick-tab"
+                            :class="
+                                feedbackTab === 'note'
+                                    ? 'active'
+                                    : ''
+                            "
+                            @click="
+                                feedbackTab = 'note'
+                            "
+                        >
+                            <i data-lucide="notebook-pen"></i>
+                            Add Note
+                        </button>
+                    @endcan
+
+                </div>
+
+
+                @can('calls.create')
                         <button type="button" class="quick-tab"
                                 :class="feedbackTab==='call' ? 'active' : ''"
                                 @click="feedbackTab='call'">
@@ -1426,17 +1988,20 @@
 
             showNewFilters: {{ request()->hasAny([
                 'new_category','new_source','new_city','new_priority',
-                'new_assigned_to','new_date_filter','new_demo_status','new_label_id'
+                'new_assigned_to','new_date_filter','new_disposition_id',
+                'new_demo_status','new_label_id'
             ]) ? 'true' : 'false' }},
 
             showDialedFilters: {{ request()->hasAny([
                 'dialed_category','dialed_source','dialed_city','dialed_priority',
-                'dialed_assigned_to','dialed_date_filter','dialed_demo_status','dialed_label_id'
+                'dialed_assigned_to','dialed_date_filter','dialed_disposition_id',
+                'dialed_demo_status','dialed_label_id'
             ]) ? 'true' : 'false' }},
 
             showConnectedFilters: {{ request()->hasAny([
                 'connected_category','connected_source','connected_city','connected_priority',
-                'connected_assigned_to','connected_date_filter','connected_demo_status','connected_label_id'
+                'connected_assigned_to','connected_date_filter','connected_disposition_id',
+                'connected_demo_status','connected_label_id'
             ]) ? 'true' : 'false' }},
 
             openFeedback(lead) {
