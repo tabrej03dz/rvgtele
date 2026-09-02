@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\LeadApiController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\WhatsappMessageTemplateController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -14,6 +15,69 @@ Route::middleware('auth:sanctum')->group(function () {
     '/leads/{lead}/communication-history',
     [LeadApiController::class, 'communicationHistory']
 );
+
+
+
+ /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Templates
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/whatsapp-templates',
+        [WhatsappMessageTemplateController::class, 'index']
+    );
+
+    Route::post(
+        '/whatsapp-templates',
+        [WhatsappMessageTemplateController::class, 'store']
+    );
+
+    Route::get(
+        '/whatsapp-templates/users',
+        [WhatsappMessageTemplateController::class, 'users']
+    );
+
+    Route::get(
+        '/whatsapp-templates/{whatsappTemplate}',
+        [WhatsappMessageTemplateController::class, 'show']
+    );
+
+    Route::put(
+        '/whatsapp-templates/{whatsappTemplate}',
+        [WhatsappMessageTemplateController::class, 'update']
+    );
+
+    Route::patch(
+        '/whatsapp-templates/{whatsappTemplate}',
+        [WhatsappMessageTemplateController::class, 'update']
+    );
+
+    Route::delete(
+        '/whatsapp-templates/{whatsappTemplate}',
+        [WhatsappMessageTemplateController::class, 'destroy']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead WhatsApp
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/leads/{lead}/whatsapp-templates',
+        [WhatsappMessageTemplateController::class, 'selectable']
+    );
+
+    Route::post(
+        '/leads/{lead}/whatsapp-message/render',
+        [WhatsappMessageTemplateController::class, 'render']
+    );
+
+
+
 
 
 Route::get(
