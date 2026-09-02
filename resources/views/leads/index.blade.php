@@ -1404,7 +1404,7 @@
                                         </button>
                                     @endif
 
-                                    @if($whatsappNumber)
+                                    {{-- @if($whatsappNumber)
                                         <button
                                             type="button"
                                             class="round-action whatsapp-action"
@@ -1413,7 +1413,20 @@
                                         >
                                             <i data-lucide="message-circle"></i>
                                         </button>
-                                    @endif
+                                    @endif --}}
+
+                                       @if($whatsappNumber)
+
+        <button
+            type="button"
+            class="round-action whatsapp-action"
+            title="Send WhatsApp Message"
+            onclick="openWhatsappTemplateModal({{ (int) $lead->id }})"
+        >
+            <i data-lucide="message-circle"></i>
+        </button>
+
+    @endif
 
                                     <button
                                         type="button"
@@ -1971,6 +1984,8 @@
 
 </div>
 
+
+@include('components.whatsapp-template-modal')
 
 <script>
     function leadIndexBoard() {

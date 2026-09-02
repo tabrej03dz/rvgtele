@@ -28,6 +28,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\DemoCityController;
 
+use App\Http\Controllers\WhatsappMessageTemplateController;
+
+
 Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth'])->group(function () {
@@ -305,6 +308,58 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     });
 
     Route::get('/reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
+});
+
+
+
+Route::middleware('auth')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Message Templates
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/whatsapp-templates',
+        [WhatsappMessageTemplateController::class, 'index']
+    )->name('whatsapp-templates.index');
+
+    Route::get(
+        '/whatsapp-templates/create',
+        [WhatsappMessageTemplateController::class, 'create']
+    )->name('whatsapp-templates.create');
+
+    Route::post(
+        '/whatsapp-templates',
+        [WhatsappMessageTemplateController::class, 'store']
+    )->name('whatsapp-templates.store');
+
+    Route::get(
+        '/whatsapp-templates/{whatsappTemplate}/edit',
+        [WhatsappMessageTemplateController::class, 'edit']
+    )->name('whatsapp-templates.edit');
+
+    Route::put(
+        '/whatsapp-templates/{whatsappTemplate}',
+        [WhatsappMessageTemplateController::class, 'update']
+    )->name('whatsapp-templates.update');
+
+    Route::delete(
+        '/whatsapp-templates/{whatsappTemplate}',
+        [WhatsappMessageTemplateController::class, 'destroy']
+    )->name('whatsapp-templates.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Lead Popup Data
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/leads/{lead}/whatsapp-templates',
+        [WhatsappMessageTemplateController::class, 'selectable']
+    )->name('leads.whatsapp-templates.selectable');
 });
 
 require __DIR__.'/settings.php';

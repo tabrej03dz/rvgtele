@@ -486,6 +486,14 @@
                         'reports.view'
                     ],
 
+                     // ✅ ADD THIS
+    [
+        'WhatsApp Templates',
+        'whatsapp-templates.index',
+        'whatsapp-templates.*',
+        'whatsapp-template.view-own|whatsapp-template.view-all'
+    ],
+
                 ],
 
                 'CRM Settings' => [
