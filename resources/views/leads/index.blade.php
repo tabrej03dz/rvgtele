@@ -2614,7 +2614,7 @@
     });
 </script>
 
-@endsection@extends('layouts.crm', ['title' => 'Leads'])
+@endsection
 
 @section('content')
 
@@ -5281,8 +5281,33 @@
                 }
             },
 
+            // openWhatsApp(number) {
+            //     const clean = String(number || '').replace(/\D/g,'');
+
+            //     if (!clean) {
+            //         alert('WhatsApp number is missing.');
+            //         return;
+            //     }
+
+            //     const url = `https://web.whatsapp.com/send?phone=${encodeURIComponent(clean)}`;
+
+            //     /*
+            //      * Named window: CRM se pehli baar WhatsApp khulne ke baad
+            //      * next clicks same WhatsApp Web tab/window ko reuse karenge.
+            //      * Login na ho to WhatsApp Web login/QR screen khud kholega.
+            //      */
+            //     const w = window.open(url, 'rvg_whatsapp_web');
+
+            //     if (w) {
+            //         w.focus();
+            //     } else {
+            //         alert('Browser popup blocked hai. Popups allow karke dobara try karein.');
+            //     }
+            // }
+
+
             openWhatsApp(number) {
-                const clean = String(number || '').replace(/\D/g,'');
+                const clean = String(number || '').replace(/\D/g, '');
 
                 if (!clean) {
                     alert('WhatsApp number is missing.');
@@ -5291,15 +5316,11 @@
 
                 const url = `https://web.whatsapp.com/send?phone=${encodeURIComponent(clean)}`;
 
-                /*
-                 * Named window: CRM se pehli baar WhatsApp khulne ke baad
-                 * next clicks same WhatsApp Web tab/window ko reuse karenge.
-                 * Login na ho to WhatsApp Web login/QR screen khud kholega.
-                 */
-                const w = window.open(url, 'rvg_whatsapp_web');
+                const whatsappTab = window.open('', 'rvg_whatsapp_web');
 
-                if (w) {
-                    w.focus();
+                if (whatsappTab) {
+                    whatsappTab.location.href = url;
+                    whatsappTab.focus();
                 } else {
                     alert('Browser popup blocked hai. Popups allow karke dobara try karein.');
                 }
