@@ -233,7 +233,7 @@
     x-data="{
         selected: [],
         selectAll: false,
-        showFilters: @js(request()->hasAny(['company_id','category','converted','show'])),
+        showFilters: @js(request()->hasAny(['company_id','category_id','converted','show'])),
         toggleAll(ids) {
             if (this.selectAll) {
                 this.selected = [...ids];
@@ -594,7 +594,7 @@
                 </label>
 
                 <select
-                    name="category"
+                    name="category_id"
                     class="w-full"
                 >
 
@@ -605,12 +605,14 @@
                     @foreach($categories as $category)
 
                         <option
-                            value="{{ $category }}"
+                            value="{{ $category->id }}"
                             @selected(
-                                request('category') === $category
+                                (string) request('category_id')
+                                ===
+                                (string) $category->id
                             )
                         >
-                            {{ $category }}
+                            {{ $category->name }}
                         </option>
 
                     @endforeach
@@ -618,25 +620,18 @@
                 </select>
 
             </div>
-
-
             {{-- Converted --}}
-
             <div>
-
                 <label class="software-label">
                     Conversion
                 </label>
-
                 <select
                     name="converted"
                     class="w-full"
                 >
-
                     <option value="">
                         All
                     </option>
-
                     <option
                         value="0"
                         @selected(request('converted') === '0')
@@ -940,7 +935,7 @@
 
                             <td>
 
-                                @if($row->category)
+                                @if($row->categoryInfo)
 
                                     <span
                                         class="
@@ -953,11 +948,15 @@
                                             text-indigo-700
                                         "
                                     >
-                                        {{ $row->category }}
+                                        {{ $row->categoryInfo->name }}
                                     </span>
 
                                 @else
-                                    —
+
+                                    <span class="text-slate-400">
+                                        —
+                                    </span>
+
                                 @endif
 
                             </td>

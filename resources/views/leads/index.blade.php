@@ -1216,6 +1216,11 @@
 
     $activeQuickMetric = $quickMetric ?? (string) request('quick_metric', '');
 
+    // Demo tab fixed "Demo" disposition ko backend ke saath save karega.
+    $demoDisposition = $dispositions->first(
+        fn ($item) => mb_strtolower(trim((string) $item->name)) === 'demo'
+    );
+
     // KPI click par existing search/board filters preserve rahenge,
     // pagination reset hogi aur selected quick_metric database query me jayega.
     $metricBaseQuery = request()->except([
@@ -1682,12 +1687,15 @@
                 <div class="lead-list">
                     @forelse($sectionLeads as $lead)
                         @php
-                            $latestCall = $lead->latestCall;
+                            // Current employee ke New Call card par purane employee ki activity mat dikhana.
+                            $latestCall = $sectionKey === 'new' ? null : $lead->latestCall;
                             $latestRemark = $latestCall?->remarks
                                 ?? $latestCall?->remark
                                 ?? $latestCall?->auto_remarks
                                 ?? null;
-                            $latestFeedback = $latestRemark ?: $lead->latest_note_body;
+                            $latestFeedback = $sectionKey === 'new'
+                                ? null
+                                : ($latestRemark ?: $lead->latest_note_body);
 
                             $duration = $latestCall?->duration_seconds
                                 ?? $latestCall?->duration
@@ -2317,9 +2325,15 @@
                     >
                         <form
                             method="POST"
-                            :action="selectedLead.demoCallUrl"
+                            :action="selectedLead.demoUpdateUrl"
                         >
                             @csrf
+                            @method('PUT')
+                            <input type="hidden" name="demo_send_only" value="1">
+                            <input type="hidden" name="demo_send" value="1">
+                            @if($demoDisposition)
+                                <input type="hidden" name="call_disposition_id" value="{{ $demoDisposition->id }}">
+                            @endif
 
                             <div class="quick-status">
                                 <div class="text-[9px] font-bold uppercase text-slate-500">
@@ -2332,7 +2346,7 @@
                                         ? 'text-emerald-600'
                                         : 'text-violet-700'"
                                     x-text="selectedLead.demoSent
-                                        ? 'Demo Already Sent'
+                                        ? 'Demo Already Sent — Resend Allowed'
                                         : 'Ready To Send Demo'"
                                 ></div>
 
@@ -2386,7 +2400,7 @@
                                     class="quick-btn quick-btn-violet"
                                 >
                                     <i data-lucide="video"></i>
-                                    <span>Send Demo</span>
+                                    <span x-text="selectedLead.demoSent ? 'Resend Demo' : 'Send Demo'"></span>
                                 </button>
                             </div>
                         </form>

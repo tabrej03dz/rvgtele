@@ -11,40 +11,8 @@ class Data extends Model
 
     protected $table = 'data';
 
-    protected $fillable = [
-        'company_id',
-
-        'name',
-        'company_name',
-
-        'mobile',
-        'alternate_mobile',
-        'whatsapp_number',
-        'email',
-
-        'category',
-        'lead_source',
-        'campaign',
-
-        'address',
-        'city',
-        'district',
-        'state',
-        'pincode',
-
-        'industry',
-        'required_product',
-        'preferred_language',
-
-        'estimated_budget',
-
-        'remarks',
-
-        'converted',
-        'lead_id',
-        'converted_at',
-
-        'raw_data',
+    protected $guarded = [
+        'id',
     ];
 
     protected $casts = [
@@ -62,5 +30,23 @@ class Data extends Model
     public function lead()
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Category Relation
+    |--------------------------------------------------------------------------
+    |
+    | Relation ka naam "category" nahi rakhenge kyunki data table me
+    | already "category" naam ka string column hai.
+    |
+    */
+
+    public function categoryInfo()
+    {
+        return $this->belongsTo(
+            Category::class,
+            'category_id'
+        );
     }
 }
