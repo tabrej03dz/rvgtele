@@ -1213,6 +1213,38 @@
         'demo_status',
         'label_id',
     ];
+
+    $activeQuickMetric = $quickMetric ?? (string) request('quick_metric', '');
+
+    // KPI click par existing search/board filters preserve rahenge,
+    // pagination reset hogi aur selected quick_metric database query me jayega.
+    $metricBaseQuery = request()->except([
+        'quick_metric',
+        'new_page',
+        'dialed_page',
+        'connected_page',
+        'page',
+    ]);
+
+    $metricUrl = function (string $metric) use ($metricBaseQuery, $activeQuickMetric) {
+        if ($activeQuickMetric === $metric) {
+            return route('leads.index', $metricBaseQuery);
+        }
+
+        return route('leads.index', array_merge($metricBaseQuery, [
+            'quick_metric' => $metric,
+        ]));
+    };
+
+    $quickMetricLabels = [
+        'calls_today' => 'Calls Today',
+        'connected_today' => 'Connected Today',
+        'employee_total_calls' => 'Employee Total Calls',
+        'unique_connected' => 'Unique Connected',
+        'follow_up' => 'Follow-up Calls',
+        'demo_today' => 'Demo Today',
+        'total_demo' => 'Total Demo',
+    ];
 @endphp
 
 <div
@@ -1286,103 +1318,91 @@
             </div>
         </div>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'calls_today' }"
-                @click="toggleMetric('calls_today')"
-                title="Filter Calls Today">
+        <a href="{{ $metricUrl('calls_today') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'calls_today' ? 'active-metric' : '' }}"
+           title="Filter Calls Today">
             <span class="stat-icon bg-blue-50 text-blue-600"><i data-lucide="phone"></i></span>
             <div>
                 <div class="stat-label">Calls Today</div>
                 <div class="stat-number">{{ number_format($callsToday) }}</div>
             </div>
-        </button>
+        </a>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'connected_today' }"
-                @click="toggleMetric('connected_today')"
-                title="Filter Connected Today">
+        <a href="{{ $metricUrl('connected_today') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'connected_today' ? 'active-metric' : '' }}"
+           title="Filter Connected Today">
             <span class="stat-icon bg-violet-50 text-violet-600"><i data-lucide="users"></i></span>
             <div>
                 <div class="stat-label">Connected Today</div>
                 <div class="stat-number">{{ number_format($connectedToday) }}</div>
             </div>
-        </button>
+        </a>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'employee_total_calls' }"
-                @click="toggleMetric('employee_total_calls')"
-                title="Filter Employee Total Calls">
+        <a href="{{ $metricUrl('employee_total_calls') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'employee_total_calls' ? 'active-metric' : '' }}"
+           title="Filter Employee Total Calls">
             <span class="stat-icon bg-orange-50 text-orange-600"><i data-lucide="badge-headset"></i></span>
             <div>
                 <div class="stat-label">Employee Total Calls</div>
                 <div class="stat-number">{{ number_format($employeeTotalCalls) }}</div>
                 <div class="stat-sub">Since Joining</div>
             </div>
-        </button>
+        </a>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'unique_connected' }"
-                @click="toggleMetric('unique_connected')"
-                title="Filter Unique Connected">
+        <a href="{{ $metricUrl('unique_connected') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'unique_connected' ? 'active-metric' : '' }}"
+           title="Filter Unique Connected">
             <span class="stat-icon bg-cyan-50 text-cyan-600"><i data-lucide="users-round"></i></span>
             <div>
                 <div class="stat-label">Unique Connected</div>
                 <div class="stat-number">{{ number_format($uniqueConnected) }}</div>
                 <div class="stat-sub">Distinct Leads</div>
             </div>
-        </button>
+        </a>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'follow_up' }"
-                @click="toggleMetric('follow_up')"
-                title="Filter Follow-up Calls">
+        <a href="{{ $metricUrl('follow_up') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'follow_up' ? 'active-metric' : '' }}"
+           title="Filter Follow-up Calls">
             <span class="stat-icon bg-rose-50 text-rose-600"><i data-lucide="refresh-cw"></i></span>
             <div>
                 <div class="stat-label">Follow-up Calls</div>
                 <div class="stat-number">{{ number_format($followUpCount) }}</div>
             </div>
-        </button>
+        </a>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'demo_today' }"
-                @click="toggleMetric('demo_today')"
-                title="Filter Demo Today">
+        <a href="{{ $metricUrl('demo_today') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'demo_today' ? 'active-metric' : '' }}"
+           title="Filter Demo Today">
             <span class="stat-icon bg-blue-50 text-blue-600"><i data-lucide="video"></i></span>
             <div>
                 <div class="stat-label">Demo Today</div>
                 <div class="stat-number">{{ number_format($demoToday) }}</div>
             </div>
-        </button>
+        </a>
 
-        <button type="button"
-                class="stat-card stat-card-link"
-                :class="{ 'active-metric': quickMetric === 'total_demo' }"
-                @click="toggleMetric('total_demo')"
-                title="Filter Total Demo">
+        <a href="{{ $metricUrl('total_demo') }}"
+           class="stat-card stat-card-link {{ $activeQuickMetric === 'total_demo' ? 'active-metric' : '' }}"
+           title="Filter Total Demo">
             <span class="stat-icon bg-amber-50 text-amber-500"><i data-lucide="send"></i></span>
             <div>
                 <div class="stat-label">Total Demo</div>
                 <div class="stat-number">{{ number_format($totalDemo) }}</div>
                 <div class="stat-sub">Till Now</div>
             </div>
-        </button>
+        </a>
     </div>
 
-    <div x-show="quickMetric" x-cloak class="metric-filter-bar">
-        <span>
-            Showing:
-            <strong x-text="metricLabel()"></strong>
-        </span>
-        <button type="button" class="metric-filter-clear" @click="quickMetric = ''">
-            CLEAR FILTER
-        </button>
-    </div>
+    @if($activeQuickMetric !== '')
+        <div class="metric-filter-bar">
+            <span>
+                Showing database filter:
+                <strong>{{ $quickMetricLabels[$activeQuickMetric] ?? $activeQuickMetric }}</strong>
+            </span>
+            <a href="{{ route('leads.index', $metricBaseQuery) }}" class="metric-filter-clear">
+                CLEAR FILTER
+            </a>
+        </div>
+    @endif
 
     {{-- THREE COLUMNS --}}
     <div class="board-grid">
@@ -1710,19 +1730,6 @@
 
                             $whatsappNumber = preg_replace('/\D+/', '', (string) ($lead->whatsapp_number ?: $lead->mobile));
 
-                            $metricLead = [
-                                'section' => $sectionKey,
-                                'hasCall' => (bool) $latestCall,
-                                'latestCallToday' => (bool) ($latestCall?->created_at?->isToday()),
-                                'hasFollowup' => (bool) $lead->next_follow_up_at,
-                                'demoSent' => (bool) $lead->demo_send,
-                                'demoToday' => (bool) (
-                                    $lead->demo_send
-                                    && $lead->demo_sent_at
-                                    && \Illuminate\Support\Carbon::parse($lead->demo_sent_at)->isToday()
-                                ),
-                            ];
-
                             $popupLead = [
                                 'id' => (int) $lead->id,
                                 'name' => $lead->name ?: 'No Name',
@@ -1742,11 +1749,7 @@
                             ];
                         @endphp
 
-                        <div
-                            class="lead-card {{ $cardClass }}"
-                            x-show='metricMatches(@js($metricLead))'
-                            x-cloak
-                        >
+                        <div class="lead-card {{ $cardClass }}">
                             <div class="lead-top">
                                 <div class="lead-profile">
                                     <div class="lead-avatar {{ $avatarClass }}">{{ $initials ?: 'L' }}</div>
@@ -2427,7 +2430,6 @@
     function leadIndexBoard() {
         return {
             sendingCall: null,
-            quickMetric: '',
             feedbackOpen: false,
             feedbackTab: 'call',
             selectedLead: {
@@ -2459,61 +2461,6 @@
                 'connected_assigned_to','connected_date_filter','connected_disposition_id',
                 'connected_demo_status','connected_label_id'
             ]) ? 'true' : 'false' }},
-
-            toggleMetric(metric) {
-                this.quickMetric = this.quickMetric === metric ? '' : metric;
-
-                this.$nextTick(() => {
-                    const board = document.querySelector('.board-grid');
-                    if (board && this.quickMetric) {
-                        board.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                });
-            },
-
-            metricLabel() {
-                const labels = {
-                    calls_today: 'Calls Today',
-                    connected_today: 'Connected Today',
-                    employee_total_calls: 'Employee Total Calls',
-                    unique_connected: 'Unique Connected',
-                    follow_up: 'Follow-up Calls',
-                    demo_today: 'Demo Today',
-                    total_demo: 'Total Demo',
-                };
-
-                return labels[this.quickMetric] || '';
-            },
-
-            metricMatches(lead) {
-                if (!this.quickMetric) return true;
-
-                switch (this.quickMetric) {
-                    case 'calls_today':
-                        return lead.hasCall && lead.latestCallToday;
-
-                    case 'connected_today':
-                        return lead.section === 'connected' && lead.latestCallToday;
-
-                    case 'employee_total_calls':
-                        return lead.section === 'dialed' && lead.hasCall;
-
-                    case 'unique_connected':
-                        return lead.section === 'connected';
-
-                    case 'follow_up':
-                        return lead.hasFollowup;
-
-                    case 'demo_today':
-                        return lead.demoToday;
-
-                    case 'total_demo':
-                        return lead.demoSent;
-
-                    default:
-                        return true;
-                }
-            },
 
             openFeedback(lead) {
                 this.selectedLead = { ...this.selectedLead, ...lead };

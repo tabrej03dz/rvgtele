@@ -702,6 +702,33 @@ public function index(Request $request): View
 
     /*
     |--------------------------------------------------------------------------
+    | Dashboard Quick Metric Filter
+    |--------------------------------------------------------------------------
+    |
+    | Top KPI card se aane wala filter. Ye server/database level par apply hoga,
+    | sirf browser me already-loaded cards ko hide/show nahi karega.
+    |
+    */
+
+    $quickMetric = (string) $request->input('quick_metric', '');
+
+    $allowedQuickMetrics = [
+        'calls_today',
+        'connected_today',
+        'employee_total_calls',
+        'unique_connected',
+        'follow_up',
+        'demo_today',
+        'total_demo',
+    ];
+
+    if (!in_array($quickMetric, $allowedQuickMetrics, true)) {
+        $quickMetric = '';
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | Remove Board Specific Filters From Existing filteredLeadQuery()
     |--------------------------------------------------------------------------
     |
@@ -727,6 +754,11 @@ public function index(Request $request): View
 
     $baseRequest->query->remove('call_disposition');
     $baseRequest->request->remove('call_disposition');
+
+    // Quick metric ko filteredLeadQuery() me nahi bhejna hai.
+    // Isko niche tino board queries par explicitly apply karenge.
+    $baseRequest->query->remove('quick_metric');
+    $baseRequest->request->remove('quick_metric');
 
     /*
     |--------------------------------------------------------------------------
@@ -879,6 +911,12 @@ public function index(Request $request): View
         $companyId
     );
 
+    $this->applyQuickMetricFilter(
+        $newQuery,
+        $quickMetric,
+        'new'
+    );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -899,6 +937,12 @@ public function index(Request $request): View
         $request,
         'dialed',
         $companyId
+    );
+
+    $this->applyQuickMetricFilter(
+        $dialedQuery,
+        $quickMetric,
+        'dialed'
     );
 
 
@@ -1004,6 +1048,12 @@ public function index(Request $request): View
         $companyId
     );
 
+    $this->applyQuickMetricFilter(
+        $connectedQuery,
+        $quickMetric,
+        'connected'
+    );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -1086,6 +1136,36 @@ public function index(Request $request): View
             $statsRequest
         );
 
+    // Dashboard numbers quick_metric se independent rahenge.
+    $connectedStatsQuery = clone $accessibleStatsQuery;
+
+    $connectedStatsQuery
+        ->whereHas('calls')
+        ->where(function (Builder $connected) {
+            $connected->whereHas('notes');
+
+            if (Schema::hasColumn('call_logs', 'remarks')) {
+                $connected->orWhereHas('calls', function (Builder $calls) {
+                    $calls->whereNotNull('remarks')
+                        ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
+                });
+            }
+
+            if (Schema::hasColumn('call_logs', 'remark')) {
+                $connected->orWhereHas('calls', function (Builder $calls) {
+                    $calls->whereNotNull('remark')
+                        ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
+                });
+            }
+
+            if (Schema::hasColumn('call_logs', 'auto_remarks')) {
+                $connected->orWhereHas('calls', function (Builder $calls) {
+                    $calls->whereNotNull('auto_remarks')
+                        ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
+                });
+            }
+        });
+
 
     /*
     |--------------------------------------------------------------------------
@@ -1130,7 +1210,7 @@ public function index(Request $request): View
     */
 
     $connectedToday =
-        (clone $connectedQuery)
+        (clone $connectedStatsQuery)
             ->whereHas(
                 'calls',
                 function (Builder $query) {
@@ -1202,7 +1282,7 @@ public function index(Request $request): View
     */
 
     $uniqueConnected =
-        (clone $connectedQuery)
+        (clone $connectedStatsQuery)
             ->count();
 
 
@@ -1535,6 +1615,9 @@ public function index(Request $request): View
 
             'totalDemo' =>
                 $totalDemo,
+
+            'quickMetric' =>
+                $quickMetric,
 
             'statuses' =>
                 $statuses,
@@ -4320,6 +4403,72 @@ public function index(Request $request): View
     }
 
     return $keys;
+}
+
+
+private function applyQuickMetricFilter(
+    Builder $query,
+    string $quickMetric,
+    string $section
+): Builder {
+
+    if ($quickMetric === '') {
+        return $query;
+    }
+
+    switch ($quickMetric) {
+
+        case 'calls_today':
+            // Aaj kam se kam ek call hui ho.
+            $query->whereHas('calls', function (Builder $calls) {
+                $calls->whereDate('call_logs.created_at', today());
+            });
+            break;
+
+        case 'connected_today':
+            // Sirf Connected column, aur call aaj ki ho.
+            if ($section !== 'connected') {
+                $query->whereRaw('1 = 0');
+                break;
+            }
+
+            $query->whereHas('calls', function (Builder $calls) {
+                $calls->whereDate('call_logs.created_at', today());
+            });
+            break;
+
+        case 'employee_total_calls':
+            // New Call me koi call hoti hi nahi. Dialed column me sab called leads.
+            // Connected ko hide rakhte hain taaki same lead duplicate na dikhe.
+            if ($section !== 'dialed') {
+                $query->whereRaw('1 = 0');
+            }
+            break;
+
+        case 'unique_connected':
+            // Distinct connected leads sirf Connected column me.
+            if ($section !== 'connected') {
+                $query->whereRaw('1 = 0');
+            }
+            break;
+
+        case 'follow_up':
+            $query->whereNotNull('leads.next_follow_up_at');
+            break;
+
+        case 'demo_today':
+            $query
+                ->where('leads.demo_send', true)
+                ->whereNotNull('leads.demo_sent_at')
+                ->whereDate('leads.demo_sent_at', today());
+            break;
+
+        case 'total_demo':
+            $query->where('leads.demo_send', true);
+            break;
+    }
+
+    return $query;
 }
 
 
