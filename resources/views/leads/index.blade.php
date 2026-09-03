@@ -307,7 +307,11 @@
     .call-time svg { width: 11px; height: 11px; }
     .call-state { margin-top: 6px; font-weight: 700; }
     .feedback-row { margin-top: 9px; font-size: 9.5px; color: #475467; line-height: 1.45; }
+    .feedback-label,
+    .note-label { color: #667085; }
     .feedback-value { font-weight: 700; color: #101828; }
+    .note-row { margin-top: 4px; font-size: 9.5px; color: #475467; line-height: 1.45; }
+    .note-value { font-weight: 700; color: #7c3aed; }
     .followup-row { margin-top: 4px; display: flex; align-items: center; gap: 4px; color: #475467; font-size: 9px; }
     .followup-row svg { width: 11px; height: 11px; }
     .card-bottom { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1695,7 +1699,11 @@
                                 ?? null;
                             $latestFeedback = $sectionKey === 'new'
                                 ? null
-                                : ($latestRemark ?: $lead->latest_note_body);
+                                : $latestRemark;
+
+                            $latestNote = $sectionKey === 'new'
+                                ? null
+                                : $lead->latest_note_body;
 
                             $duration = $latestCall?->duration_seconds
                                 ?? $latestCall?->duration
@@ -1810,8 +1818,13 @@
 
                             @if($sectionKey !== 'new')
                                 <div class="feedback-row">
-                                    Last Feedback:
+                                    <span class="feedback-label">Last Feedback:</span>
                                     <span class="feedback-value">{{ $latestFeedback ?: 'No feedback entered' }}</span>
+                                </div>
+
+                                <div class="note-row">
+                                    <span class="note-label">Note:</span>
+                                    <span class="note-value">{{ $latestNote ?: 'No note entered' }}</span>
                                 </div>
                             @endif
 
@@ -2910,7 +2923,11 @@
     .call-time svg { width: 11px; height: 11px; }
     .call-state { margin-top: 6px; font-weight: 700; }
     .feedback-row { margin-top: 9px; font-size: 9.5px; color: #475467; line-height: 1.45; }
+    .feedback-label,
+    .note-label { color: #667085; }
     .feedback-value { font-weight: 700; color: #101828; }
+    .note-row { margin-top: 4px; font-size: 9.5px; color: #475467; line-height: 1.45; }
+    .note-value { font-weight: 700; color: #7c3aed; }
     .followup-row { margin-top: 4px; display: flex; align-items: center; gap: 4px; color: #475467; font-size: 9px; }
     .followup-row svg { width: 11px; height: 11px; }
     .card-bottom { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -4298,7 +4315,11 @@
                                 ?? null;
                             $latestFeedback = $sectionKey === 'new'
                                 ? null
-                                : ($latestRemark ?: $lead->latest_note_body);
+                                : $latestRemark;
+
+                            $latestNote = $sectionKey === 'new'
+                                ? null
+                                : $lead->latest_note_body;
 
                             /*
                              | Popup me poori lead ki latest previous activity dikhani hai.
@@ -4434,8 +4455,13 @@
 
                             @if($sectionKey !== 'new')
                                 <div class="feedback-row">
-                                    Last Feedback:
+                                    <span class="feedback-label">Last Feedback:</span>
                                     <span class="feedback-value">{{ $latestFeedback ?: 'No feedback entered' }}</span>
+                                </div>
+
+                                <div class="note-row">
+                                    <span class="note-label">Note:</span>
+                                    <span class="note-value">{{ $latestNote ?: 'No note entered' }}</span>
                                 </div>
                             @endif
 
