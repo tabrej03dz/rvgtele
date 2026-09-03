@@ -29,6 +29,30 @@
         box-shadow: 0 2px 8px rgba(15, 23, 42, .035);
     }
 
+    .stat-card-link {
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+
+    .stat-card-link:hover {
+        transform: translateY(-2px);
+        border-color: #f3c54a;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, .08);
+    }
+
+    .stat-card-link:focus-visible {
+        outline: 3px solid rgba(245, 185, 0, .22);
+        outline-offset: 2px;
+    }
+
+    .stat-card-link .stat-label,
+    .stat-card-link .stat-number,
+    .stat-card-link .stat-sub {
+        color: inherit;
+    }
+
     .stat-icon {
         width: 40px;
         height: 40px;
@@ -383,12 +407,17 @@
         padding:18px;
         background:rgba(15,23,42,.58);
         backdrop-filter:blur(3px);
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
     }
 
     .quick-modal {
         width:100%;
         max-width:800px;
-        max-height:94vh;
+        max-height:calc(100dvh - 36px);
+        display:flex;
+        flex-direction:column;
         overflow:hidden;
         border:1px solid #f4ddb0;
         border-radius:18px;
@@ -401,6 +430,7 @@
 
     .quick-modal-head {
         position:relative;
+        flex:0 0 auto;
         display:flex;
         align-items:flex-start;
         justify-content:space-between;
@@ -491,8 +521,11 @@
     }
 
     .quick-modal-body {
-        max-height:calc(94vh - 112px);
+        flex:1 1 auto;
+        min-height:0;
         overflow-y:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
         padding:0 24px 22px;
         background:transparent;
     }
@@ -675,11 +708,16 @@
     }
 
     .quick-form-actions {
+        position:sticky;
+        bottom:-1px;
+        z-index:12;
         display:flex;
         align-items:center;
         justify-content:flex-end;
         gap:9px;
         margin-top:16px;
+        padding:12px 0 4px;
+        background:linear-gradient(to top, #fff 72%, rgba(255,255,255,.90) 88%, rgba(255,255,255,0));
     }
 
     .quick-btn {
@@ -732,7 +770,19 @@
 
     @media (max-width:700px) {
         .quick-modal-backdrop {
+            align-items:flex-start;
             padding:8px;
+        }
+
+        .quick-modal {
+            max-height:calc(100dvh - 16px);
+            margin:auto 0;
+            border-radius:14px;
+        }
+
+        .quick-modal-head {
+            padding-top:14px;
+            padding-bottom:10px;
         }
 
         .quick-modal-head,
@@ -741,14 +791,345 @@
             padding-right:14px;
         }
 
+        .quick-modal-title {
+            font-size:18px;
+        }
+
+        .quick-close {
+            width:38px;
+            height:38px;
+            flex-basis:38px;
+        }
+
         .quick-summary {
             grid-template-columns:repeat(2,1fr);
+            gap:8px;
+        }
+
+        .quick-summary-card {
+            min-height:74px;
+            padding:10px;
         }
 
         .quick-top-actions,
         .quick-tabs,
         .quick-grid {
             grid-template-columns:1fr;
+        }
+
+        .quick-top-actions,
+        .quick-tabs {
+            gap:7px;
+        }
+
+        .quick-primary-action,
+        .quick-tab {
+            min-height:44px;
+        }
+
+        .quick-panel {
+            padding:12px;
+        }
+
+        .quick-form-actions {
+            margin-left:-12px;
+            margin-right:-12px;
+            padding:12px 12px 6px;
+        }
+    }
+
+    @media (max-height:720px) {
+        .quick-modal-backdrop {
+            align-items:flex-start;
+            padding-top:8px;
+            padding-bottom:8px;
+        }
+
+        .quick-modal {
+            max-height:calc(100dvh - 16px);
+            margin:auto 0;
+        }
+
+        .quick-modal-head {
+            padding-top:12px;
+            padding-bottom:10px;
+        }
+
+        .quick-modal-body {
+            padding-bottom:12px;
+        }
+    }
+
+
+    /* =========================================================
+       COMPACT QUICK ACTION MODAL
+       ========================================================= */
+    .quick-modal {
+        max-width: 720px;
+        border-radius: 14px;
+    }
+
+    .quick-modal-head {
+        gap: 10px;
+        padding: 12px 16px 9px;
+    }
+
+    .quick-modal-tag {
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 6px;
+        font-size: 8px;
+    }
+
+    .quick-modal-tag svg {
+        width: 11px;
+        height: 11px;
+    }
+
+    .quick-modal-title {
+        margin-top: 5px;
+        font-size: 18px;
+    }
+
+    .quick-modal-meta {
+        margin-top: 5px;
+        gap: 10px;
+        font-size: 9px;
+    }
+
+    .quick-modal-meta svg {
+        width: 11px;
+        height: 11px;
+    }
+
+    .quick-close {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        border-radius: 9px;
+    }
+
+    .quick-close svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .quick-modal-body {
+        padding: 0 16px 14px;
+    }
+
+    .quick-summary {
+        gap: 7px;
+        margin-bottom: 9px;
+    }
+
+    .quick-summary-card {
+        min-height: 62px;
+        gap: 8px;
+        padding: 8px 9px;
+        border-radius: 10px;
+    }
+
+    .quick-summary-icon {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+    }
+
+    .quick-summary-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-summary-label {
+        font-size: 7px;
+    }
+
+    .quick-summary-value {
+        margin-top: 2px;
+        font-size: 10px;
+        line-height: 1.2;
+    }
+
+    .quick-top-actions {
+        gap: 7px;
+        margin-bottom: 7px;
+    }
+
+    .quick-primary-action {
+        min-height: 38px;
+        gap: 6px;
+        border-radius: 8px;
+        font-size: 9px;
+    }
+
+    .quick-primary-action svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-tabs {
+        gap: 7px;
+        margin-bottom: 8px;
+    }
+
+    .quick-tab {
+        min-height: 38px;
+        gap: 6px;
+        border-radius: 8px;
+        padding: 0 9px;
+        font-size: 9px;
+    }
+
+    .quick-tab svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-panel {
+        padding: 11px;
+        border-radius: 10px;
+    }
+
+    .quick-grid {
+        gap: 9px;
+    }
+
+    .quick-field label {
+        margin-bottom: 4px;
+        font-size: 9px;
+    }
+
+    .quick-field input,
+    .quick-field select,
+    .quick-field textarea {
+        border-radius: 8px;
+        font-size: 10px;
+    }
+
+    .quick-field input,
+    .quick-field select {
+        min-height: 36px;
+        padding: 0 9px;
+    }
+
+    .quick-field textarea {
+        min-height: 68px;
+        padding: 8px 9px;
+    }
+
+    .quick-status {
+        padding: 9px;
+        border-radius: 8px;
+    }
+
+    .quick-form-actions {
+        gap: 7px;
+        margin-top: 9px;
+        padding: 8px 0 2px;
+    }
+
+    .quick-btn {
+        min-height: 34px;
+        gap: 5px;
+        border-radius: 8px;
+        padding: 0 11px;
+        font-size: 8px;
+    }
+
+    .quick-btn svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    /* KPI filter buttons */
+    button.stat-card {
+        width: 100%;
+        text-align: left;
+    }
+
+    .stat-card-link.active-metric {
+        border-color: #f5b900;
+        background: #fffbeb;
+        box-shadow: 0 0 0 2px rgba(245,185,0,.11);
+    }
+
+    .metric-filter-bar {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        margin-top:8px;
+        padding:8px 11px;
+        border:1px solid #f2d675;
+        border-radius:8px;
+        background:#fffaf0;
+        color:#475467;
+        font-size:10px;
+        font-weight:700;
+    }
+
+    .metric-filter-clear {
+        border:0;
+        background:transparent;
+        color:#dc2626;
+        font-size:9px;
+        font-weight:900;
+        cursor:pointer;
+    }
+
+    @media (max-width:700px) {
+        .quick-modal-head {
+            padding: 10px 11px 8px;
+        }
+
+        .quick-modal-body {
+            padding-left: 11px;
+            padding-right: 11px;
+            padding-bottom: 10px;
+        }
+
+        .quick-summary {
+            grid-template-columns: repeat(2,1fr);
+            gap: 6px;
+        }
+
+        .quick-summary-card {
+            min-height: 56px;
+            padding: 7px;
+        }
+
+        .quick-top-actions,
+        .quick-tabs {
+            grid-template-columns: repeat(3,1fr);
+            gap: 5px;
+        }
+
+        .quick-primary-action,
+        .quick-tab {
+            min-height: 36px;
+            padding: 0 6px;
+            font-size: 8px;
+        }
+
+        .quick-grid {
+            grid-template-columns:1fr;
+        }
+    }
+
+    @media (max-height:720px) {
+        .quick-modal-head {
+            padding-top:8px;
+            padding-bottom:7px;
+        }
+
+        .quick-summary-card {
+            min-height:54px;
+        }
+
+        .quick-primary-action,
+        .quick-tab {
+            min-height:34px;
         }
     }
 
@@ -905,64 +1286,102 @@
             </div>
         </div>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'calls_today' }"
+                @click="toggleMetric('calls_today')"
+                title="Filter Calls Today">
             <span class="stat-icon bg-blue-50 text-blue-600"><i data-lucide="phone"></i></span>
             <div>
                 <div class="stat-label">Calls Today</div>
                 <div class="stat-number">{{ number_format($callsToday) }}</div>
             </div>
-        </div>
+        </button>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'connected_today' }"
+                @click="toggleMetric('connected_today')"
+                title="Filter Connected Today">
             <span class="stat-icon bg-violet-50 text-violet-600"><i data-lucide="users"></i></span>
             <div>
                 <div class="stat-label">Connected Today</div>
                 <div class="stat-number">{{ number_format($connectedToday) }}</div>
             </div>
-        </div>
+        </button>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'employee_total_calls' }"
+                @click="toggleMetric('employee_total_calls')"
+                title="Filter Employee Total Calls">
             <span class="stat-icon bg-orange-50 text-orange-600"><i data-lucide="badge-headset"></i></span>
             <div>
                 <div class="stat-label">Employee Total Calls</div>
                 <div class="stat-number">{{ number_format($employeeTotalCalls) }}</div>
                 <div class="stat-sub">Since Joining</div>
             </div>
-        </div>
+        </button>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'unique_connected' }"
+                @click="toggleMetric('unique_connected')"
+                title="Filter Unique Connected">
             <span class="stat-icon bg-cyan-50 text-cyan-600"><i data-lucide="users-round"></i></span>
             <div>
                 <div class="stat-label">Unique Connected</div>
                 <div class="stat-number">{{ number_format($uniqueConnected) }}</div>
                 <div class="stat-sub">Distinct Leads</div>
             </div>
-        </div>
+        </button>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'follow_up' }"
+                @click="toggleMetric('follow_up')"
+                title="Filter Follow-up Calls">
             <span class="stat-icon bg-rose-50 text-rose-600"><i data-lucide="refresh-cw"></i></span>
             <div>
                 <div class="stat-label">Follow-up Calls</div>
                 <div class="stat-number">{{ number_format($followUpCount) }}</div>
             </div>
-        </div>
+        </button>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'demo_today' }"
+                @click="toggleMetric('demo_today')"
+                title="Filter Demo Today">
             <span class="stat-icon bg-blue-50 text-blue-600"><i data-lucide="video"></i></span>
             <div>
                 <div class="stat-label">Demo Today</div>
                 <div class="stat-number">{{ number_format($demoToday) }}</div>
             </div>
-        </div>
+        </button>
 
-        <div class="stat-card">
+        <button type="button"
+                class="stat-card stat-card-link"
+                :class="{ 'active-metric': quickMetric === 'total_demo' }"
+                @click="toggleMetric('total_demo')"
+                title="Filter Total Demo">
             <span class="stat-icon bg-amber-50 text-amber-500"><i data-lucide="send"></i></span>
             <div>
                 <div class="stat-label">Total Demo</div>
                 <div class="stat-number">{{ number_format($totalDemo) }}</div>
                 <div class="stat-sub">Till Now</div>
             </div>
-        </div>
+        </button>
+    </div>
+
+    <div x-show="quickMetric" x-cloak class="metric-filter-bar">
+        <span>
+            Showing:
+            <strong x-text="metricLabel()"></strong>
+        </span>
+        <button type="button" class="metric-filter-clear" @click="quickMetric = ''">
+            CLEAR FILTER
+        </button>
     </div>
 
     {{-- THREE COLUMNS --}}
@@ -990,7 +1409,7 @@
                 $showVar = $section['show_var'];
             @endphp
 
-            <section class="call-column {{ $section['column_class'] }}">
+            <section id="{{ $sectionKey }}-call-section" class="call-column {{ $section['column_class'] }}" style="scroll-margin-top: 18px;">
 
                 {{-- COLUMN HEADER --}}
                 <div class="column-header">
@@ -1291,6 +1710,19 @@
 
                             $whatsappNumber = preg_replace('/\D+/', '', (string) ($lead->whatsapp_number ?: $lead->mobile));
 
+                            $metricLead = [
+                                'section' => $sectionKey,
+                                'hasCall' => (bool) $latestCall,
+                                'latestCallToday' => (bool) ($latestCall?->created_at?->isToday()),
+                                'hasFollowup' => (bool) $lead->next_follow_up_at,
+                                'demoSent' => (bool) $lead->demo_send,
+                                'demoToday' => (bool) (
+                                    $lead->demo_send
+                                    && $lead->demo_sent_at
+                                    && \Illuminate\Support\Carbon::parse($lead->demo_sent_at)->isToday()
+                                ),
+                            ];
+
                             $popupLead = [
                                 'id' => (int) $lead->id,
                                 'name' => $lead->name ?: 'No Name',
@@ -1310,7 +1742,11 @@
                             ];
                         @endphp
 
-                        <div class="lead-card {{ $cardClass }}">
+                        <div
+                            class="lead-card {{ $cardClass }}"
+                            x-show='metricMatches(@js($metricLead))'
+                            x-cloak
+                        >
                             <div class="lead-top">
                                 <div class="lead-profile">
                                     <div class="lead-avatar {{ $avatarClass }}">{{ $initials ?: 'L' }}</div>
@@ -1991,6 +2427,7 @@
     function leadIndexBoard() {
         return {
             sendingCall: null,
+            quickMetric: '',
             feedbackOpen: false,
             feedbackTab: 'call',
             selectedLead: {
@@ -2022,6 +2459,61 @@
                 'connected_assigned_to','connected_date_filter','connected_disposition_id',
                 'connected_demo_status','connected_label_id'
             ]) ? 'true' : 'false' }},
+
+            toggleMetric(metric) {
+                this.quickMetric = this.quickMetric === metric ? '' : metric;
+
+                this.$nextTick(() => {
+                    const board = document.querySelector('.board-grid');
+                    if (board && this.quickMetric) {
+                        board.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            },
+
+            metricLabel() {
+                const labels = {
+                    calls_today: 'Calls Today',
+                    connected_today: 'Connected Today',
+                    employee_total_calls: 'Employee Total Calls',
+                    unique_connected: 'Unique Connected',
+                    follow_up: 'Follow-up Calls',
+                    demo_today: 'Demo Today',
+                    total_demo: 'Total Demo',
+                };
+
+                return labels[this.quickMetric] || '';
+            },
+
+            metricMatches(lead) {
+                if (!this.quickMetric) return true;
+
+                switch (this.quickMetric) {
+                    case 'calls_today':
+                        return lead.hasCall && lead.latestCallToday;
+
+                    case 'connected_today':
+                        return lead.section === 'connected' && lead.latestCallToday;
+
+                    case 'employee_total_calls':
+                        return lead.section === 'dialed' && lead.hasCall;
+
+                    case 'unique_connected':
+                        return lead.section === 'connected';
+
+                    case 'follow_up':
+                        return lead.hasFollowup;
+
+                    case 'demo_today':
+                        return lead.demoToday;
+
+                    case 'total_demo':
+                        return lead.demoSent;
+
+                    default:
+                        return true;
+                }
+            },
 
             openFeedback(lead) {
                 this.selectedLead = { ...this.selectedLead, ...lead };
