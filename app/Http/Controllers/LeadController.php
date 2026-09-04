@@ -270,12 +270,9 @@ public function index(Request $request): View
                                     ->whereNotNull('leads.assigned_to')
                                     ->whereColumn('call_logs.user_id', 'leads.assigned_to')
                                     ->whereRaw(
-                                        'call_logs.created_at >= COALESCE((
-'
-                                        . 'SELECT MAX(la.assigned_at) FROM lead_assignments la '
+                                        'call_logs.created_at >= COALESCE(('. 'SELECT MAX(la.assigned_at) FROM lead_assignments la '
                                         . 'WHERE la.lead_id = leads.id '
-                                        . 'AND la.new_user_id = leads.assigned_to
-'
+                                        . 'AND la.new_user_id = leads.assigned_to'
                                         . '), leads.created_at)'
                                     );
                             })

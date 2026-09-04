@@ -644,116 +644,248 @@
 </div>
 
 <script>
-    window.bulkDownloadRunning = false;
+    let bulkDownloadRunning = false;
 
-    async function bulkDownloadFiles(urls, button = null) {
+    function safeDownloadFileName(name) {
+        name = String(name || 'demo-file');
 
-        if (window.bulkDownloadRunning) {
+        // Windows invalid characters
+        name = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-');
+
+        // Multiple spaces
+        name = name.replace(/\s+/g, ' ');
+
+        // Ending dots/spaces
+        name = name.replace(/[. ]+$/g, '');
+
+        if (!name) {
+            name = 'demo-file';
+        }
+
+        return name;
+    }
+
+    function uniqueDownloadFileName(originalName, usedNames) {
+        let name = safeDownloadFileName(originalName);
+        let lower = name.toLowerCase();
+
+        if (!usedNames.has(lower)) {
+            usedNames.add(lower);
+            return name;
+        }
+
+        const lastDot = name.lastIndexOf('.');
+
+        let base = name;
+        let extension = '';
+
+        if (lastDot > 0) {
+            base = name.substring(0, lastDot);
+            extension = name.substring(lastDot);
+        }
+
+        let counter = 2;
+        let candidate;
+
+        do {
+            candidate = base + ' (' + counter + ')' + extension;
+            counter++;
+        } while (usedNames.has(candidate.toLowerCase()));
+
+        usedNames.add(candidate.toLowerCase());
+
+        return candidate;
+    }
+
+    async function downloadCityFiles(files, button = null) {
+
+        if (bulkDownloadRunning) {
             return;
         }
 
-        if (!Array.isArray(urls) || urls.length === 0) {
+        if (!Array.isArray(files) || files.length === 0) {
+            alert('No demo files available.');
+            return;
+        }
 
-            alert('No demo files available for download.');
+        /*
+        |--------------------------------------------------------------------------
+        | Chrome / Edge Folder API
+        |--------------------------------------------------------------------------
+        */
+        if (typeof window.showDirectoryPicker !== 'function') {
+            alert(
+                'Bulk Download requires latest Chrome or Edge desktop browser.'
+            );
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Select Folder
+        |--------------------------------------------------------------------------
+        */
+        let directoryHandle;
+
+        try {
+
+            directoryHandle = await window.showDirectoryPicker({
+                mode: 'readwrite'
+            });
+
+        } catch (error) {
+
+            if (error && error.name === 'AbortError') {
+                return;
+            }
+
+            console.error('Folder picker error:', error);
+
+            alert('Unable to select download folder.');
 
             return;
         }
 
+        bulkDownloadRunning = true;
 
-        const total = urls.length;
+        const total = files.length;
 
         const textElement = button
             ? button.querySelector('.bulk-download-text')
             : null;
 
         const originalText = textElement
-            ? textElement.innerText
+            ? textElement.textContent
             : 'Bulk Download';
 
-
-        window.bulkDownloadRunning = true;
-
-
         if (button) {
-
             button.disabled = true;
             button.style.opacity = '0.65';
             button.style.cursor = 'not-allowed';
-
         }
 
+        const usedNames = new Set();
+
+        let downloaded = 0;
+        let failed = 0;
 
         try {
 
-            for (
-                let index = 0;
-                index < urls.length;
-                index++
-            ) {
+            for (let index = 0; index < files.length; index++) {
+
+                const file = files[index];
 
                 if (textElement) {
-
-                    textElement.innerText =
+                    textElement.textContent =
                         `Downloading ${index + 1}/${total}`;
-
                 }
 
+                try {
 
-                const link =
-                    document.createElement('a');
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Download file from Laravel
+                    |--------------------------------------------------------------------------
+                    */
+                    const response = await fetch(file.url, {
+                        method: 'GET',
 
-                link.href = urls[index];
+                        credentials: 'same-origin',
 
-                link.style.display = 'none';
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
 
-
-                document.body.appendChild(link);
-
-                link.click();
-
-
-                setTimeout(() => {
-
-                    if (link.parentNode) {
-
-                        link.parentNode
-                            .removeChild(link);
-
+                    if (!response.ok) {
+                        throw new Error(
+                            'Download failed: ' + response.status
+                        );
                     }
 
-                }, 1000);
+                    const blob = await response.blob();
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Safe unique filename
+                    |--------------------------------------------------------------------------
+                    */
+                    const fileName = uniqueDownloadFileName(
+                        file.name,
+                        usedNames
+                    );
 
-                /*
-                |--------------------------------------------------------------------------
-                | 900ms Gap
-                |--------------------------------------------------------------------------
-                */
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Create file
+                    |--------------------------------------------------------------------------
+                    */
+                    const fileHandle =
+                        await directoryHandle.getFileHandle(
+                            fileName,
+                            {
+                                create: true
+                            }
+                        );
 
-                await new Promise(resolve => {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Save blob
+                    |--------------------------------------------------------------------------
+                    */
+                    const writable =
+                        await fileHandle.createWritable();
 
-                    setTimeout(resolve, 900);
+                    await writable.write(blob);
 
-                });
+                    await writable.close();
 
+                    downloaded++;
+
+                } catch (fileError) {
+
+                    failed++;
+
+                    console.error(
+                        'Failed file:',
+                        file,
+                        fileError
+                    );
+                }
             }
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Completed
+            |--------------------------------------------------------------------------
+            */
             if (textElement) {
 
-                textElement.innerText =
-                    `${total} Files Started`;
-
+                if (failed === 0) {
+                    textElement.textContent =
+                        `${downloaded} Files Downloaded`;
+                } else {
+                    textElement.textContent =
+                        `${downloaded} Downloaded, ${failed} Failed`;
+                }
             }
 
+            if (failed === 0) {
 
-            setTimeout(() => {
+                alert(
+                    downloaded +
+                    ' files successfully downloaded.'
+                );
 
-                if (textElement) {
-                    textElement.innerText = originalText;
-                }
+            } else {
 
-            }, 2500);
+                alert(
+                    downloaded +
+                    ' files downloaded.\n' +
+                    failed +
+                    ' files failed.'
+                );
+            }
 
         } catch (error) {
 
@@ -763,34 +895,26 @@
             );
 
             alert(
-                'Some files could not be downloaded.'
+                'Bulk download could not be completed.'
             );
 
         } finally {
 
-            window.bulkDownloadRunning = false;
+            bulkDownloadRunning = false;
 
-
-            setTimeout(() => {
+            setTimeout(function () {
 
                 if (button) {
-
                     button.disabled = false;
                     button.style.opacity = '';
                     button.style.cursor = '';
-
                 }
-
 
                 if (textElement) {
-
-                    textElement.innerText =
-                        originalText;
-
+                    textElement.textContent = originalText;
                 }
 
-            }, 1000);
-
+            }, 2000);
         }
     }
 </script>
