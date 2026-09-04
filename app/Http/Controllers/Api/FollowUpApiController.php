@@ -10,123 +10,155 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+
+
 class FollowUpApiController extends Controller
 {
-    /**
-     * Admin/Super Admin को company के सभी follow-ups मिलेंगे।
-     * Normal user को केवल अपने follow-ups मिलेंगे।
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'search' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
 
-            'status' => [
-                'nullable',
-                Rule::in([
-                    'all',
-                    'pending',
-                    'completed',
-                    'cancelled',
-                    'overdue',
-                    'due_soon',
-                    'today',
-                    'upcoming',
-                ]),
-            ],
 
-            'assigned_to' => [
-                'nullable',
-                'integer',
-            ],
+public function index(Request $request): JsonResponse
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    */
 
-            'date_from' => [
-                'nullable',
-                'date',
-            ],
+    $validated = $request->validate([
+        'search' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
 
-            'date_to' => [
-                'nullable',
-                'date',
-                'after_or_equal:date_from',
-            ],
+        'status' => [
+            'nullable',
+            Rule::in([
+                'all',
+                'pending',
+                'completed',
+                'cancelled',
+                'overdue',
+                'due_soon',
+                'today',
+                'upcoming',
+            ]),
+        ],
 
-            'per_page' => [
-                'nullable',
-                'integer',
-                Rule::in([
-                    10,
-                    20,
-                    25,
-                    50,
-                    100,
-                ]),
-            ],
+        'assigned_to' => [
+            'nullable',
+            'integer',
+        ],
+
+        'date_from' => [
+            'nullable',
+            'date_format:Y-m-d',
+        ],
+
+        'date_to' => [
+            'nullable',
+            'date_format:Y-m-d',
+            'after_or_equal:date_from',
+        ],
+
+        'per_page' => [
+            'nullable',
+            'integer',
+            Rule::in([
+                10,
+                20,
+                25,
+                50,
+                100,
+            ]),
+        ],
+
+        'page' => [
+            'nullable',
+            'integer',
+            'min:1',
+        ],
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accessible Follow-up Query
+    |--------------------------------------------------------------------------
+    |
+    | accessibleQuery() के हिसाब से:
+    |
+    | Super Admin/Admin = पूरी company
+    | Manager/Team Leader = अपनी team
+    | Employee = केवल अपने follow-ups
+    |
+    */
+
+    $query = $this->accessibleQuery($request)
+        ->with([
+            'lead',
+            'assignedUser:id,name,email,employee_code,team_id',
         ]);
 
-        $query = $this->accessibleQuery($request)
-            ->with([
-                'lead',
-                'assignedUser:id,name,email,employee_code',
-            ]);
+    /*
+    |--------------------------------------------------------------------------
+    | Search By Lead Name Or Mobile
+    |--------------------------------------------------------------------------
+    */
 
-        /*
-        |--------------------------------------------------------------------------
-        | Search
-        |--------------------------------------------------------------------------
-        */
+    if (!empty($validated['search'])) {
+        $search = trim((string) $validated['search']);
 
-        if ($request->filled('search')) {
-            $search = trim((string) $request->search);
+        $query->whereHas(
+            'lead',
+            function (Builder $leadQuery) use ($search) {
+                $leadQuery->where(
+                    function (Builder $builder) use ($search) {
+                        $builder
+                            ->where(
+                                'name',
+                                'like',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'mobile',
+                                'like',
+                                "%{$search}%"
+                            );
+                    }
+                );
+            }
+        );
+    }
 
-            $query->where(function (Builder $builder) use ($search) {
-                $builder
-                    ->where('notes', 'like', "%{$search}%")
-                    ->orWhereHas('lead', function (Builder $leadQuery) use ($search) {
-                        $leadQuery->where(function (Builder $searchQuery) use ($search) {
-                            $searchQuery
-                                ->where('name', 'like', "%{$search}%")
-                                ->orWhere('business_name', 'like', "%{$search}%")
-                                ->orWhere('mobile', 'like', "%{$search}%")
-                                ->orWhere('phone', 'like', "%{$search}%")
-                                ->orWhere('city', 'like', "%{$search}%");
-                        });
-                    });
-            });
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | Status Filter
+    |--------------------------------------------------------------------------
+    */
 
-        /*
-        |--------------------------------------------------------------------------
-        | Status Filter
-        |--------------------------------------------------------------------------
-        */
+    $status = $validated['status'] ?? 'all';
 
-        $status = $validated['status'] ?? 'all';
-
-        if ($status === 'pending') {
+    switch ($status) {
+        case 'pending':
             $query->where('status', 'pending');
-        }
+            break;
 
-        if ($status === 'completed') {
+        case 'completed':
             $query->where('status', 'completed');
-        }
+            break;
 
-        if ($status === 'cancelled') {
+        case 'cancelled':
             $query->where('status', 'cancelled');
-        }
+            break;
 
-        if ($status === 'overdue') {
+        case 'overdue':
             $query
                 ->where('status', 'pending')
                 ->whereNotNull('scheduled_at')
                 ->where('scheduled_at', '<', now());
-        }
+            break;
 
-        if ($status === 'due_soon') {
+        case 'due_soon':
             $query
                 ->where('status', 'pending')
                 ->whereNotNull('scheduled_at')
@@ -134,97 +166,156 @@ class FollowUpApiController extends Controller
                     now(),
                     now()->copy()->addMinutes(30),
                 ]);
-        }
+            break;
 
-        if ($status === 'today') {
+        case 'today':
             $query
                 ->whereNotNull('scheduled_at')
-                ->whereDate('scheduled_at', today());
-        }
+                ->whereBetween('scheduled_at', [
+                    now()->copy()->startOfDay(),
+                    now()->copy()->endOfDay(),
+                ]);
+            break;
 
-        if ($status === 'upcoming') {
+        case 'upcoming':
             $query
                 ->where('status', 'pending')
                 ->whereNotNull('scheduled_at')
                 ->where('scheduled_at', '>', now());
-        }
+            break;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Assigned User Filter
-        |--------------------------------------------------------------------------
-        |
-        | यह filter केवल admin/super_admin इस्तेमाल कर सकते हैं।
-        |
-        */
-
-        if (
-            $this->hasFullAccess($request)
-            && $request->filled('assigned_to')
-        ) {
-            $query->where(
-                'assigned_to',
-                (int) $request->assigned_to
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Date Filters
-        |--------------------------------------------------------------------------
-        */
-
-        if ($request->filled('date_from')) {
-            $query->whereDate(
-                'scheduled_at',
-                '>=',
-                $validated['date_from']
-            );
-        }
-
-        if ($request->filled('date_to')) {
-            $query->whereDate(
-                'scheduled_at',
-                '<=',
-                $validated['date_to']
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Pagination
-        |--------------------------------------------------------------------------
-        */
-
-        $followUps = $query
-            ->orderByRaw("
-                CASE
-                    WHEN status = 'pending'
-                        AND scheduled_at IS NOT NULL
-                        AND scheduled_at < NOW()
-                    THEN 0
-
-                    WHEN status = 'pending'
-                        AND scheduled_at IS NOT NULL
-                    THEN 1
-
-                    ELSE 2
-                END
-            ")
-            ->orderBy('scheduled_at')
-            ->orderByDesc('id')
-            ->paginate((int) ($validated['per_page'] ?? 25));
-
-        $followUps->getCollection()->transform(
-            fn (FollowUp $followUp) => $this->formatFollowUp($followUp)
-        );
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Follow-ups fetched successfully.',
-            'data' => $followUps,
-        ]);
+        case 'all':
+        default:
+            /*
+             * कोई status condition नहीं लगेगी।
+             */
+            break;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Date From Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if (!empty($validated['date_from'])) {
+        $dateFrom = Carbon::createFromFormat(
+            'Y-m-d',
+            $validated['date_from'],
+            config('app.timezone')
+        )->startOfDay();
+
+        $query->where(
+            'scheduled_at',
+            '>=',
+            $dateFrom
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Date To Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if (!empty($validated['date_to'])) {
+        $dateTo = Carbon::createFromFormat(
+            'Y-m-d',
+            $validated['date_to'],
+            config('app.timezone')
+        )->endOfDay();
+
+        $query->where(
+            'scheduled_at',
+            '<=',
+            $dateTo
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assigned Employee Filter
+    |--------------------------------------------------------------------------
+    |
+    | accessibleQuery() पहले ही access restrict कर चुका है।
+    | इसलिए manager केवल अपनी team के user को filter कर पाएगा।
+    |
+    */
+
+    if (!empty($validated['assigned_to'])) {
+        $query->where(
+            'assigned_to',
+            (int) $validated['assigned_to']
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination And Sorting
+    |--------------------------------------------------------------------------
+    */
+
+    $perPage = (int) ($validated['per_page'] ?? 25);
+
+    $followUps = $query
+        ->orderByRaw("
+            CASE
+                WHEN status = 'pending'
+                    AND scheduled_at IS NOT NULL
+                    AND scheduled_at < NOW()
+                THEN 0
+
+                WHEN status = 'pending'
+                    AND scheduled_at IS NOT NULL
+                THEN 1
+
+                ELSE 2
+            END
+        ")
+        ->orderBy('scheduled_at')
+        ->orderByDesc('id')
+        ->paginate($perPage)
+        ->withQueryString();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clean Flutter Response
+    |--------------------------------------------------------------------------
+    */
+
+    $followUps->getCollection()->transform(
+        fn (FollowUp $followUp) =>
+            $this->formatFollowUp($followUp)
+    );
+
+    return response()->json([
+        'status' => true,
+
+        'message' =>
+            'Follow-ups fetched successfully.',
+
+        'filters' => [
+            'search' =>
+                $validated['search'] ?? null,
+
+            'status' =>
+                $status,
+
+            'assigned_to' =>
+                isset($validated['assigned_to'])
+                    ? (int) $validated['assigned_to']
+                    : null,
+
+            'date_from' =>
+                $validated['date_from'] ?? null,
+
+            'date_to' =>
+                $validated['date_to'] ?? null,
+        ],
+
+        'data' => $followUps,
+    ]);
+}
 
     /**
      * Dashboard और tabs के लिए follow-up counts.
