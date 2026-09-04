@@ -5,10 +5,12 @@ use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\LeadApiController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\WhatsappMessageTemplateController;
+use App\Http\Controllers\Api\DashboardController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
+      Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get(
