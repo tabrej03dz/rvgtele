@@ -96,65 +96,61 @@
         >
 
 
-            {{-- SEARCH --}}
+            {{-- SEARCH + CATEGORY FILTER --}}
 
             <form
                 method="GET"
-
-                action="{{
-                    route(
-                        'demo-cities.index'
-                    )
-                }}"
-
-                class="relative"
+                action="{{ route('demo-cities.index') }}"
+                class="flex flex-wrap items-center gap-2"
             >
+                <div class="relative">
+                    <i
+                        data-lucide="search"
+                        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    ></i>
 
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ request('search') }}"
+                        placeholder="Search city..."
+                        class="h-10 w-[220px] rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-xs outline-none focus:border-amber-400"
+                    >
+                </div>
 
-                <i
-                    data-lucide="search"
-
-                    class="
-                        absolute
-                        left-3
-                        top-1/2
-                        h-4
-                        w-4
-                        -translate-y-1/2
-                        text-slate-400
-                    "
-                ></i>
-
-
-                <input
-                    type="text"
-
-                    name="search"
-
-                    value="{{
-                        request(
-                            'search'
-                        )
-                    }}"
-
-                    placeholder="Search city..."
-
-                    class="
-                        h-10
-                        w-[280px]
-                        rounded-lg
-                        border
-                        border-slate-200
-                        bg-white
-                        pl-10
-                        pr-4
-                        text-xs
-                        outline-none
-
-                        focus:border-amber-400
-                    "
+                <select
+                    name="category_id"
+                    class="h-10 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none focus:border-amber-400"
                 >
+                    <option value="">All Categories</option>
 
+                    @foreach($categories as $category)
+                        <option
+                            value="{{ $category->id }}"
+                            @selected((string) request('category_id') === (string) $category->id)
+                        >
+                            {{ $category->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <button
+                    type="submit"
+                    class="demo-btn demo-btn-dark"
+                >
+                    <i data-lucide="filter"></i>
+                    Filter
+                </button>
+
+                @if(request()->filled('search') || request()->filled('category_id'))
+                    <a
+                        href="{{ route('demo-cities.index') }}"
+                        class="demo-btn"
+                    >
+                        <i data-lucide="x"></i>
+                        Clear
+                    </a>
+                @endif
             </form>
 
 
@@ -471,7 +467,7 @@
 
                     <div class="flex items-start justify-between gap-3">
 
-                        <div>
+                        <div class="min-w-0">
 
                             <div class="city-title">
 
@@ -483,27 +479,41 @@
 
                             </div>
 
-                            <div class="mt-2 flex gap-2 text-[9px] font-bold text-slate-500">
-
-                                <span>
-                                    {{ $media->count() }} Files
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <span
+                                    class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-extrabold text-amber-700"
+                                >
+                                    {{ $categoryNames->get($city->category_id, 'No Category') }}
                                 </span>
 
-                                <span>•</span>
-
-                                <span>
-                                    {{ $images }} Images
-                                </span>
-
-                                <span>•</span>
-
-                                <span>
-                                    {{ $videos }} Videos
-                                </span>
-
+                                <div class="flex gap-2 text-[9px] font-bold text-slate-500">
+                                    <span>{{ $media->count() }} Files</span>
+                                    <span>•</span>
+                                    <span>{{ $images }} Images</span>
+                                    <span>•</span>
+                                    <span>{{ $videos }} Videos</span>
+                                </div>
                             </div>
 
                         </div>
+
+                        <form
+                            method="POST"
+                            action="{{ route('demo-cities.destroy', $city) }}"
+                            onsubmit="return confirm('Delete this city demo and all its files? This action cannot be undone.');"
+                            class="shrink-0"
+                        >
+                            @csrf
+                            @method('DELETE')
+
+                            <button
+                                type="submit"
+                                title="Delete city demo"
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                            >
+                                <i data-lucide="trash-2" class="h-4 w-4"></i>
+                            </button>
+                        </form>
 
                     </div>
 

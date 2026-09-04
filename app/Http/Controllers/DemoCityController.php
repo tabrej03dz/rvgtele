@@ -119,16 +119,27 @@ class DemoCityController extends Controller
 
     public function index(Request $request)
     {
-        $companyId = $this->companyId(
-            $request
-        );
+        $companyId = $this->companyId($request);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Categories For Filter / Card Labels
+        |--------------------------------------------------------------------------
+        */
+
+        $categories = Category::query()
+            ->where('company_id', $companyId)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+            ]);
+
+        $categoryNames = $categories
+            ->pluck('name', 'id');
 
         $query = DemoCity::query()
-            ->where(
-                'company_id',
-                $companyId
-            );
-
+            ->where('company_id', $companyId);
 
         /*
         |--------------------------------------------------------------------------
@@ -136,12 +147,7 @@ class DemoCityController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $search = trim(
-                (string) $request->get('search')
-            )
-        ) {
-
+        if ($search = trim((string) $request->get('search'))) {
             $query->where(
                 'name',
                 'like',
@@ -149,12 +155,30 @@ class DemoCityController extends Controller
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Category Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('category_id')) {
+            $categoryId = (int) $request->get('category_id');
+
+            abort_unless(
+                $categories->contains(
+                    fn ($category) => (int) $category->id === $categoryId
+                ),
+                404,
+                'Category not found.'
+            );
+
+            $query->where('category_id', $categoryId);
+        }
 
         $cities = $query
             ->latest('id')
             ->paginate(12)
             ->withQueryString();
-
 
         /*
         |--------------------------------------------------------------------------
@@ -163,64 +187,38 @@ class DemoCityController extends Controller
         */
 
         $totalCities = DemoCity::query()
-            ->where(
-                'company_id',
-                $companyId
-            )
+            ->where('company_id', $companyId)
             ->count();
 
-
         $allCities = DemoCity::query()
-            ->where(
-                'company_id',
-                $companyId
-            )
+            ->where('company_id', $companyId)
             ->get([
                 'id',
                 'media',
             ]);
 
-
         $totalFiles = 0;
         $totalImages = 0;
         $totalVideos = 0;
 
-
         foreach ($allCities as $city) {
-
-            foreach (
-                ($city->media ?? [])
-                as
-                $item
-            ) {
-
+            foreach (($city->media ?? []) as $item) {
                 $totalFiles++;
 
-
-                if (
-                    ($item['type'] ?? null)
-                    ===
-                    'image'
-                ) {
-
+                if (($item['type'] ?? null) === 'image') {
                     $totalImages++;
-
-                } elseif (
-                    ($item['type'] ?? null)
-                    ===
-                    'video'
-                ) {
-
+                } elseif (($item['type'] ?? null) === 'video') {
                     $totalVideos++;
                 }
             }
         }
 
-
         return view(
             'demo-cities.index',
             compact(
                 'cities',
+                'categories',
+                'categoryNames',
                 'totalCities',
                 'totalFiles',
                 'totalImages',
@@ -282,10 +280,15 @@ public function create(Request $request)
                     'name'
                 )->where(
                     fn ($query) =>
-                    $query->where(
-                        'company_id',
-                        $companyId
-                    )
+                    $query
+                        ->where(
+                            'company_id',
+                            $companyId
+                        )
+                        ->where(
+                            'category_id',
+                            (int) $request->input('category_id')
+                        )
                 ),
             ],
 
@@ -542,10 +545,15 @@ public function create(Request $request)
                 )
                     ->where(
                         fn ($query) =>
-                        $query->where(
-                            'company_id',
-                            $companyId
-                        )
+                        $query
+                            ->where(
+                                'company_id',
+                                $companyId
+                            )
+                            ->where(
+                                'category_id',
+                                (int) $request->input('category_id')
+                            )
                     )
                     ->ignore(
                         $demoCity->id
