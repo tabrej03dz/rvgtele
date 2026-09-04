@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\WhatsappMessageTemplateController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FollowUpApiController;
+use App\Http\Controllers\Api\CallDispositionApiController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -19,6 +20,25 @@ Route::middleware('auth:sanctum')->group(function () {
     [LeadApiController::class, 'communicationHistory']
 );
 
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Call Disposition APIs
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/call-dispositions',
+    [CallDispositionApiController::class, 'index']
+);
+
+Route::get(
+    '/call-dispositions/{callDisposition}',
+    [CallDispositionApiController::class, 'show']
+);
 
 
 /*
