@@ -2383,211 +2383,756 @@ public function communicationHistory(
 
 
 
+// public function saveCallResult(
+//     Request $request,
+//     Lead $lead
+// ): JsonResponse {
+//     $this->guard($request, $lead);
+
+//     $companyId = $this->companyId($request);
+//     $userId = (int) $request->user()->id;
+
+//     /*
+//      * Flutter compatibility:
+//      * दोनों field names स्वीकार किए जाएंगे।
+//      */
+//     if (
+//         !$request->filled('call_disposition_id')
+//         && $request->filled('disposition_id')
+//     ) {
+//         $request->merge([
+//             'call_disposition_id' =>
+//                 $request->input('disposition_id'),
+//         ]);
+//     }
+
+//     if (
+//         !$request->filled('follow_up_at')
+//         && $request->filled('next_follow_up_at')
+//     ) {
+//         $request->merge([
+//             'follow_up_at' =>
+//                 $request->input('next_follow_up_at'),
+//         ]);
+//     }
+
+//     $request->validate([
+//         'call_disposition_id' => [
+//             'required',
+//             'integer',
+//         ],
+//     ]);
+
+//     /*
+//      * केवल global या current company disposition allow करें।
+//      */
+//     $disposition = CallDisposition::query()
+//         ->whereKey(
+//             (int) $request->input(
+//                 'call_disposition_id'
+//             )
+//         )
+//         ->where('is_active', true)
+//         ->where(function (Builder $query) use ($companyId) {
+//             $query
+//                 ->whereNull('company_id')
+//                 ->orWhere('company_id', $companyId);
+//         })
+//         ->firstOrFail();
+
+//     $validated = $request->validate([
+//         'call_disposition_id' => [
+//             'required',
+//             'integer',
+//         ],
+
+//         'remarks' => [
+//             $disposition->requires_remarks
+//                 ? 'required'
+//                 : 'nullable',
+//             'string',
+//             'max:3000',
+//         ],
+
+//         'follow_up_at' => [
+//             $disposition->requires_follow_up
+//                 ? 'required'
+//                 : 'nullable',
+//             'nullable',
+//             'date',
+//             'after:now',
+//         ],
+
+//         'duration_seconds' => [
+//             'nullable',
+//             'integer',
+//             'min:0',
+//         ],
+//     ], [
+//         'remarks.required' =>
+//             "Remarks are required for {$disposition->name}.",
+
+//         'follow_up_at.required' =>
+//             "Follow-up date and time are required for {$disposition->name}.",
+
+//         'follow_up_at.after' =>
+//             'Follow-up date and time must be in the future.',
+//     ]);
+
+//     $remarks = trim(
+//         (string) ($validated['remarks'] ?? '')
+//     );
+
+//     $followUpAt =
+//         $validated['follow_up_at'] ?? null;
+
+//     $durationSeconds = (int) (
+//         $validated['duration_seconds'] ?? 0
+//     );
+
+//     $result = DB::transaction(function () use (
+//         $lead,
+//         $companyId,
+//         $userId,
+//         $disposition,
+//         $remarks,
+//         $followUpAt,
+//         $durationSeconds
+//     ) {
+//         /*
+//          * Call log save करें।
+//          */
+//         $callLog = CallLog::create([
+//             'company_id' => $companyId,
+//             'lead_id' => $lead->id,
+//             'user_id' => $userId,
+
+//             'call_disposition_id' =>
+//                 $disposition->id,
+
+//             'direction' => 'outgoing',
+
+//             'started_at' => now()->subSeconds(
+//                 $durationSeconds
+//             ),
+
+//             'ended_at' => now(),
+
+//             'duration_seconds' =>
+//                 $durationSeconds,
+
+//             'remarks' =>
+//                 $remarks !== '' ? $remarks : null,
+//         ]);
+
+//         $followUp = null;
+
+//         /*
+//          * Date/time आया है तो follow_ups table में record बनाएँ।
+//          */
+//         if (!empty($followUpAt)) {
+//             $assignedTo = $lead->assigned_to
+//                 ? (int) $lead->assigned_to
+//                 : $userId;
+
+//             $followUp = FollowUp::create([
+//                 'company_id' => $companyId,
+//                 'lead_id' => $lead->id,
+//                 'assigned_to' => $assignedTo,
+//                 'created_by' => $userId,
+
+//                 'type' => 'phone',
+
+//                 'scheduled_at' => $followUpAt,
+
+//                 'reminder_notified_at' => null,
+
+//                 'priority' => 'normal',
+//                 'status' => 'pending',
+
+//                 'notes' => $remarks !== ''
+//                     ? $remarks
+//                     : "Follow-up created from {$disposition->name} call disposition.",
+//             ]);
+
+//             /*
+//              * Lead पर next follow-up भी update करें।
+//              */
+//             $lead->update([
+//                 'last_contact_at' => now(),
+//                 'next_follow_up_at' => $followUpAt,
+//             ]);
+//         } else {
+//             $lead->update([
+//                 'last_contact_at' => now(),
+//             ]);
+//         }
+
+//         return [
+//             'call_log' => $callLog->fresh([
+//                 'disposition',
+//                 'user',
+//             ]),
+
+//             'follow_up' => $followUp?->fresh([
+//                 'assignedUser',
+//                 'lead',
+//             ]),
+
+//             'lead' => $lead->fresh(),
+//         ];
+//     });
+
+//     return $this->success(
+//         $result,
+//         $result['follow_up']
+//             ? 'Call result and follow-up saved successfully.'
+//             : 'Call result saved successfully.',
+//         201
+//     );
+// }
+
+
 public function saveCallResult(
     Request $request,
     Lead $lead
 ): JsonResponse {
-    $this->guard($request, $lead);
 
-    $companyId = $this->companyId($request);
-    $userId = (int) $request->user()->id;
+    $this->guard(
+        $request,
+        $lead
+    );
+
+    $companyId =
+        $this->companyId(
+            $request
+        );
+
+    $userId =
+        (int) $request
+            ->user()
+            ->id;
+
 
     /*
-     * Flutter compatibility:
-     * दोनों field names स्वीकार किए जाएंगे।
-     */
+    |--------------------------------------------------------------------------
+    | Flutter Compatibility
+    |--------------------------------------------------------------------------
+    |
+    | Dono field names accept karenge.
+    |
+    */
+
     if (
-        !$request->filled('call_disposition_id')
-        && $request->filled('disposition_id')
+        !$request->filled(
+            'call_disposition_id'
+        )
+        &&
+        $request->filled(
+            'disposition_id'
+        )
     ) {
+
         $request->merge([
+
             'call_disposition_id' =>
-                $request->input('disposition_id'),
+                $request->input(
+                    'disposition_id'
+                ),
+
         ]);
     }
 
+
     if (
-        !$request->filled('follow_up_at')
-        && $request->filled('next_follow_up_at')
+        !$request->filled(
+            'follow_up_at'
+        )
+        &&
+        $request->filled(
+            'next_follow_up_at'
+        )
     ) {
+
         $request->merge([
+
             'follow_up_at' =>
-                $request->input('next_follow_up_at'),
+                $request->input(
+                    'next_follow_up_at'
+                ),
+
         ]);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Basic Disposition Validation
+    |--------------------------------------------------------------------------
+    */
 
     $request->validate([
+
         'call_disposition_id' => [
             'required',
             'integer',
         ],
+
     ]);
+
 
     /*
-     * केवल global या current company disposition allow करें।
-     */
-    $disposition = CallDisposition::query()
-        ->whereKey(
-            (int) $request->input(
-                'call_disposition_id'
+    |--------------------------------------------------------------------------
+    | Load Disposition
+    |--------------------------------------------------------------------------
+    |
+    | Sirf:
+    | - Global disposition
+    | - Current company disposition
+    |
+    | allow hoga.
+    |
+    */
+
+    $disposition =
+        CallDisposition::query()
+
+            ->whereKey(
+                (int) $request->input(
+                    'call_disposition_id'
+                )
             )
-        )
-        ->where('is_active', true)
-        ->where(function (Builder $query) use ($companyId) {
-            $query
-                ->whereNull('company_id')
-                ->orWhere('company_id', $companyId);
-        })
-        ->firstOrFail();
 
-    $validated = $request->validate([
-        'call_disposition_id' => [
-            'required',
-            'integer',
-        ],
+            ->where(
+                'is_active',
+                true
+            )
 
-        'remarks' => [
-            $disposition->requires_remarks
-                ? 'required'
-                : 'nullable',
-            'string',
-            'max:3000',
-        ],
+            ->where(
+                function (
+                    Builder $query
+                ) use (
+                    $companyId
+                ) {
 
-        'follow_up_at' => [
-            $disposition->requires_follow_up
-                ? 'required'
-                : 'nullable',
-            'nullable',
-            'date',
-            'after:now',
-        ],
+                    $query
+                        ->whereNull(
+                            'company_id'
+                        )
+                        ->orWhere(
+                            'company_id',
+                            $companyId
+                        );
+                }
+            )
 
-        'duration_seconds' => [
-            'nullable',
-            'integer',
-            'min:0',
-        ],
-    ], [
-        'remarks.required' =>
-            "Remarks are required for {$disposition->name}.",
+            ->firstOrFail();
 
-        'follow_up_at.required' =>
-            "Follow-up date and time are required for {$disposition->name}.",
 
-        'follow_up_at.after' =>
-            'Follow-up date and time must be in the future.',
-    ]);
+    /*
+    |--------------------------------------------------------------------------
+    | Dynamic Validation
+    |--------------------------------------------------------------------------
+    */
 
-    $remarks = trim(
-        (string) ($validated['remarks'] ?? '')
-    );
+    $validated =
+        $request->validate([
 
-    $followUpAt =
-        $validated['follow_up_at'] ?? null;
+            'call_disposition_id' => [
+                'required',
+                'integer',
+            ],
 
-    $durationSeconds = (int) (
-        $validated['duration_seconds'] ?? 0
-    );
+            'remarks' => [
 
-    $result = DB::transaction(function () use (
-        $lead,
-        $companyId,
-        $userId,
-        $disposition,
-        $remarks,
-        $followUpAt,
-        $durationSeconds
-    ) {
-        /*
-         * Call log save करें।
-         */
-        $callLog = CallLog::create([
-            'company_id' => $companyId,
-            'lead_id' => $lead->id,
-            'user_id' => $userId,
+                $disposition
+                    ->requires_remarks
+                        ? 'required'
+                        : 'nullable',
 
-            'call_disposition_id' =>
-                $disposition->id,
+                'string',
+                'max:3000',
+            ],
 
-            'direction' => 'outgoing',
+            'follow_up_at' => [
 
-            'started_at' => now()->subSeconds(
-                $durationSeconds
-            ),
+                $disposition
+                    ->requires_follow_up
+                        ? 'required'
+                        : 'nullable',
 
-            'ended_at' => now(),
+                'nullable',
+                'date',
+                'after:now',
+            ],
 
-            'duration_seconds' =>
-                $durationSeconds,
+            'duration_seconds' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
 
-            'remarks' =>
-                $remarks !== '' ? $remarks : null,
+        ], [
+
+            'remarks.required' =>
+                "Remarks are required for {$disposition->name}.",
+
+            'follow_up_at.required' =>
+                "Follow-up date and time are required for {$disposition->name}.",
+
+            'follow_up_at.after' =>
+                'Follow-up date and time must be in the future.',
+
         ]);
 
-        $followUp = null;
 
-        /*
-         * Date/time आया है तो follow_ups table में record बनाएँ।
-         */
-        if (!empty($followUpAt)) {
-            $assignedTo = $lead->assigned_to
-                ? (int) $lead->assigned_to
-                : $userId;
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Remarks
+    |--------------------------------------------------------------------------
+    */
 
-            $followUp = FollowUp::create([
-                'company_id' => $companyId,
-                'lead_id' => $lead->id,
-                'assigned_to' => $assignedTo,
-                'created_by' => $userId,
+    $remarks =
+        trim(
+            (string) (
+                $validated[
+                    'remarks'
+                ] ?? ''
+            )
+        );
 
-                'type' => 'phone',
 
-                'scheduled_at' => $followUpAt,
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Follow-up
+    |--------------------------------------------------------------------------
+    */
 
-                'reminder_notified_at' => null,
+    $followUpAt =
+        $validated[
+            'follow_up_at'
+        ] ?? null;
 
-                'priority' => 'normal',
-                'status' => 'pending',
 
-                'notes' => $remarks !== ''
-                    ? $remarks
-                    : "Follow-up created from {$disposition->name} call disposition.",
-            ]);
+    /*
+    |--------------------------------------------------------------------------
+    | Duration
+    |--------------------------------------------------------------------------
+    */
 
-            /*
-             * Lead पर next follow-up भी update करें।
-             */
-            $lead->update([
-                'last_contact_at' => now(),
-                'next_follow_up_at' => $followUpAt,
-            ]);
-        } else {
-            $lead->update([
-                'last_contact_at' => now(),
-            ]);
-        }
+    $durationSeconds =
+        max(
+            0,
+            (int) (
+                $validated[
+                    'duration_seconds'
+                ] ?? 0
+            )
+        );
 
-        return [
-            'call_log' => $callLog->fresh([
-                'disposition',
-                'user',
-            ]),
 
-            'follow_up' => $followUp?->fresh([
-                'assignedUser',
-                'lead',
-            ]),
+    /*
+    |--------------------------------------------------------------------------
+    | Database Transaction
+    |--------------------------------------------------------------------------
+    */
 
-            'lead' => $lead->fresh(),
-        ];
-    });
+    $result =
+        DB::transaction(
+            function () use (
+                $lead,
+                $companyId,
+                $userId,
+                $disposition,
+                $remarks,
+                $followUpAt,
+                $durationSeconds
+            ) {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Create Call Log
+                |--------------------------------------------------------------------------
+                |
+                | Har call result ke liye naya call log create hoga.
+                |
+                */
+
+                $callLog =
+                    CallLog::create([
+
+                        'company_id' =>
+                            $companyId,
+
+                        'lead_id' =>
+                            $lead->id,
+
+                        'user_id' =>
+                            $userId,
+
+                        'call_disposition_id' =>
+                            $disposition->id,
+
+                        'direction' =>
+                            'outgoing',
+
+                        'started_at' =>
+                            now()
+                                ->subSeconds(
+                                    $durationSeconds
+                                ),
+
+                        'ended_at' =>
+                            now(),
+
+                        'duration_seconds' =>
+                            $durationSeconds,
+
+                        'remarks' =>
+                            $remarks !== ''
+                                ? $remarks
+                                : null,
+
+                    ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Follow-up
+                |--------------------------------------------------------------------------
+                |
+                | Follow-up time aaya hai:
+                |
+                | 1. Same lead ka pending follow-up already hai
+                |    => usi ko UPDATE karo.
+                |
+                | 2. Pending follow-up nahi hai
+                |    => naya follow-up CREATE karo.
+                |
+                */
+
+                $followUp = null;
+
+
+                if (
+                    !empty(
+                        $followUpAt
+                    )
+                ) {
+
+                    $assignedTo =
+                        $lead->assigned_to
+                            ? (int) $lead->assigned_to
+                            : $userId;
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Find Existing Pending Follow-up
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $existingFollowUp =
+                        FollowUp::query()
+
+                            ->where(
+                                'company_id',
+                                $companyId
+                            )
+
+                            ->where(
+                                'lead_id',
+                                $lead->id
+                            )
+
+                            ->where(
+                                'status',
+                                'pending'
+                            )
+
+                            ->latest(
+                                'id'
+                            )
+
+                            ->first();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Existing Pending Follow-up Found
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        $existingFollowUp
+                    ) {
+
+                        $existingFollowUp
+                            ->update([
+
+                                'assigned_to' =>
+                                    $assignedTo,
+
+                                'type' =>
+                                    'phone',
+
+                                'scheduled_at' =>
+                                    $followUpAt,
+
+                                /*
+                                 * Time change hua hai,
+                                 * isliye reminder dobara eligible hona chahiye.
+                                 */
+
+                                'reminder_notified_at' =>
+                                    null,
+
+                                'priority' =>
+                                    'normal',
+
+                                'status' =>
+                                    'pending',
+
+                                'notes' =>
+                                    $remarks !== ''
+                                        ? $remarks
+                                        : "Follow-up updated from {$disposition->name} call disposition.",
+
+                            ]);
+
+
+                        $followUp =
+                            $existingFollowUp
+                                ->fresh();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | No Pending Follow-up
+                    |--------------------------------------------------------------------------
+                    */
+
+                    } else {
+
+                        $followUp =
+                            FollowUp::create([
+
+                                'company_id' =>
+                                    $companyId,
+
+                                'lead_id' =>
+                                    $lead->id,
+
+                                'assigned_to' =>
+                                    $assignedTo,
+
+                                'created_by' =>
+                                    $userId,
+
+                                'type' =>
+                                    'phone',
+
+                                'scheduled_at' =>
+                                    $followUpAt,
+
+                                'reminder_notified_at' =>
+                                    null,
+
+                                'priority' =>
+                                    'normal',
+
+                                'status' =>
+                                    'pending',
+
+                                'notes' =>
+                                    $remarks !== ''
+                                        ? $remarks
+                                        : "Follow-up created from {$disposition->name} call disposition.",
+
+                            ]);
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Update Lead Follow-up Time
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $lead->update([
+
+                        'last_contact_at' =>
+                            now(),
+
+                        'next_follow_up_at' =>
+                            $followUpAt,
+
+                    ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | No Follow-up
+                |--------------------------------------------------------------------------
+                */
+
+                } else {
+
+                    $lead->update([
+
+                        'last_contact_at' =>
+                            now(),
+
+                    ]);
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Response Data
+                |--------------------------------------------------------------------------
+                */
+
+                return [
+
+                    'call_log' =>
+                        $callLog->fresh([
+                            'disposition',
+                            'user',
+                        ]),
+
+                    'follow_up' =>
+                        $followUp
+                            ?->fresh([
+                                'assignedUser',
+                                'lead',
+                            ]),
+
+                    'lead' =>
+                        $lead->fresh(),
+
+                ];
+            }
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Success Response
+    |--------------------------------------------------------------------------
+    */
 
     return $this->success(
+
         $result,
-        $result['follow_up']
+
+        $result[
+            'follow_up'
+        ]
             ? 'Call result and follow-up saved successfully.'
             : 'Call result saved successfully.',
+
         201
     );
 }
