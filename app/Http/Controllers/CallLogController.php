@@ -831,7 +831,7 @@ class CallLogController extends Controller
     // }
 
 
-    public function store(
+public function store(
     Request $request,
     Lead $lead
 ): RedirectResponse {
@@ -855,7 +855,7 @@ class CallLogController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | First Validate Selected Disposition
+    | First Validation
     |--------------------------------------------------------------------------
     */
 
@@ -877,9 +877,7 @@ class CallLogController extends Controller
                             true
                         )
                         ->where(
-                            function ($subQuery) use (
-                                $companyId
-                            ) {
+                            function ($subQuery) use ($companyId) {
 
                                 $subQuery
                                     ->whereNull(
@@ -921,9 +919,7 @@ class CallLogController extends Controller
                 true
             )
             ->where(
-                function (Builder $query) use (
-                    $companyId
-                ) {
+                function (Builder $query) use ($companyId) {
 
                     $query
                         ->whereNull(
@@ -1068,8 +1064,9 @@ class CallLogController extends Controller
         $remarks =
             trim(
                 (string) (
-                    $validated['remarks']
-                    ?? ''
+                    $validated[
+                        'remarks'
+                    ] ?? ''
                 )
             );
 
@@ -1126,6 +1123,11 @@ class CallLogController extends Controller
             |--------------------------------------------------------------------------
             | Create Call Log
             |--------------------------------------------------------------------------
+            |
+            | Har call par naya call log create hoga.
+            |
+            | Demo dubara send hua to bhi naya call log create hoga.
+            |
             */
 
             CallLog::create([
@@ -1177,6 +1179,17 @@ class CallLogController extends Controller
             |--------------------------------------------------------------------------
             | Demo Send
             |--------------------------------------------------------------------------
+            |
+            | Important:
+            |
+            | Agar Demo first time send hua:
+            | demo_send = 1
+            | demo_sent_at = current time
+            |
+            | Agar Demo dubara send hua:
+            | demo_send already 1 rahega
+            | demo_sent_at dobara current/latest time se update hoga
+            |
             */
 
             if ($markDemoSend) {
@@ -1204,23 +1217,15 @@ class CallLogController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | Create OR Update Follow-up
+            | Follow-up Create OR Update
             |--------------------------------------------------------------------------
             |
-            | IMPORTANT:
+            | Same lead ka pending follow-up already hai:
+            | => NEW follow-up create nahi hoga
+            | => existing pending follow-up update hoga
             |
-            | Agar same lead ka pending follow-up pehle se hai,
-            | to naya record create nahi hoga.
-            |
-            | Existing pending follow-up ka:
-            | - scheduled_at
-            | - assigned_to
-            | - notes
-            | - status
-            |
-            | update hoga.
-            |
-            | Agar pending follow-up nahi hai tabhi new create hoga.
+            | Pending follow-up nahi hai:
+            | => new follow-up create hoga
             |
             */
 
@@ -1230,9 +1235,10 @@ class CallLogController extends Controller
                 !empty($followUpAt)
             ) {
 
+
                 /*
                 |--------------------------------------------------------------------------
-                | Find Existing Pending Follow-up
+                | Existing Pending Follow-up
                 |--------------------------------------------------------------------------
                 */
 
@@ -1258,54 +1264,38 @@ class CallLogController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | Follow-up Data
-                |--------------------------------------------------------------------------
-                */
-
-                $followUpData = [
-
-                    'assigned_to' =>
-                        $lead->assigned_to
-                        ?: $request->user()->id,
-
-                    'scheduled_at' =>
-                        $followUpAt,
-
-                    'notes' =>
-                        $remarks
-                        ?: "Follow-up updated from {$disposition->name} call disposition.",
-
-                    'status' =>
-                        'pending',
-
-                ];
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Update Existing OR Create New
+                | Existing Follow-up Found
                 |--------------------------------------------------------------------------
                 */
 
                 if ($existingFollowUp) {
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Existing Follow-up Update
-                    |--------------------------------------------------------------------------
-                    */
+                    $existingFollowUp->update([
 
-                    $existingFollowUp->update(
-                        $followUpData
-                    );
+                        'assigned_to' =>
+                            $lead->assigned_to
+                            ?: $request->user()->id,
+
+                        'scheduled_at' =>
+                            $followUpAt,
+
+                        'notes' =>
+                            $remarks
+                            ?: "Follow-up updated from {$disposition->name} call disposition.",
+
+                        'status' =>
+                            'pending',
+
+                    ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | No Existing Follow-up
+                |--------------------------------------------------------------------------
+                */
 
                 } else {
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | New Follow-up Create
-                    |--------------------------------------------------------------------------
-                    */
 
                     FollowUp::create([
 
@@ -1338,7 +1328,7 @@ class CallLogController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | Update Lead Next Follow-up
+                | Update Lead Next Follow-up Time
                 |--------------------------------------------------------------------------
                 */
 
@@ -1364,7 +1354,7 @@ class CallLogController extends Controller
 
         return back()->with(
             'success',
-            'Demo Sent successfully. Demo disposition and call log have also been saved.'
+            'Demo Sent successfully. Latest demo sent time and call log have been saved.'
         );
     }
 
