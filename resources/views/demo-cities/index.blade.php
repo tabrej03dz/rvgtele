@@ -436,6 +436,33 @@
                 $videos = $media
                     ->where('type', 'video')
                     ->count();
+
+
+                $bulkDownloadFiles = $media
+                    ->filter(function ($item) {
+                        return !empty($item['id'])
+                            && !empty($item['path']);
+                    })
+                    ->map(function ($item) use ($city) {
+
+                        return [
+                            'id' => $item['id'],
+
+                            'name' => $item['original_name']
+                                ?? basename($item['path']),
+
+                            'url' => route(
+                                'demo-cities.media.download',
+                                [
+                                    $city,
+                                    $item['id']
+                                ]
+                            ),
+                        ];
+
+                    })
+                    ->values()
+                    ->all();
             @endphp
 
             <section class="city-card">
@@ -550,18 +577,26 @@
 
                         </a>
 
+                        
+
                         @if($media->isNotEmpty())
 
-                            <a
-                                href="{{ route('demo-cities.download-all', $city) }}"
+                            <button
+                                type="button"
                                 class="demo-btn demo-btn-dark"
+                                onclick='downloadCityFiles(
+                                    @json($bulkDownloadFiles),
+                                    this
+                                )'
                             >
 
-                                <i data-lucide="archive"></i>
+                                <i data-lucide="download"></i>
 
-                                Download All
+                                <span class="bulk-download-text">
+                                    Bulk Download
+                                </span>
 
-                            </a>
+                            </button>
 
                         @endif
 
@@ -607,5 +642,281 @@
 
 
 </div>
+
+<script>
+    let bulkDownloadRunning = false;
+
+    function safeDownloadFileName(name) {
+        name = String(name || 'demo-file');
+
+        // Windows invalid characters
+        name = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-');
+
+        // Multiple spaces
+        name = name.replace(/\s+/g, ' ');
+
+        // Ending dots/spaces
+        name = name.replace(/[. ]+$/g, '');
+
+        if (!name) {
+            name = 'demo-file';
+        }
+
+        return name;
+    }
+
+    function uniqueDownloadFileName(originalName, usedNames) {
+        let name = safeDownloadFileName(originalName);
+        let lower = name.toLowerCase();
+
+        if (!usedNames.has(lower)) {
+            usedNames.add(lower);
+            return name;
+        }
+
+        const lastDot = name.lastIndexOf('.');
+
+        let base = name;
+        let extension = '';
+
+        if (lastDot > 0) {
+            base = name.substring(0, lastDot);
+            extension = name.substring(lastDot);
+        }
+
+        let counter = 2;
+        let candidate;
+
+        do {
+            candidate = base + ' (' + counter + ')' + extension;
+            counter++;
+        } while (usedNames.has(candidate.toLowerCase()));
+
+        usedNames.add(candidate.toLowerCase());
+
+        return candidate;
+    }
+
+    async function downloadCityFiles(files, button = null) {
+
+        if (bulkDownloadRunning) {
+            return;
+        }
+
+        if (!Array.isArray(files) || files.length === 0) {
+            alert('No demo files available.');
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Chrome / Edge Folder API
+        |--------------------------------------------------------------------------
+        */
+        if (typeof window.showDirectoryPicker !== 'function') {
+            alert(
+                'Bulk Download requires latest Chrome or Edge desktop browser.'
+            );
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Select Folder
+        |--------------------------------------------------------------------------
+        */
+        let directoryHandle;
+
+        try {
+
+            directoryHandle = await window.showDirectoryPicker({
+                mode: 'readwrite'
+            });
+
+        } catch (error) {
+
+            if (error && error.name === 'AbortError') {
+                return;
+            }
+
+            console.error('Folder picker error:', error);
+
+            alert('Unable to select download folder.');
+
+            return;
+        }
+
+        bulkDownloadRunning = true;
+
+        const total = files.length;
+
+        const textElement = button
+            ? button.querySelector('.bulk-download-text')
+            : null;
+
+        const originalText = textElement
+            ? textElement.textContent
+            : 'Bulk Download';
+
+        if (button) {
+            button.disabled = true;
+            button.style.opacity = '0.65';
+            button.style.cursor = 'not-allowed';
+        }
+
+        const usedNames = new Set();
+
+        let downloaded = 0;
+        let failed = 0;
+
+        try {
+
+            for (let index = 0; index < files.length; index++) {
+
+                const file = files[index];
+
+                if (textElement) {
+                    textElement.textContent =
+                        `Downloading ${index + 1}/${total}`;
+                }
+
+                try {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Download file from Laravel
+                    |--------------------------------------------------------------------------
+                    */
+                    const response = await fetch(file.url, {
+                        method: 'GET',
+
+                        credentials: 'same-origin',
+
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(
+                            'Download failed: ' + response.status
+                        );
+                    }
+
+                    const blob = await response.blob();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Safe unique filename
+                    |--------------------------------------------------------------------------
+                    */
+                    const fileName = uniqueDownloadFileName(
+                        file.name,
+                        usedNames
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Create file
+                    |--------------------------------------------------------------------------
+                    */
+                    const fileHandle =
+                        await directoryHandle.getFileHandle(
+                            fileName,
+                            {
+                                create: true
+                            }
+                        );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Save blob
+                    |--------------------------------------------------------------------------
+                    */
+                    const writable =
+                        await fileHandle.createWritable();
+
+                    await writable.write(blob);
+
+                    await writable.close();
+
+                    downloaded++;
+
+                } catch (fileError) {
+
+                    failed++;
+
+                    console.error(
+                        'Failed file:',
+                        file,
+                        fileError
+                    );
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Completed
+            |--------------------------------------------------------------------------
+            */
+            if (textElement) {
+
+                if (failed === 0) {
+                    textElement.textContent =
+                        `${downloaded} Files Downloaded`;
+                } else {
+                    textElement.textContent =
+                        `${downloaded} Downloaded, ${failed} Failed`;
+                }
+            }
+
+            if (failed === 0) {
+
+                alert(
+                    downloaded +
+                    ' files successfully downloaded.'
+                );
+
+            } else {
+
+                alert(
+                    downloaded +
+                    ' files downloaded.\n' +
+                    failed +
+                    ' files failed.'
+                );
+            }
+
+        } catch (error) {
+
+            console.error(
+                'Bulk download error:',
+                error
+            );
+
+            alert(
+                'Bulk download could not be completed.'
+            );
+
+        } finally {
+
+            bulkDownloadRunning = false;
+
+            setTimeout(function () {
+
+                if (button) {
+                    button.disabled = false;
+                    button.style.opacity = '';
+                    button.style.cursor = '';
+                }
+
+                if (textElement) {
+                    textElement.textContent = originalText;
+                }
+
+            }, 2000);
+        }
+    }
+</script>
 
 @endsection

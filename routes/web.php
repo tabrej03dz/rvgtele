@@ -251,29 +251,100 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.delete')->name('employees.destroy');
 
 
-    Route::resource('demo-cities', DemoCityController::class);
+    // Route::resource('demo-cities', DemoCityController::class);
 
-    Route::prefix('demo-cities/{demoCity}')
-        ->name('demo-cities.')
-        ->group(function () {
+    // Route::prefix('demo-cities/{demoCity}')
+    //     ->name('demo-cities.')
+    //     ->group(function () {
 
-            // Media
-            Route::post('media', [DemoCityController::class, 'uploadMedia'])
-                ->name('media.upload');
+    //         // Media
+    //         Route::post('media', [DemoCityController::class, 'uploadMedia'])
+    //             ->name('media.upload');
 
-            Route::get('media/{mediaId}/download', [DemoCityController::class, 'downloadMedia'])
-                ->name('media.download');
+    //         Route::get('media/{mediaId}/download', [DemoCityController::class, 'downloadMedia'])
+    //             ->name('media.download');
 
-            Route::delete('media/{mediaId}', [DemoCityController::class, 'destroyMedia'])
-                ->name('media.destroy');
+    //         Route::delete('media/{mediaId}', [DemoCityController::class, 'destroyMedia'])
+    //             ->name('media.destroy');
 
-            // ZIP
-            Route::post('zip', [DemoCityController::class, 'uploadZip'])
-                ->name('zip.upload');
+    //         // ZIP
+    //         Route::post('zip', [DemoCityController::class, 'uploadZip'])
+    //             ->name('zip.upload');
 
-            Route::get('download-all', [DemoCityController::class, 'downloadAll'])
-                ->name('download-all');
-    });
+    //         Route::get('download-all', [DemoCityController::class, 'downloadAll'])
+    //             ->name('download-all');
+    // });
+
+
+
+    Route::get('/demo-cities', [DemoCityController::class, 'index'])
+        ->name('demo-cities.index');
+
+    Route::get('/demo-cities/create', [DemoCityController::class, 'create'])
+        ->name('demo-cities.create');
+
+    Route::post('/demo-cities', [DemoCityController::class, 'store'])
+        ->name('demo-cities.store');
+
+    Route::get('/demo-cities/{demoCity}', [DemoCityController::class, 'show'])
+        ->name('demo-cities.show');
+
+    Route::get('/demo-cities/{demoCity}/edit', [DemoCityController::class, 'edit'])
+        ->name('demo-cities.edit');
+
+    Route::put('/demo-cities/{demoCity}', [DemoCityController::class, 'update'])
+        ->name('demo-cities.update');
+
+    Route::delete('/demo-cities/{demoCity}', [DemoCityController::class, 'destroy'])
+        ->name('demo-cities.destroy');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Media
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        '/demo-cities/{demoCity}/media',
+        [DemoCityController::class, 'uploadMedia']
+    )->name('demo-cities.media.upload');
+
+    Route::post(
+        '/demo-cities/{demoCity}/zip',
+        [DemoCityController::class, 'uploadZip']
+    )->name('demo-cities.zip.upload');
+
+    Route::delete(
+        '/demo-cities/{demoCity}/media/{mediaId}',
+        [DemoCityController::class, 'destroyMedia']
+    )->name('demo-cities.media.destroy');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Individual Download
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/demo-cities/{demoCity}/media/{mediaId}/download',
+        [DemoCityController::class, 'downloadMedia']
+    )->name('demo-cities.media.download');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ZIP Download
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/demo-cities/{demoCity}/download-all',
+        [DemoCityController::class, 'downloadAll']
+    )->name('demo-cities.download-all');
+
+
 
 
 

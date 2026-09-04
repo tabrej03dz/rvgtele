@@ -61,6 +61,8 @@ class LeadsImport implements
 
         private readonly int $defaultStatusId,
 
+        private readonly int $defaultCategoryId,
+
         private readonly ?int $defaultAssignedTo = null,
 
         private readonly ?int $defaultTeamId = null,
@@ -352,6 +354,9 @@ class LeadsImport implements
             'category' =>
                 $category,
 
+            'category_id' =>
+                $this->defaultCategoryId,
+
             'preferred_language' =>
                 $this->clean(
                     $row->get(
@@ -483,6 +488,9 @@ class LeadsImport implements
                     $existingLead->category =
                         $data['category'];
 
+                    $existingLead->category_id =
+                        $data['category_id'];
+
                     $existingLead->save();
 
                     /*
@@ -573,6 +581,9 @@ class LeadsImport implements
 
                 $lead->category =
                     $data['category'];
+
+                $lead->category_id =
+                    $data['category_id'];
 
                 /*
                 |--------------------------------------------------------------------------
