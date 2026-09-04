@@ -4,7 +4,11 @@
 
 @include('data.partials.styles')
 
+
 <div class="software-ui mx-auto w-full max-w-4xl space-y-3">
+
+
+    {{-- HEADER --}}
 
     <section class="software-toolbar">
 
@@ -22,16 +26,32 @@
             <div class="flex items-center gap-3">
 
                 <span class="data-toolbar-icon">
+
                     <i data-lucide="upload"></i>
+
                 </span>
+
 
                 <div>
 
-                    <h1 class="text-lg font-bold text-slate-900">
+                    <h1
+                        class="
+                            text-lg
+                            font-bold
+                            text-slate-900
+                        "
+                    >
                         Bulk Import Data
                     </h1>
 
-                    <p class="mt-1 text-[11px] text-slate-500">
+
+                    <p
+                        class="
+                            mt-1
+                            text-[11px]
+                            text-slate-500
+                        "
+                    >
                         CSV file se multiple records import karein.
                     </p>
 
@@ -39,17 +59,55 @@
 
             </div>
 
+
             <a
                 href="{{ route('data.index') }}"
                 class="software-btn"
             >
+
                 <i data-lucide="arrow-left"></i>
+
                 BACK
+
             </a>
 
         </div>
 
     </section>
+
+
+
+    {{-- ERRORS --}}
+
+    @if($errors->any())
+
+        <section
+            class="
+                rounded-lg
+                border
+                border-red-200
+                bg-red-50
+                p-4
+            "
+        >
+
+            @foreach($errors->all() as $error)
+
+                <div
+                    class="
+                        text-xs
+                        text-red-600
+                    "
+                >
+                    {{ $error }}
+                </div>
+
+            @endforeach
+
+        </section>
+
+    @endif
+
 
 
     <form
@@ -62,14 +120,20 @@
         @csrf
 
 
+
+        {{-- IMPORT SETTINGS --}}
+
         <section class="software-panel">
+
 
             <div class="software-panel-title">
 
                 <span class="panel-heading-label">
 
                     <span class="panel-heading-icon">
+
                         <i data-lucide="file-spreadsheet"></i>
+
                     </span>
 
                     Import Settings
@@ -79,13 +143,27 @@
             </div>
 
 
-            <div class="grid gap-4 p-4 md:grid-cols-2">
+
+            <div
+                class="
+                    grid
+                    gap-4
+                    p-4
+                    md:grid-cols-2
+                "
+            >
+
+
+                {{-- COMPANY --}}
 
                 <div>
 
                     <label class="software-label">
+
                         Company *
+
                     </label>
+
 
                     <select
                         name="company_id"
@@ -94,8 +172,11 @@
                     >
 
                         <option value="">
+
                             Select Company
+
                         </option>
+
 
                         @foreach($companies as $company)
 
@@ -106,42 +187,122 @@
                                     == $company->id
                                 )
                             >
+
                                 {{ $company->name }}
+
                             </option>
 
                         @endforeach
 
                     </select>
 
+
+                    @error('company_id')
+
+                        <div
+                            class="
+                                mt-1
+                                text-[10px]
+                                text-red-500
+                            "
+                        >
+
+                            {{ $message }}
+
+                        </div>
+
+                    @enderror
+
                 </div>
 
+
+
+                {{-- CATEGORY --}}
 
                 <div>
 
                     <label class="software-label">
-                        Default Category
+
+                        Category *
+
                     </label>
 
-                    <input
-                        type="text"
-                        name="category"
-                        value="{{ old('category') }}"
+
+                    <select
+                        name="category_id"
+                        required
                         class="w-full"
-                        placeholder="Jewellery, Solar, Furniture..."
                     >
 
-                    <div class="mt-1 text-[10px] text-slate-500">
-                        Optional. Agar diya to sab imported records me ye category lagegi.
+                        <option value="">
+
+                            Select Category
+
+                        </option>
+
+
+                        @foreach($categories as $category)
+
+                            <option
+                                value="{{ $category->id }}"
+                                @selected(
+                                    old('category_id')
+                                    == $category->id
+                                )
+                            >
+
+                                {{ $category->name }}
+
+                            </option>
+
+                        @endforeach
+
+                    </select>
+
+
+                    <div
+                        class="
+                            mt-1
+                            text-[10px]
+                            text-slate-500
+                        "
+                    >
+
+                        Ye category sabhi imported data me save hogi.
+
                     </div>
+
+
+                    @error('category_id')
+
+                        <div
+                            class="
+                                mt-1
+                                text-[10px]
+                                text-red-500
+                            "
+                        >
+
+                            {{ $message }}
+
+                        </div>
+
+                    @enderror
 
                 </div>
 
 
+
+                {{-- FILE --}}
+
                 <div class="md:col-span-2">
 
                     <label class="software-label">
+
                         CSV File *
+
                     </label>
+
 
                     <input
                         type="file"
@@ -160,21 +321,46 @@
                         "
                     >
 
+
+                    @error('file')
+
+                        <div
+                            class="
+                                mt-1
+                                text-[10px]
+                                text-red-500
+                            "
+                        >
+
+                            {{ $message }}
+
+                        </div>
+
+                    @enderror
+
                 </div>
 
+
             </div>
+
 
         </section>
 
 
+
+        {{-- CSV COLUMNS --}}
+
         <section class="software-panel">
+
 
             <div class="software-panel-title">
 
                 <span class="panel-heading-label">
 
                     <span class="panel-heading-icon">
+
                         <i data-lucide="table-properties"></i>
+
                     </span>
 
                     Supported CSV Columns
@@ -184,31 +370,61 @@
             </div>
 
 
+
             <div class="p-4">
 
-                <div class="grid gap-2 md:grid-cols-3">
+
+                <div
+                    class="
+                        grid
+                        gap-2
+                        md:grid-cols-3
+                    "
+                >
+
 
                     @foreach([
+
                         'name',
+
                         'company_name',
+
                         'mobile',
+
                         'alternate_mobile',
+
                         'whatsapp_number',
+
                         'email',
+
                         'category',
+
                         'lead_source',
+
                         'campaign',
+
                         'address',
+
                         'city',
+
                         'district',
+
                         'state',
+
                         'pincode',
+
                         'industry',
+
                         'required_product',
+
                         'preferred_language',
+
                         'estimated_budget',
+
                         'remarks',
+
                     ] as $column)
+
 
                         <div
                             class="
@@ -223,43 +439,71 @@
                                 text-slate-700
                             "
                         >
+
                             {{ $column }}
+
                         </div>
+
 
                     @endforeach
 
+
                 </div>
 
+
             </div>
+
 
         </section>
 
 
+
+        {{-- BUTTONS --}}
+
         <section class="software-panel">
 
-            <div class="flex justify-end gap-2 p-4">
+
+            <div
+                class="
+                    flex
+                    justify-end
+                    gap-2
+                    p-4
+                "
+            >
+
 
                 <a
                     href="{{ route('data.index') }}"
                     class="software-btn"
                 >
+
                     CANCEL
+
                 </a>
+
 
                 <button
                     type="submit"
-                    class="software-btn software-btn-primary"
+                    class="
+                        software-btn
+                        software-btn-primary
+                    "
                 >
+
                     <i data-lucide="upload"></i>
+
                     IMPORT DATA
+
                 </button>
+
 
             </div>
 
+
         </section>
 
+
     </form>
-
 </div>
-
 @endsection

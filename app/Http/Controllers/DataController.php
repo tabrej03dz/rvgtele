@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Data;
 use App\Models\Lead;
 use App\Models\Company;
@@ -15,40 +16,116 @@ class DataController extends Controller
     /**
      * Display listing of data.
      */
+    // public function index(Request $request)
+    // {
+    //     $query = Data::query()
+    //         ->with(['company', 'lead']);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Company Filter
+    //     |--------------------------------------------------------------------------
+    //     */
+    //     if ($request->filled('company_id')) {
+    //         $query->where('company_id', $request->company_id);
+    //     }
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Search
+    //     |--------------------------------------------------------------------------
+    //     */
+    //     if ($request->filled('q')) {
+    //         $search = trim($request->q);
+
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('name', 'like', "%{$search}%")
+    //                 ->orWhere('company_name', 'like', "%{$search}%")
+    //                 ->orWhere('mobile', 'like', "%{$search}%")
+    //                 ->orWhere('alternate_mobile', 'like', "%{$search}%")
+    //                 ->orWhere('whatsapp_number', 'like', "%{$search}%")
+    //                 ->orWhere('email', 'like', "%{$search}%")
+    //                 ->orWhere('category', 'like', "%{$search}%")
+    //                 ->orWhere('city', 'like', "%{$search}%")
+    //                 ->orWhere('district', 'like', "%{$search}%")
+    //                 ->orWhere('state', 'like', "%{$search}%");
+    //         });
+    //     }
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Category Filter
+    //     |--------------------------------------------------------------------------
+    //     */
+    //     if ($request->filled('category')) {
+    //         $query->where('category', $request->category);
+    //     }
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Converted Filter
+    //     |--------------------------------------------------------------------------
+    //     */
+    //     if ($request->filled('converted')) {
+    //         if ($request->converted === '1') {
+    //             $query->where('converted', true);
+    //         }
+
+    //         if ($request->converted === '0') {
+    //             $query->where('converted', false);
+    //         }
+    //     }
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Deleted Filter
+    //     |--------------------------------------------------------------------------
+    //     */
+    //     if ($request->get('show') === 'deleted') {
+    //         $query->onlyTrashed();
+    //     }
+
+    //     $data = $query
+    //         ->latest()
+    //         ->paginate(25)
+    //         ->withQueryString();
+
+    //     $companies = Company::orderBy('name')->get();
+
+    //     $categories = Data::query()
+    //         ->whereNotNull('category')
+    //         ->where('category', '!=', '')
+    //         ->distinct()
+    //         ->orderBy('category')
+    //         ->pluck('category');
+
+    //     return view('data.index', compact(
+    //         'data',
+    //         'companies',
+    //         'categories'
+    //     ));
+    // }
+
     public function index(Request $request)
     {
         $query = Data::query()
-            ->with(['company', 'lead']);
+            ->with([
+                'company',
+                'lead',
+                'categoryInfo',
+            ]);
 
         /*
         |--------------------------------------------------------------------------
         | Company Filter
         |--------------------------------------------------------------------------
         */
+
         if ($request->filled('company_id')) {
-            $query->where('company_id', $request->company_id);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Search
-        |--------------------------------------------------------------------------
-        */
-        if ($request->filled('q')) {
-            $search = trim($request->q);
-
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('company_name', 'like', "%{$search}%")
-                    ->orWhere('mobile', 'like', "%{$search}%")
-                    ->orWhere('alternate_mobile', 'like', "%{$search}%")
-                    ->orWhere('whatsapp_number', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('category', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%")
-                    ->orWhere('district', 'like', "%{$search}%")
-                    ->orWhere('state', 'like', "%{$search}%");
-            });
+            $query->where(
+                'company_id',
+                $request->company_id
+            );
         }
 
         /*
@@ -56,8 +133,85 @@ class DataController extends Controller
         | Category Filter
         |--------------------------------------------------------------------------
         */
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
+
+        if ($request->filled('category_id')) {
+            $query->where(
+                'category_id',
+                $request->category_id
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('q')) {
+
+            $search = trim($request->q);
+
+            $query->where(function ($q) use ($search) {
+
+                $q->where(
+                    'name',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'company_name',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'mobile',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'alternate_mobile',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'whatsapp_number',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'email',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'city',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'district',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhere(
+                    'state',
+                    'like',
+                    "%{$search}%"
+                )
+                ->orWhereHas(
+                    'categoryInfo',
+                    function ($categoryQuery) use ($search) {
+
+                        $categoryQuery->where(
+                            'name',
+                            'like',
+                            "%{$search}%"
+                        );
+
+                    }
+                );
+
+            });
         }
 
         /*
@@ -65,7 +219,9 @@ class DataController extends Controller
         | Converted Filter
         |--------------------------------------------------------------------------
         */
+
         if ($request->filled('converted')) {
+
             if ($request->converted === '1') {
                 $query->where('converted', true);
             }
@@ -80,29 +236,50 @@ class DataController extends Controller
         | Deleted Filter
         |--------------------------------------------------------------------------
         */
+
         if ($request->get('show') === 'deleted') {
             $query->onlyTrashed();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Data
+        |--------------------------------------------------------------------------
+        */
 
         $data = $query
             ->latest()
             ->paginate(25)
             ->withQueryString();
 
-        $companies = Company::orderBy('name')->get();
+        /*
+        |--------------------------------------------------------------------------
+        | Companies
+        |--------------------------------------------------------------------------
+        */
 
-        $categories = Data::query()
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
+        $companies = Company::query()
+            ->orderBy('name')
+            ->get();
 
-        return view('data.index', compact(
-            'data',
-            'companies',
-            'categories'
-        ));
+        /*
+        |--------------------------------------------------------------------------
+        | Categories
+        |--------------------------------------------------------------------------
+        */
+
+        $categories = Category::query()
+            ->orderBy('name')
+            ->get();
+
+        return view(
+            'data.index',
+            compact(
+                'data',
+                'companies',
+                'categories'
+            )
+        );
     }
 
     /**
@@ -889,11 +1066,23 @@ class DataController extends Controller
         );
     }
 
+    // public function importCreate()
+    // {
+    //     $companies = Company::orderBy('name')->get();
+
+    //     return view('data.import', compact('companies'));
+    // }
+
     public function importCreate()
     {
         $companies = Company::orderBy('name')->get();
 
-        return view('data.import', compact('companies'));
+        $categories = Category::orderBy('name')->get();
+
+        return view('data.import', compact(
+            'companies',
+            'categories'
+        ));
     }
 
 
@@ -906,10 +1095,10 @@ class DataController extends Controller
                 'exists:companies,id',
             ],
 
-            'category' => [
-                'nullable',
-                'string',
-                'max:255',
+            'category_id' => [
+                'required',
+                'integer',
+                'exists:categories,id',
             ],
 
             'file' => [
@@ -946,216 +1135,319 @@ class DataController extends Controller
                 ->with('error', 'CSV file is empty.');
         }
 
+
         /*
         |--------------------------------------------------------------------------
-        | Normalize CSV Headers
+        | Normalize CSV Header
         |--------------------------------------------------------------------------
         */
+
         $header = array_map(function ($value) {
 
             $value = (string) $value;
 
-            /*
-            |--------------------------------------------------------------------------
-            | Remove UTF-8 BOM
-            |--------------------------------------------------------------------------
-            */
-            $value = preg_replace('/^\xEF\xBB\xBF/', '', $value);
+            $value = preg_replace(
+                '/^\xEF\xBB\xBF/',
+                '',
+                $value
+            );
 
-            // Unicode BOM safety
-            $value = str_replace("\xEF\xBB\xBF", '', $value);
+            $value = str_replace(
+                "\xEF\xBB\xBF",
+                '',
+                $value
+            );
 
             $value = trim($value);
+
             $value = strtolower($value);
 
-            $value = str_replace([
-                ' ',
-                '-',
-                '.',
-                '/',
-            ], '_', $value);
+            $value = str_replace(
+                [
+                    ' ',
+                    '-',
+                    '.',
+                    '/',
+                ],
+                '_',
+                $value
+            );
 
             return $value;
 
         }, $header);
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Allowed CSV Fields
+        |--------------------------------------------------------------------------
+        */
+
         $allowedFields = [
+
             'name',
+
             'company_name',
 
             'mobile',
+
             'alternate_mobile',
+
             'whatsapp_number',
+
             'email',
 
             'category',
+
             'lead_source',
+
             'campaign',
 
             'address',
+
             'city',
+
             'district',
+
             'state',
+
             'pincode',
 
             'industry',
+
             'required_product',
+
             'preferred_language',
 
             'estimated_budget',
+
             'remarks',
+
         ];
 
+
         $inserted = 0;
+
         $skipped = 0;
-        $rowNumber = 1;
+
 
         DB::beginTransaction();
+
 
         try {
 
             while (($row = fgetcsv($handle)) !== false) {
 
-                $rowNumber++;
 
                 /*
                 |--------------------------------------------------------------------------
-                | Skip completely empty rows
+                | Empty Row Check
                 |--------------------------------------------------------------------------
                 */
-                $hasValue = collect($row)->contains(function ($value) {
-                    return trim((string) $value) !== '';
-                });
+
+                $hasValue = collect($row)
+                    ->contains(function ($value) {
+
+                        return trim(
+                            (string) $value
+                        ) !== '';
+
+                    });
+
 
                 if (!$hasValue) {
+
                     continue;
+
                 }
+
 
                 /*
                 |--------------------------------------------------------------------------
-                | Fix column mismatch
+                | Column Count Fix
                 |--------------------------------------------------------------------------
                 */
+
                 if (count($row) < count($header)) {
+
                     $row = array_pad(
                         $row,
                         count($header),
                         null
                     );
+
                 }
 
+
                 if (count($row) > count($header)) {
+
                     $row = array_slice(
                         $row,
                         0,
                         count($header)
                     );
+
                 }
+
 
                 $csvData = array_combine(
                     $header,
                     $row
                 );
 
+
                 if (!$csvData) {
+
                     $skipped++;
+
                     continue;
+
                 }
+
 
                 /*
                 |--------------------------------------------------------------------------
-                | Only allowed columns
+                | Prepare Data
                 |--------------------------------------------------------------------------
                 */
+
                 $data = [];
+
 
                 foreach ($allowedFields as $field) {
 
-                    if (!array_key_exists($field, $csvData)) {
+
+                    if (!array_key_exists(
+                        $field,
+                        $csvData
+                    )) {
+
                         continue;
+
                     }
 
+
                     $value = trim(
-                        (string) ($csvData[$field] ?? '')
+                        (string) (
+                            $csvData[$field]
+                            ?? ''
+                        )
                     );
+
 
                     $data[$field] = $value !== ''
                         ? $value
                         : null;
+
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Default Company
-                |--------------------------------------------------------------------------
-                */
-                $data['company_id'] = $validated['company_id'];
 
                 /*
                 |--------------------------------------------------------------------------
-                | Default Category
+                | Selected Company
                 |--------------------------------------------------------------------------
-                |
-                | Agar upload page par category select ki hai,
-                | to wo CSV category ko override karegi.
-                |
                 */
-                if (!empty($validated['category'])) {
-                    $data['category'] = $validated['category'];
-                }
+
+                $data['company_id'] =
+                    $validated['company_id'];
+
 
                 /*
                 |--------------------------------------------------------------------------
-                | Budget Clean
+                | Selected Category
                 |--------------------------------------------------------------------------
                 */
+
+                $data['category_id'] =
+                    $validated['category_id'];
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Clean Budget
+                |--------------------------------------------------------------------------
+                */
+
                 if (
-                    isset($data['estimated_budget'])
-                    && $data['estimated_budget'] !== null
+                    isset(
+                        $data['estimated_budget']
+                    )
+                    &&
+                    $data['estimated_budget']
+                    !== null
                 ) {
 
                     $budget = str_replace(
-                        [',', '₹', ' '],
+                        [
+                            ',',
+                            '₹',
+                            ' ',
+                        ],
                         '',
                         $data['estimated_budget']
                     );
+
 
                     $data['estimated_budget'] =
                         is_numeric($budget)
                             ? $budget
                             : null;
+
                 }
+
 
                 /*
                 |--------------------------------------------------------------------------
-                | Raw Original Data
+                | Raw CSV
                 |--------------------------------------------------------------------------
                 */
+
                 $data['raw_data'] = $csvData;
 
+
                 /*
                 |--------------------------------------------------------------------------
-                | Ignore row if everything useful is empty
+                | Skip Invalid Row
                 |--------------------------------------------------------------------------
                 */
+
                 if (
                     empty($data['name'])
-                    && empty($data['mobile'])
-                    && empty($data['company_name'])
-                    && empty($data['email'])
+                    &&
+                    empty($data['mobile'])
+                    &&
+                    empty($data['company_name'])
+                    &&
+                    empty($data['email'])
                 ) {
+
                     $skipped++;
+
                     continue;
+
                 }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Create Data
+                |--------------------------------------------------------------------------
+                */
 
                 Data::create($data);
 
+
                 $inserted++;
+
             }
+
 
             fclose($handle);
 
+
             DB::commit();
+
 
             return redirect()
                 ->route('data.index')
@@ -1164,22 +1456,31 @@ class DataController extends Controller
                     "{$inserted} data records imported successfully. {$skipped} rows skipped."
                 );
 
+
         } catch (\Throwable $e) {
 
+
             if (is_resource($handle)) {
+
                 fclose($handle);
+
             }
+
 
             DB::rollBack();
 
+
             report($e);
+
 
             return back()
                 ->withInput()
                 ->with(
                     'error',
-                    'Import failed: ' . $e->getMessage()
+                    'Import failed: '
+                    . $e->getMessage()
                 );
+
         }
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CallDisposition;
 use App\Models\CallLog;
 use App\Models\FollowUp;
 use App\Models\Lead;
@@ -17,519 +18,257 @@ class DashboardController extends Controller
     /**
      * Display dashboard.
      */
-    // public function index(Request $request): View
-    // {
-    //     $user = $request->user();
-
-    //     $companyId = (int) $user->company_id;
-    //     $userId = (int) $user->id;
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Full Access Roles
-    //     |--------------------------------------------------------------------------
-    //     |
-    //     | Super Admin aur Admin company ki saari leads/data dekh sakte hain.
-    //     |
-    //     | Baaki roles:
-    //     | - telecaller
-    //     | - employee
-    //     | - sales executive
-    //     | - etc.
-    //     |
-    //     | Sirf apni assigned leads dekhenge.
-    //     |
-    //     */
-
-    //     $hasFullAccess = $user->hasAnyRole([
-    //         'super_admin',
-    //         'admin',
-    //     ]);
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Base Lead Query
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $leadQuery = Lead::query()
-    //         ->where('company_id', $companyId);
-
-    //     if (!$hasFullAccess) {
-    //         $leadQuery->where(
-    //             'assigned_to',
-    //             $userId
-    //         );
-    //     }
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Lead IDs
-    //     |--------------------------------------------------------------------------
-    //     |
-    //     | Calls, follow-ups, orders etc. ko employee ke assigned leads ke
-    //     | according filter karne ke liye.
-    //     |
-    //     */
-
-    //     $visibleLeadIdsQuery = Lead::query()
-    //         ->select('id')
-    //         ->where('company_id', $companyId);
-
-    //     if (!$hasFullAccess) {
-    //         $visibleLeadIdsQuery->where(
-    //             'assigned_to',
-    //             $userId
-    //         );
-    //     }
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Total Leads
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $totalLeads = (clone $leadQuery)->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | New Leads Today
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $newToday = (clone $leadQuery)
-    //         ->whereDate(
-    //             'created_at',
-    //             today()
-    //         )
-    //         ->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Hot Leads
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $hotLeads = (clone $leadQuery)
-    //         ->where(
-    //             'temperature',
-    //             'hot'
-    //         )
-    //         ->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Calls Today
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $callsTodayQuery = CallLog::query()
-    //         ->where(
-    //             'company_id',
-    //             $companyId
-    //         )
-    //         ->whereDate(
-    //             'created_at',
-    //             today()
-    //         );
-
-    //     if (!$hasFullAccess) {
-    //         $callsTodayQuery->whereIn(
-    //             'lead_id',
-    //             clone $visibleLeadIdsQuery
-    //         );
-    //     }
-
-    //     $callsToday = $callsTodayQuery->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Connected Calls Today
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $connectedTodayQuery = CallLog::query()
-    //         ->where(
-    //             'company_id',
-    //             $companyId
-    //         )
-    //         ->whereDate(
-    //             'created_at',
-    //             today()
-    //         )
-    //         ->whereHas(
-    //             'disposition',
-    //             function (Builder $query) {
-    //                 $query->where(
-    //                     'type',
-    //                     'connected'
-    //                 );
-    //             }
-    //         );
-
-    //     if (!$hasFullAccess) {
-    //         $connectedTodayQuery->whereIn(
-    //             'lead_id',
-    //             clone $visibleLeadIdsQuery
-    //         );
-    //     }
-
-    //     $connectedToday =
-    //         $connectedTodayQuery->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Follow-ups Due Today
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $followUpsDueQuery = FollowUp::query()
-    //         ->where(
-    //             'company_id',
-    //             $companyId
-    //         )
-    //         ->where(
-    //             'status',
-    //             'pending'
-    //         )
-    //         ->whereDate(
-    //             'scheduled_at',
-    //             today()
-    //         );
-
-    //     if (!$hasFullAccess) {
-    //         $followUpsDueQuery->whereIn(
-    //             'lead_id',
-    //             clone $visibleLeadIdsQuery
-    //         );
-    //     }
-
-    //     $followUpsDue =
-    //         $followUpsDueQuery->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Overdue Follow-ups
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $overdueQuery = FollowUp::query()
-    //         ->where(
-    //             'company_id',
-    //             $companyId
-    //         )
-    //         ->where(
-    //             'status',
-    //             'pending'
-    //         )
-    //         ->where(
-    //             'scheduled_at',
-    //             '<',
-    //             now()
-    //         );
-
-    //     if (!$hasFullAccess) {
-    //         $overdueQuery->whereIn(
-    //             'lead_id',
-    //             clone $visibleLeadIdsQuery
-    //         );
-    //     }
-
-    //     $overdue = $overdueQuery->count();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Sales
-    //     |--------------------------------------------------------------------------
-    //     |
-    //     | Admin / Super Admin:
-    //     | Company ki total sales.
-    //     |
-    //     | Employee:
-    //     | Sirf uski assigned leads se related orders.
-    //     |
-    //     */
-
-    //     $salesQuery = Order::query()
-    //         ->where(
-    //             'company_id',
-    //             $companyId
-    //         );
-
-    //     if (!$hasFullAccess) {
-    //         $salesQuery->whereIn(
-    //             'lead_id',
-    //             clone $visibleLeadIdsQuery
-    //         );
-    //     }
-
-    //     $sales = (float) $salesQuery
-    //         ->sum('total_amount');
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Payments Received
-    //     |--------------------------------------------------------------------------
-    //     |
-    //     | Payment -> Order -> Lead relation ke through filter.
-    //     |
-    //     */
-
-    //     $receivedQuery = Payment::query()
-    //         ->where(
-    //             'company_id',
-    //             $companyId
-    //         );
-
-    //     if (!$hasFullAccess) {
-    //         $receivedQuery->whereHas(
-    //             'order',
-    //             function (Builder $query) use (
-    //                 $visibleLeadIdsQuery
-    //             ) {
-    //                 $query->whereIn(
-    //                     'lead_id',
-    //                     clone $visibleLeadIdsQuery
-    //                 );
-    //             }
-    //         );
-    //     }
-
-    //     $received = (float) $receivedQuery
-    //         ->sum('amount');
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Active Users
-    //     |--------------------------------------------------------------------------
-    //     |
-    //     | Sirf Admin/Super Admin ke liye company employee count useful hai.
-    //     | Employee ke dashboard par 1 show karna meaningful nahi hai.
-    //     |
-    //     */
-
-    //     $activeUsers = $hasFullAccess
-    //         ? User::query()
-    //             ->where(
-    //                 'company_id',
-    //                 $companyId
-    //             )
-    //             ->where(
-    //                 'is_active',
-    //                 true
-    //             )
-    //             ->count()
-    //         : 1;
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | Recent Leads
-    //     |--------------------------------------------------------------------------
-    //     */
-
-    //     $recentLeads = (clone $leadQuery)
-    //         ->with([
-    //             'assignedUser:id,name,employee_code',
-    //             'status:id,name,color',
-    //             'source:id,name',
-    //         ])
-    //         ->latest('id')
-    //         ->limit(8)
-    //         ->get();
-
-    //     /*
-    //     |--------------------------------------------------------------------------
-    //     | User Dashboard Type
-    //     |--------------------------------------------------------------------------
-    //     |
-    //     | Blade me bhi role-wise cards control kar sakte hain.
-    //     |
-    //     */
-
-    //     $dashboardMode = $hasFullAccess
-    //         ? 'admin'
-    //         : 'employee';
-
-    //     return view('dashboard', [
-    //         'totalLeads' => $totalLeads,
-    //         'newToday' => $newToday,
-    //         'hotLeads' => $hotLeads,
-
-    //         'callsToday' => $callsToday,
-    //         'connectedToday' => $connectedToday,
-
-    //         'followUpsDue' => $followUpsDue,
-    //         'overdue' => $overdue,
-
-    //         'sales' => $sales,
-    //         'received' => $received,
-
-    //         'activeUsers' => $activeUsers,
-
-    //         'recentLeads' => $recentLeads,
-
-    //         'dashboardMode' => $dashboardMode,
-    //         'hasFullAccess' => $hasFullAccess,
-    //     ]);
-    // }
-
-
     public function index(Request $request): View
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $companyId = (int) $user->company_id;
-    $userId = (int) $user->id;
+        $companyId = (int) $user->company_id;
+        $userId = (int) $user->id;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Full Access Roles
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard Period Filter
+        |--------------------------------------------------------------------------
+        |
+        | today = Today
+        | month = Current Month
+        | all   = All Time
+        |
+        | Default = today
+        |
+        */
 
-    $hasFullAccess = $user->hasAnyRole([
-        'super_admin',
-        'admin',
-    ]);
+        $period = $request->get('period', 'today');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Base Lead Query
-    |--------------------------------------------------------------------------
-    */
+        if (!in_array($period, [
+            'today',
+            'month',
+            'all',
+        ], true)) {
+            $period = 'today';
+        }
 
-    $leadQuery = Lead::query()
-        ->where('company_id', $companyId);
+        $periodLabel = match ($period) {
+            'month' => 'This Month',
+            'all' => 'All Time',
+            default => 'Today',
+        };
 
-    if (!$hasFullAccess) {
-        $leadQuery->where(
-            'assigned_to',
-            $userId
+        /*
+        |--------------------------------------------------------------------------
+        | Period Filter Helper
+        |--------------------------------------------------------------------------
+        */
+
+        $applyPeriod = function (
+            Builder $query,
+            string $column = 'created_at'
+        ) use ($period): Builder {
+
+            if ($period === 'today') {
+                $query->whereBetween(
+                    $column,
+                    [
+                        now()->startOfDay(),
+                        now(),
+                    ]
+                );
+            }
+
+            if ($period === 'month') {
+                $query->whereBetween(
+                    $column,
+                    [
+                        now()->startOfMonth(),
+                        now(),
+                    ]
+                );
+            }
+
+            /*
+             * all = No date restriction
+             */
+
+            return $query;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Full Access Roles
+        |--------------------------------------------------------------------------
+        */
+
+        $hasFullAccess = $user->hasAnyRole([
+            'super_admin',
+            'admin',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Base Lead Query
+        |--------------------------------------------------------------------------
+        */
+
+        $leadQuery = Lead::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        if (!$hasFullAccess) {
+            $leadQuery->where(
+                'assigned_to',
+                $userId
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Visible Lead IDs
+        |--------------------------------------------------------------------------
+        */
+
+        $visibleLeadIdsQuery = Lead::query()
+            ->select('id')
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        if (!$hasFullAccess) {
+            $visibleLeadIdsQuery->where(
+                'assigned_to',
+                $userId
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Total Leads
+        |--------------------------------------------------------------------------
+        */
+
+        $totalLeads = (clone $leadQuery)
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | New Leads - Selected Period
+        |--------------------------------------------------------------------------
+        */
+
+        $newLeadQuery = clone $leadQuery;
+
+        $applyPeriod(
+            $newLeadQuery,
+            'created_at'
         );
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Visible Lead IDs
-    |--------------------------------------------------------------------------
-    */
+        $newToday = $newLeadQuery->count();
 
-    $visibleLeadIdsQuery = Lead::query()
-        ->select('id')
-        ->where('company_id', $companyId);
+        /*
+        |--------------------------------------------------------------------------
+        | Total Demo Sent
+        |--------------------------------------------------------------------------
+        */
 
-    if (!$hasFullAccess) {
-        $visibleLeadIdsQuery->where(
-            'assigned_to',
-            $userId
-        );
-    }
+        $totalLeadSend = (clone $leadQuery)
+            ->where(
+                'demo_send',
+                true
+            )
+            ->count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Total Leads
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Demo Sent - Selected Period
+        |--------------------------------------------------------------------------
+        */
 
-    $totalLeads = (clone $leadQuery)->count();
+        $demoPeriodQuery = (clone $leadQuery)
+            ->where(
+                'demo_send',
+                true
+            )
+            ->whereNotNull(
+                'demo_sent_at'
+            );
 
-    /*
-    |--------------------------------------------------------------------------
-    | New Leads Today
-    |--------------------------------------------------------------------------
-    */
-
-    $newToday = (clone $leadQuery)
-        ->whereDate(
-            'created_at',
-            today()
-        )
-        ->count();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Total Lead Send
-    |--------------------------------------------------------------------------
-    |
-    | demo_send = 1 wali visible leads.
-    |
-    */
-
-    $totalLeadSend = (clone $leadQuery)
-        ->where('demo_send', true)
-        ->count();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Today Lead Send
-    |--------------------------------------------------------------------------
-    |
-    | demo_sent_at aaj ki date ka hona chahiye.
-    |
-    */
-
-    $todayLeadSend = (clone $leadQuery)
-        ->where('demo_send', true)
-        ->whereDate(
-            'demo_sent_at',
-            today()
-        )
-        ->count();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Hot Leads
-    |--------------------------------------------------------------------------
-    */
-
-    $hotLeads = (clone $leadQuery)
-        ->where(
-            'temperature',
-            'hot'
-        )
-        ->count();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Calls Today
-    |--------------------------------------------------------------------------
-    */
-
-    $callsTodayQuery = CallLog::query()
-        ->where(
-            'company_id',
-            $companyId
-        )
-        ->whereDate(
-            'created_at',
-            today()
+        $applyPeriod(
+            $demoPeriodQuery,
+            'demo_sent_at'
         );
 
-    if (!$hasFullAccess) {
-        $callsTodayQuery->whereIn(
-            'lead_id',
-            clone $visibleLeadIdsQuery
+        $todayLeadSend = $demoPeriodQuery
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hot Leads
+        |--------------------------------------------------------------------------
+        */
+
+        $hotLeads = (clone $leadQuery)
+            ->where(
+                'temperature',
+                'hot'
+            )
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Base Call Query
+        |--------------------------------------------------------------------------
+        */
+
+        $callsBaseQuery = CallLog::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        /*
+         * Employee / Telecaller:
+         * Sirf apni assigned leads ki calls dekhe.
+         */
+
+        if (!$hasFullAccess) {
+            $callsBaseQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Total Calls - Selected Period
+        |--------------------------------------------------------------------------
+        */
+
+        $callsPeriodQuery = clone $callsBaseQuery;
+
+        $applyPeriod(
+            $callsPeriodQuery,
+            'created_at'
         );
-    }
 
-    $callsToday = $callsTodayQuery->count();
+        $callsToday = $callsPeriodQuery
+            ->count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Connected Calls Today
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Connected Calls - Selected Period
+        |--------------------------------------------------------------------------
+        */
 
-    $connectedTodayQuery = CallLog::query()
-        ->where(
-            'company_id',
-            $companyId
-        )
-        ->whereDate(
-            'created_at',
-            today()
-        )
-        ->whereHas(
+        $connectedTodayQuery = clone $callsBaseQuery;
+
+        $applyPeriod(
+            $connectedTodayQuery,
+            'created_at'
+        );
+
+        $connectedTodayQuery->whereHas(
             'disposition',
             function (Builder $query) {
                 $query->where(
@@ -539,204 +278,438 @@ class DashboardController extends Controller
             }
         );
 
-    if (!$hasFullAccess) {
-        $connectedTodayQuery->whereIn(
-            'lead_id',
-            clone $visibleLeadIdsQuery
-        );
-    }
+        $connectedToday = $connectedTodayQuery
+            ->count();
 
-    $connectedToday =
-        $connectedTodayQuery->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Disposition Call Counts
+        |--------------------------------------------------------------------------
+        |
+        | CallLog table column:
+        |
+        | call_disposition_id
+        |
+        | Yahan selected period ke calls ko group karenge.
+        |
+        */
 
-    /*
-    |--------------------------------------------------------------------------
-    | Follow-ups Due Today
-    |--------------------------------------------------------------------------
-    */
+        $dispositionCountQuery = clone $callsBaseQuery;
 
-    $followUpsDueQuery = FollowUp::query()
-        ->where(
-            'company_id',
-            $companyId
-        )
-        ->where(
-            'status',
-            'pending'
-        )
-        ->whereDate(
-            'scheduled_at',
-            today()
+        $applyPeriod(
+            $dispositionCountQuery,
+            'created_at'
         );
 
-    if (!$hasFullAccess) {
-        $followUpsDueQuery->whereIn(
-            'lead_id',
-            clone $visibleLeadIdsQuery
-        );
-    }
+        $dispositionCounts = $dispositionCountQuery
+            ->whereNotNull(
+                'call_disposition_id'
+            )
+            ->select(
+                'call_disposition_id'
+            )
+            ->selectRaw(
+                'COUNT(*) as total'
+            )
+            ->groupBy(
+                'call_disposition_id'
+            )
+            ->pluck(
+                'total',
+                'call_disposition_id'
+            );
 
-    $followUpsDue =
-        $followUpsDueQuery->count();
+        /*
+        |--------------------------------------------------------------------------
+        | ALL DYNAMIC DISPOSITIONS
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        |
+        | Hum CallLog se disposition list nahi bana rahe.
+        |
+        | Hum CallDisposition master table se SAARE dispositions
+        | la rahe hain.
+        |
+        | Isliye:
+        |
+        | - Count 0 ho tab bhi disposition dikhega
+        | - New disposition add hote hi dikhega
+        | - Name hard-coded nahi hai
+        | - Type hard-coded nahi hai
+        |
+        */
 
-    /*
-    |--------------------------------------------------------------------------
-    | Overdue Follow-ups
-    |--------------------------------------------------------------------------
-    */
+        $allDispositionsQuery = CallDisposition::query();
 
-    $overdueQuery = FollowUp::query()
-        ->where(
-            'company_id',
-            $companyId
-        )
-        ->where(
-            'status',
-            'pending'
-        )
-        ->where(
-            'scheduled_at',
-            '<',
-            now()
-        );
+        /*
+         * Agar CallDisposition company-wise hai to company filter.
+         *
+         * Agar aapki call_dispositions table me company_id column hai
+         * to ye required hai.
+         */
 
-    if (!$hasFullAccess) {
-        $overdueQuery->whereIn(
-            'lead_id',
-            clone $visibleLeadIdsQuery
-        );
-    }
-
-    $overdue = $overdueQuery->count();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Sales
-    |--------------------------------------------------------------------------
-    */
-
-    $salesQuery = Order::query()
-        ->where(
+        $allDispositionsQuery->where(
             'company_id',
             $companyId
         );
 
-    if (!$hasFullAccess) {
-        $salesQuery->whereIn(
-            'lead_id',
-            clone $visibleLeadIdsQuery
-        );
-    }
+        /*
+         * Saare dispositions la rahe hain.
+         *
+         * Active aur inactive dono ka data available rahega.
+         *
+         * Agar sirf active chahiye to:
+         *
+         * ->where('is_active', true)
+         *
+         * laga sakte ho.
+         */
 
-    $sales = (float) $salesQuery
-        ->sum('total_amount');
+        $allDispositions = $allDispositionsQuery
+            ->orderBy('id')
+            ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Payments Received
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Final Dynamic Disposition Stats
+        |--------------------------------------------------------------------------
+        */
 
-    $receivedQuery = Payment::query()
-        ->where(
-            'company_id',
-            $companyId
-        );
-
-    if (!$hasFullAccess) {
-        $receivedQuery->whereHas(
-            'order',
-            function (Builder $query) use (
-                $visibleLeadIdsQuery
+        $dispositionStats = $allDispositions
+            ->map(function ($disposition) use (
+                $dispositionCounts
             ) {
-                $query->whereIn(
-                    'lead_id',
-                    clone $visibleLeadIdsQuery
-                );
-            }
+
+                return [
+
+                    'id' => (int) $disposition->id,
+
+                    'name' => $disposition->name,
+
+                    'type' => $disposition->type,
+
+                    /*
+                     * Count nahi mila to 0
+                     */
+                    'total' => (int) (
+                        $dispositionCounts[
+                            $disposition->id
+                        ] ?? 0
+                    ),
+
+                    /*
+                     * Dashboard par active/inactive
+                     * dikhane ke kaam aa sakta hai.
+                     */
+                    'is_active' => (bool) (
+                        $disposition->is_active ?? true
+                    ),
+
+                    /*
+                     * Extra fields bhi Blade me use kar sakte hain.
+                     */
+                    'requires_follow_up' => (bool) (
+                        $disposition->requires_follow_up ?? false
+                    ),
+
+                    'requires_remarks' => (bool) (
+                        $disposition->requires_remarks ?? false
+                    ),
+
+                    'auto_remarks' => $disposition->auto_remarks
+                        ?? null,
+
+                    'next_followup' => $disposition->next_followup
+                        ?? null,
+                ];
+            })
+            ->values();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calls Without Disposition
+        |--------------------------------------------------------------------------
+        */
+
+        $withoutDispositionQuery = clone $callsBaseQuery;
+
+        $applyPeriod(
+            $withoutDispositionQuery,
+            'created_at'
         );
-    }
 
-    $received = (float) $receivedQuery
-        ->sum('amount');
+        $withoutDisposition = $withoutDispositionQuery
+            ->whereNull(
+                'call_disposition_id'
+            )
+            ->count();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Active Users
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Follow-ups - Selected Period
+        |--------------------------------------------------------------------------
+        */
 
-    $activeUsers = $hasFullAccess
-        ? User::query()
+        $followUpsDueQuery = FollowUp::query()
             ->where(
                 'company_id',
                 $companyId
             )
             ->where(
-                'is_active',
-                true
-            )
-            ->count()
-        : 1;
+                'status',
+                'pending'
+            );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Recent Leads
-    |--------------------------------------------------------------------------
-    */
+        if (!$hasFullAccess) {
+            $followUpsDueQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
+        }
 
-    $recentLeads = (clone $leadQuery)
-        ->with([
-            'assignedUser:id,name,employee_code',
-            'status:id,name,color',
-            'source:id,name',
-        ])
-        ->latest('id')
-        ->limit(8)
-        ->get();
+        $applyPeriod(
+            $followUpsDueQuery,
+            'scheduled_at'
+        );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard Mode
-    |--------------------------------------------------------------------------
-    */
-
-    $dashboardMode = $hasFullAccess
-        ? 'admin'
-        : 'employee';
-
-    /*
-    |--------------------------------------------------------------------------
-    | View
-    |--------------------------------------------------------------------------
-    */
-
-    return view('dashboard', [
-        'totalLeads' => $totalLeads,
-        'newToday' => $newToday,
-        'hotLeads' => $hotLeads,
+        $followUpsDue = $followUpsDueQuery
+            ->count();
 
         /*
-         * Lead send dashboard counts
-         */
-        'todayLeadSend' => $todayLeadSend,
-        'totalLeadSend' => $totalLeadSend,
+        |--------------------------------------------------------------------------
+        | Overdue Follow-ups
+        |--------------------------------------------------------------------------
+        */
 
-        'callsToday' => $callsToday,
-        'connectedToday' => $connectedToday,
+        $overdueQuery = FollowUp::query()
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->where(
+                'status',
+                'pending'
+            )
+            ->where(
+                'scheduled_at',
+                '<',
+                now()
+            );
 
-        'followUpsDue' => $followUpsDue,
-        'overdue' => $overdue,
+        if (!$hasFullAccess) {
+            $overdueQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
+        }
 
-        'sales' => $sales,
-        'received' => $received,
+        if ($period !== 'all') {
+            $applyPeriod(
+                $overdueQuery,
+                'scheduled_at'
+            );
+        }
 
-        'activeUsers' => $activeUsers,
+        $overdue = $overdueQuery
+            ->count();
 
-        'recentLeads' => $recentLeads,
+        /*
+        |--------------------------------------------------------------------------
+        | Sales - Selected Period
+        |--------------------------------------------------------------------------
+        */
 
-        'dashboardMode' => $dashboardMode,
-        'hasFullAccess' => $hasFullAccess,
-    ]);
-}
+        $salesQuery = Order::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        if (!$hasFullAccess) {
+            $salesQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
+        }
+
+        $applyPeriod(
+            $salesQuery,
+            'created_at'
+        );
+
+        $sales = (float) $salesQuery
+            ->sum(
+                'total_amount'
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Payments - Selected Period
+        |--------------------------------------------------------------------------
+        */
+
+        $receivedQuery = Payment::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        if (!$hasFullAccess) {
+            $receivedQuery->whereHas(
+                'order',
+                function (Builder $query) use (
+                    $visibleLeadIdsQuery
+                ) {
+
+                    $query->whereIn(
+                        'lead_id',
+                        clone $visibleLeadIdsQuery
+                    );
+                }
+            );
+        }
+
+        $applyPeriod(
+            $receivedQuery,
+            'created_at'
+        );
+
+        $received = (float) $receivedQuery
+            ->sum(
+                'amount'
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Active Users
+        |--------------------------------------------------------------------------
+        */
+
+        $activeUsers = $hasFullAccess
+            ? User::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->count()
+            : 1;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recent Leads
+        |--------------------------------------------------------------------------
+        */
+
+        $recentLeads = (clone $leadQuery)
+            ->with([
+                'assignedUser:id,name,employee_code',
+                'status:id,name,color',
+                'source:id,name',
+            ])
+            ->latest('id')
+            ->limit(8)
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard Mode
+        |--------------------------------------------------------------------------
+        */
+
+        $dashboardMode = $hasFullAccess
+            ? 'admin'
+            : 'employee';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Return View
+        |--------------------------------------------------------------------------
+        */
+
+        return view('dashboard', [
+
+            /*
+             * Leads
+             */
+
+            'totalLeads' => $totalLeads,
+
+            'newToday' => $newToday,
+
+            'hotLeads' => $hotLeads,
+
+            /*
+             * Demo
+             */
+
+            'todayLeadSend' => $todayLeadSend,
+
+            'totalLeadSend' => $totalLeadSend,
+
+            /*
+             * Calls
+             */
+
+            'callsToday' => $callsToday,
+
+            'connectedToday' => $connectedToday,
+
+            /*
+             * Dynamic Dispositions
+             */
+
+            'dispositionStats' => $dispositionStats,
+
+            'withoutDisposition' => $withoutDisposition,
+
+            /*
+             * Follow Ups
+             */
+
+            'followUpsDue' => $followUpsDue,
+
+            'overdue' => $overdue,
+
+            /*
+             * Sales
+             */
+
+            'sales' => $sales,
+
+            'received' => $received,
+
+            /*
+             * Employees
+             */
+
+            'activeUsers' => $activeUsers,
+
+            /*
+             * Leads
+             */
+
+            'recentLeads' => $recentLeads,
+
+            /*
+             * Dashboard
+             */
+
+            'dashboardMode' => $dashboardMode,
+
+            'hasFullAccess' => $hasFullAccess,
+
+            /*
+             * Filter
+             */
+
+            'period' => $period,
+
+            'periodLabel' => $periodLabel,
+        ]);
+    }
 }

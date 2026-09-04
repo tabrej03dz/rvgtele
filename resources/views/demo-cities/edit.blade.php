@@ -275,266 +275,92 @@
 
             {{-- MEDIA GRID --}}
 
-            <div
-                class="
-                    media-grid
-                "
-            >
+            {{-- MEDIA GRID --}}
+            <div class="media-grid">
 
+                @foreach(($demoCity->media ?? []) as $item)
 
-                @foreach(
-                    (
-                        $demoCity->media
-                        ??
-                        []
-                    )
-                    as
-                    $item
-                )
-
-
-                    <div
-                        class="
-                            media-card
-                        "
-                    >
-
+                    <div class="media-card">
 
                         {{-- PREVIEW --}}
+                        <div class="media-box">
 
-                        <div
-                            class="
-                                media-box
-                            "
-                        >
-
-
-                            @if(
-                                ($item['type'] ?? '')
-                                ===
-                                'image'
-                            )
-
+                            @if(($item['type'] ?? '') === 'image')
 
                                 <img
-
-                                    src="{{
-                                        Storage::url(
-                                            $item['path']
-                                        )
-                                    }}"
-
+                                    src="{{ Storage::url($item['path']) }}"
                                     alt=""
                                 >
 
-
                             @else
 
-
                                 <video
-
-                                    src="{{
-                                        Storage::url(
-                                            $item['path']
-                                        )
-                                    }}"
-
+                                    src="{{ Storage::url($item['path']) }}"
                                     controls
-
-                                    preload="
-                                        metadata
-                                    "
+                                    preload="metadata"
                                 ></video>
-
 
                             @endif
 
-
                         </div>
-
 
                         {{-- INFO --}}
-
-                        <div
-                            class="
-                                media-info
-                            "
-                        >
-
+                        <div class="media-info">
 
                             <div
-                                class="
-                                    media-name
-                                "
-
-                                title="{{
-                                    $item[
-                                        'original_name'
-                                    ]
-                                    ??
-                                    ''
-                                }}"
+                                class="media-name"
+                                title="{{ $item['original_name'] ?? '' }}"
                             >
-
-                                {{
-                                    $item[
-                                        'original_name'
-                                    ]
-                                    ??
-                                    'Demo file'
-                                }}
-
+                                {{ $item['original_name'] ?? 'Demo file' }}
                             </div>
 
-
-                            <div
-                                class="
-                                    media-meta
-                                "
-                            >
-
-                                {{
-                                    strtoupper(
-                                        $item[
-                                            'type'
-                                        ]
-                                        ??
-                                        'file'
-                                    )
-                                }}
-
+                            <div class="media-meta">
+                                {{ strtoupper($item['type'] ?? 'file') }}
                                 •
-
-                                {{
-                                    number_format(
-
-                                        (
-                                            $item[
-                                                'size'
-                                            ]
-                                            ??
-                                            0
-                                        )
-
-                                        /
-
-                                        1024
-
-                                        /
-
-                                        1024,
-
-                                        2
-                                    )
-                                }}
-
+                                {{ number_format(($item['size'] ?? 0) / 1024 / 1024, 2) }}
                                 MB
-
                             </div>
 
-
-                            {{-- ACTIONS --}}
-
-                            <div
-                                class="
-                                    mt-3
-                                    flex
-                                    gap-2
-                                "
-                            >
-
+                            <div class="mt-3 flex gap-2">
 
                                 {{-- DOWNLOAD --}}
-
                                 <a
-
-                                    href="{{
-                                        route(
-                                            'demo-cities.media.download',
-                                            [
-                                                $demoCity,
-                                                $item[
-                                                    'id'
-                                                ]
-                                            ]
-                                        )
-                                    }}"
-
-                                    class="
-                                        demo-btn
-                                        flex-1
-                                    "
+                                    href="{{ route('demo-cities.media.download', [
+                                        $demoCity,
+                                        $item['id']
+                                    ]) }}"
+                                    class="demo-btn flex-1"
                                 >
-
-                                    <i
-                                        data-lucide="download"
-                                    ></i>
-
+                                    <i data-lucide="download"></i>
                                 </a>
 
-
                                 {{-- DELETE --}}
-
                                 <form
-
                                     method="POST"
-
-                                    action="{{
-                                        route(
-                                            'demo-cities.media.destroy',
-                                            [
-                                                $demoCity,
-                                                $item[
-                                                    'id'
-                                                ]
-                                            ]
-                                        )
-                                    }}"
-
-                                    onsubmit="
-                                        return confirm(
-                                            'Delete this demo file?'
-                                        )
-                                    "
+                                    action="{{ route('demo-cities.media.destroy', [
+                                        $demoCity,
+                                        $item['id']
+                                    ]) }}"
+                                    onsubmit="return confirm('Delete this demo file?')"
                                 >
-
-
                                     @csrf
-
                                     @method('DELETE')
 
-
                                     <button
-
                                         type="submit"
-
-                                        class="
-                                            demo-btn
-                                            demo-btn-red
-                                        "
+                                        class="demo-btn demo-btn-red"
                                     >
-
-                                        <i
-                                            data-lucide="trash-2"
-                                        ></i>
-
+                                        <i data-lucide="trash-2"></i>
                                     </button>
-
-
                                 </form>
-
 
                             </div>
 
-
                         </div>
-
 
                     </div>
 
-
                 @endforeach
-
 
             </div>
 
