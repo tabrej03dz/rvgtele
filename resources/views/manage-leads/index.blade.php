@@ -266,7 +266,28 @@
             <div class="form-grid">
                 <label>Status<select name="status"><option value="">All statuses</option>@foreach($statuses as $s)<option value="{{ $s->id }}" @selected((string)request('status')===(string)$s->id)>{{ $s->name }}</option>@endforeach</select></label>
                 <label>Source<select name="source"><option value="">All sources</option>@foreach($sources as $s)<option value="{{ $s->id }}" @selected((string)request('source')===(string)$s->id)>{{ $s->name }}</option>@endforeach</select></label>
-                <label>Category<select name="category"><option value="">All categories</option>@foreach($categories as $cat)<option value="{{ $cat }}" @selected(request('category')===$cat)>{{ $cat }}</option>@endforeach</select></label>
+                <label>
+                    Category
+
+                    <select name="category_id">
+                        <option value="">
+                            All categories
+                        </option>
+
+                        @foreach($categories as $category)
+                            <option
+                                value="{{ $category->id }}"
+                                @selected(
+                                    (string) request('category_id')
+                                    ===
+                                    (string) $category->id
+                                )
+                            >
+                                {{ $category->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
                 <label>City<select name="city"><option value="">All cities</option>@foreach($cities as $city)<option value="{{ $city }}" @selected(request('city')===$city)>{{ $city }}</option>@endforeach</select></label>
                 @if($canFilterByEmployee)
                     <label>Employee<select name="assigned_to"><option value="">All employees</option>@if($hasFullAccess)<option value="unassigned" @selected(request('assigned_to')==='unassigned')>Unassigned</option>@endif @foreach($users as $u)<option value="{{ $u->id }}" @selected((string)request('assigned_to')===(string)$u->id)>{{ $u->name }}{{ $u->employee_code ? ' ('.$u->employee_code.')' : '' }}</option>@endforeach</select></label>

@@ -419,6 +419,40 @@
 
                         <label class="block">
                             <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                                Default Category
+                                <span class="text-rose-500">*</span>
+                            </span>
+
+                            <select
+                                name="default_category_id"
+                                required
+                                class="w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
+                            >
+                                <option value="">Select category</option>
+
+                                @foreach ($categories as $category)
+                                    <option
+                                        value="{{ $category->id }}"
+                                        @selected(
+                                            (string) old('default_category_id')
+                                            ===
+                                            (string) $category->id
+                                        )
+                                    >
+                                        {{ $category->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            @error('default_category_id')
+                                <p class="mt-1.5 text-xs font-medium text-rose-600">
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </label>
+
+                        <label class="block">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">
                                 Default Employee
                             </span>
 
@@ -439,6 +473,7 @@
                                     </option>
                                 @endforeach
                             </select>
+
 
                             @error('default_assigned_to')
                                 <p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>

@@ -706,6 +706,5 @@
             @endif
         </div>
     </section>
-
 </div>
 @endsection
