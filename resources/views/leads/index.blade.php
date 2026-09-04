@@ -2338,14 +2338,17 @@
                     >
                         <form
                             method="POST"
-                            :action="selectedLead.demoUpdateUrl"
+                            :action="selectedLead.demoCallUrl"
+                            @submit="prepareDemoSubmit($event)"
+                            data-next-followup="{{ $demoDisposition?->next_followup ?? '' }}"
                         >
                             @csrf
-                            @method('PUT')
                             <input type="hidden" name="demo_send_only" value="1">
                             <input type="hidden" name="demo_send" value="1">
                             @if($demoDisposition)
                                 <input type="hidden" name="call_disposition_id" value="{{ $demoDisposition->id }}">
+                                <input type="hidden" name="remarks" value="{{ $demoDisposition->auto_remarks ?? '' }}">
+                                <input type="hidden" name="follow_up_at" value="">
                             @endif
 
                             <div class="quick-status">
@@ -2517,6 +2520,20 @@
                     + pad(d.getDate()) + 'T'
                     + pad(d.getHours()) + ':'
                     + pad(d.getMinutes());
+            },
+
+            prepareDemoSubmit(event) {
+                const form = event?.target;
+                if (!form) return;
+
+                const followupInput = form.querySelector('input[name="follow_up_at"]');
+                if (!followupInput) return;
+
+                const minutes = Number(form.dataset.nextFollowup || 0);
+
+                followupInput.value = Number.isFinite(minutes) && minutes > 0
+                    ? this.datetimeLocalAfterMinutes(minutes)
+                    : '';
             },
 
             dispositionChanged(event) {
@@ -5035,14 +5052,17 @@
                     >
                         <form
                             method="POST"
-                            :action="selectedLead.demoUpdateUrl"
+                            :action="selectedLead.demoCallUrl"
+                            @submit="prepareDemoSubmit($event)"
+                            data-next-followup="{{ $demoDisposition?->next_followup ?? '' }}"
                         >
                             @csrf
-                            @method('PUT')
                             <input type="hidden" name="demo_send_only" value="1">
                             <input type="hidden" name="demo_send" value="1">
                             @if($demoDisposition)
                                 <input type="hidden" name="call_disposition_id" value="{{ $demoDisposition->id }}">
+                                <input type="hidden" name="remarks" value="{{ $demoDisposition->auto_remarks ?? '' }}">
+                                <input type="hidden" name="follow_up_at" value="">
                             @endif
 
                             <div class="quick-status">
@@ -5215,6 +5235,20 @@
                     + pad(d.getDate()) + 'T'
                     + pad(d.getHours()) + ':'
                     + pad(d.getMinutes());
+            },
+
+            prepareDemoSubmit(event) {
+                const form = event?.target;
+                if (!form) return;
+
+                const followupInput = form.querySelector('input[name="follow_up_at"]');
+                if (!followupInput) return;
+
+                const minutes = Number(form.dataset.nextFollowup || 0);
+
+                followupInput.value = Number.isFinite(minutes) && minutes > 0
+                    ? this.datetimeLocalAfterMinutes(minutes)
+                    : '';
             },
 
             dispositionChanged(event) {
