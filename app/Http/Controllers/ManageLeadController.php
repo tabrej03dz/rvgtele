@@ -81,779 +81,334 @@ public function callOnMobile(
         'admin',
     ];
 
-// public function index(Request $request): View
-// {
 
-//     if (!$request->has('call_disposition')) {
-//         $request->merge([
-//             'call_disposition' => 'no_call',
-//         ]);
-//     }
 
-//     $companyId = $this->companyId($request);
-//     $hasFullAccess = $this->hasFullAccess($request);
-
-//     $leaderTeamIds = $this->leaderTeamIds($request);
-
-//     $isTeamLeader =
-//         !$hasFullAccess &&
-//         !empty($leaderTeamIds);
-
-//     $canFilterByEmployee =
-//         $hasFullAccess || $isTeamLeader;
-
-//     $canFilterByTeam =
-//         $hasFullAccess || $isTeamLeader;
-
-//     $callDisposition = (string) $request->input(
-//         'call_disposition',
-//         'no_call'
-//     );
-
-//     $filterRequest = clone $request;
-
-//     $filterRequest->query->remove('call_disposition');
-//     $filterRequest->request->remove('call_disposition');
-
-//     $query = $this->filteredLeadQuery($filterRequest)
-//         ->with([
-//             'assignedUser:id,name,employee_code,team_id',
-//             'source:id,name',
-//             'status:id,name,color',
-//             'team:id,name',
-//             'stage:id,name,color',
-//             'labels:id,company_id,name,color',
-//         ])
-//         ->addSelect([
-
-//             'latest_note_body' => Note::query()
-//                 ->select('body')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
-
-//             'latest_note_created_at' => Note::query()
-//                 ->select('created_at')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
-
-//             'latest_note_user_name' => Note::query()
-//                 ->leftJoin(
-//                     'users',
-//                     'users.id',
-//                     '=',
-//                     'notes.user_id'
-//                 )
-//                 ->select('users.name')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
-//         ]);
-
-//     if ($callDisposition === 'no_call') {
-
-//         $query->whereDoesntHave('calls');
-
-//     } elseif (
-//         $callDisposition !== '' &&
-//         $callDisposition !== 'all'
-//     ) {
-
-//         $dispositionId = (int) $callDisposition;
-
-//         $query->whereHas('calls', function (Builder $callQuery) use ($dispositionId) {
-
-//             $callQuery
-//                 ->where(
-//                     'call_disposition_id',
-//                     $dispositionId
-//                 )
-//                 ->where(
-//                     'call_logs.id',
-//                     '=',
-//                     function ($subQuery) {
-//                         $subQuery
-//                             ->selectRaw('MAX(cl2.id)')
-//                             ->from('call_logs as cl2')
-//                             ->whereColumn(
-//                                 'cl2.lead_id',
-//                                 'call_logs.lead_id'
-//                             );
-//                     }
-//                 );
-//         });
-//     }
-
-//     $allowedPerPage = [
-//         25,
-//         50,
-//         100,
-//         200,
-//     ];
-
-//     $perPage = (int) $request->input(
-//         'per_page',
-//         25
-//     );
-
-//     if (!in_array(
-//         $perPage,
-//         $allowedPerPage,
-//         true
-//     )) {
-//         $perPage = 25;
-//     }
-
-//     $leads = $query
-//         ->latest('leads.id')
-//         ->paginate($perPage)
-//         ->withQueryString();
-
-//     $statuses = LeadStatus::query()
-//         ->where(function (Builder $query) use ($companyId) {
-//             $query
-//                 ->whereNull('company_id')
-//                 ->orWhere(
-//                     'company_id',
-//                     $companyId
-//                 );
-//         })
-//         ->where('is_active', true)
-//         ->orderBy('sort_order')
-//         ->orderBy('name')
-//         ->get();
-
-//     $dispositions = CallDisposition::query()
-//         ->where(function (Builder $query) use ($companyId) {
-//             $query
-//                 ->whereNull('company_id')
-//                 ->orWhere(
-//                     'company_id',
-//                     $companyId
-//                 );
-//         })
-//         ->where('is_active', true)
-//         ->orderBy('name')
-//         ->get();
-
-//     $sources = LeadSource::query()
-//         ->where(function (Builder $query) use ($companyId) {
-//             $query
-//                 ->whereNull('company_id')
-//                 ->orWhere(
-//                     'company_id',
-//                     $companyId
-//                 );
-//         })
-//         ->orderBy('name')
-//         ->get();
-
-//     $categories = Category::query()
-//         ->where(
-//             'company_id',
-//             $companyId
-//         )
-//         ->whereNotNull('name')
-//         ->where(
-//             'name',
-//             '<>',
-//             ''
-//         )
-//         ->orderBy('name')
-//         ->pluck('name');
-
-//     $cities = Lead::query()
-//         ->where('company_id', $companyId)
-//         ->whereNotNull('city')
-//         ->where('city', '<>', '')
-//         ->select('city')
-//         ->distinct()
-//         ->orderBy('city')
-//         ->pluck('city');
-
-//     if ($hasFullAccess) {
-
-//         $users = User::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->where(
-//                 'is_active',
-//                 true
-//             )
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//                 'employee_code',
-//                 'team_id',
-//             ]);
-
-//     } elseif ($isTeamLeader) {
-
-//         $users = User::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->where(
-//                 'is_active',
-//                 true
-//             )
-//             ->where(function (Builder $query) use (
-//                 $request,
-//                 $leaderTeamIds
-//             ) {
-//                 $query
-//                     ->whereKey(
-//                         $request->user()->id
-//                     )
-//                     ->orWhereIn(
-//                         'team_id',
-//                         $leaderTeamIds
-//                     );
-//             })
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//                 'employee_code',
-//                 'team_id',
-//             ]);
-
-//     } else {
-
-//         $users = collect();
-//     }
-
-//     if ($hasFullAccess) {
-
-//         $teams = Team::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//             ]);
-
-//     } elseif ($isTeamLeader) {
-
-//         $teams = Team::query()
-//             ->where(
-//                 'company_id',
-//                 $companyId
-//             )
-//             ->whereIn(
-//                 'id',
-//                 $leaderTeamIds
-//             )
-//             ->orderBy('name')
-//             ->get([
-//                 'id',
-//                 'name',
-//             ]);
-
-//     } else {
-
-//         $teams = collect();
-//     }
-
-//     $labels = LeadLabel::query()
-//         ->where(
-//             'company_id',
-//             $companyId
-//         )
-//         ->withCount('leads')
-//         ->orderBy('name')
-//         ->get();
-
-//     return view('manage-leads.index', [
-
-//         'leads' => $leads,
-
-//         'statuses' => $statuses,
-//         'dispositions' => $dispositions,
-//         'sources' => $sources,
-//         'categories' => $categories,
-//         'cities' => $cities,
-
-//         'perPage' => $perPage,
-
-//         'users' => $users,
-//         'teams' => $teams,
-
-//         'labels' => $labels,
-
-//         'hasFullAccess' => $hasFullAccess,
-//         'isTeamLeader' => $isTeamLeader,
-//         'canFilterByEmployee' => $canFilterByEmployee,
-//         'canFilterByTeam' => $canFilterByTeam,
-//     ]);
-// }
-
-public function index(Request $request): View
-{
-    /*
-    |--------------------------------------------------------------------------
-    | Default Call Disposition
-    |--------------------------------------------------------------------------
-    */
-
-    if (!$request->has('call_disposition')) {
-        $request->merge([
-            'call_disposition' => 'no_call',
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Company + Access
-    |--------------------------------------------------------------------------
-    */
-
-    $companyId = $this->companyId($request);
-
-    $hasFullAccess =
-        $this->hasFullAccess($request);
-
-    $leaderTeamIds =
-        $this->leaderTeamIds($request);
-
-    $isTeamLeader =
-        !$hasFullAccess &&
-        !empty($leaderTeamIds);
-
-    $canFilterByEmployee =
-        $hasFullAccess ||
-        $isTeamLeader;
-
-    $canFilterByTeam =
-        $hasFullAccess ||
-        $isTeamLeader;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Call Disposition
-    |--------------------------------------------------------------------------
-    */
-
-    $callDisposition =
-        (string) $request->input(
-            'call_disposition',
-            'no_call'
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Main Filter Request
-    |--------------------------------------------------------------------------
-    |
-    | Call disposition ko yahan remove kiya ja raha hai,
-    | kyunki latest disposition filtering neeche separately hogi.
-    |
-    */
-
-    $filterRequest =
-        clone $request;
-
-    $filterRequest
-        ->query
-        ->remove('call_disposition');
-
-    $filterRequest
-        ->request
-        ->remove('call_disposition');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Main Lead Query
-    |--------------------------------------------------------------------------
-    */
-
-    $query =
-        $this->filteredLeadQuery(
-            $filterRequest
-        )
-        ->with([
-            'assignedUser:id,name,employee_code,team_id',
-
-            'source:id,name',
-
-            'status:id,name,color',
-
-            'team:id,name',
-
-            'stage:id,name,color',
-
-            'labels:id,company_id,name,color',
-        ])
-        ->addSelect([
-
-            /*
-            |--------------------------------------------------------------------------
-            | Latest Note Body
-            |--------------------------------------------------------------------------
-            */
-
-            'latest_note_body' =>
-                Note::query()
-                    ->select('body')
-                    ->whereColumn(
-                        'notes.lead_id',
-                        'leads.id'
-                    )
-                    ->latest(
-                        'notes.id'
-                    )
-                    ->limit(1),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Latest Note Date
-            |--------------------------------------------------------------------------
-            */
-
-            'latest_note_created_at' =>
-                Note::query()
-                    ->select('created_at')
-                    ->whereColumn(
-                        'notes.lead_id',
-                        'leads.id'
-                    )
-                    ->latest(
-                        'notes.id'
-                    )
-                    ->limit(1),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Latest Note User
-            |--------------------------------------------------------------------------
-            */
-
-            'latest_note_user_name' =>
-                Note::query()
-                    ->leftJoin(
-                        'users',
-                        'users.id',
-                        '=',
-                        'notes.user_id'
-                    )
-                    ->select(
-                        'users.name'
-                    )
-                    ->whereColumn(
-                        'notes.lead_id',
-                        'leads.id'
-                    )
-                    ->latest(
-                        'notes.id'
-                    )
-                    ->limit(1),
-        ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Latest Call Disposition Filter
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $callDisposition ===
-        'no_call'
-    ) {
-
-        $query
-            ->whereDoesntHave(
-                'calls'
+    public function index(Request $request): View
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Default Call Disposition
+        |--------------------------------------------------------------------------
+        */
+
+        if (!$request->has('call_disposition')) {
+            $request->merge([
+                'call_disposition' => 'no_call',
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Company + Access
+        |--------------------------------------------------------------------------
+        */
+
+        $companyId = $this->companyId($request);
+
+        $hasFullAccess =
+            $this->hasFullAccess($request);
+
+        $leaderTeamIds =
+            $this->leaderTeamIds($request);
+
+        $isTeamLeader =
+            !$hasFullAccess &&
+            !empty($leaderTeamIds);
+
+        $canFilterByEmployee =
+            $hasFullAccess ||
+            $isTeamLeader;
+
+        $canFilterByTeam =
+            $hasFullAccess ||
+            $isTeamLeader;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Call Disposition
+        |--------------------------------------------------------------------------
+        */
+
+        $callDisposition =
+            (string) $request->input(
+                'call_disposition',
+                'no_call'
             );
 
-    } elseif (
-        $callDisposition !== ''
-        &&
-        $callDisposition !== 'all'
-    ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Main Filter Request
+        |--------------------------------------------------------------------------
+        |
+        | Call disposition ko yahan remove kiya ja raha hai,
+        | kyunki latest disposition filtering neeche separately hogi.
+        |
+        */
 
-        $dispositionId =
-            (int) $callDisposition;
+        $filterRequest =
+            clone $request;
 
-        $query->whereHas(
-            'calls',
-            function (
-                Builder $callQuery
-            ) use (
-                $dispositionId
-            ) {
+        $filterRequest
+            ->query
+            ->remove('call_disposition');
 
-                $callQuery
-                    ->where(
-                        'call_disposition_id',
-                        $dispositionId
-                    )
-                    ->where(
-                        'call_logs.id',
-                        '=',
-                        function (
-                            $subQuery
-                        ) {
-                            $subQuery
-                                ->selectRaw(
-                                    'MAX(cl2.id)'
-                                )
-                                ->from(
-                                    'call_logs as cl2'
-                                )
-                                ->whereColumn(
-                                    'cl2.lead_id',
-                                    'call_logs.lead_id'
-                                );
-                        }
-                    );
-            }
-        );
-    }
+        $filterRequest
+            ->request
+            ->remove('call_disposition');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Per Page
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Main Lead Query
+        |--------------------------------------------------------------------------
+        */
 
-    $allowedPerPage = [
-        25,
-        50,
-        100,
-        200,
-    ];
-
-    $perPage =
-        (int) $request->input(
-            'per_page',
-            25
-        );
-
-    if (
-        !in_array(
-            $perPage,
-            $allowedPerPage,
-            true
-        )
-    ) {
-        $perPage = 25;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Leads
-    |--------------------------------------------------------------------------
-    */
-
-    $leads =
-        $query
-            ->latest(
-                'leads.id'
+        $query =
+            $this->filteredLeadQuery(
+                $filterRequest
             )
-            ->paginate(
-                $perPage
-            )
-            ->withQueryString();
+            ->with([
+                'assignedUser:id,name,employee_code,team_id',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Statuses
-    |--------------------------------------------------------------------------
-    */
+                'source:id,name',
 
-    $statuses =
-        LeadStatus::query()
-            ->where(
-                function (
-                    Builder $query
-                ) use (
-                    $companyId
-                ) {
-                    $query
-                        ->whereNull(
-                            'company_id'
+                'status:id,name,color',
+
+                'team:id,name',
+
+                'stage:id,name,color',
+
+                'labels:id,company_id,name,color',
+            ])
+            ->addSelect([
+
+                /*
+                |--------------------------------------------------------------------------
+                | Latest Note Body
+                |--------------------------------------------------------------------------
+                */
+
+                'latest_note_body' =>
+                    Note::query()
+                        ->select('body')
+                        ->whereColumn(
+                            'notes.lead_id',
+                            'leads.id'
                         )
-                        ->orWhere(
-                            'company_id',
-                            $companyId
-                        );
-                }
-            )
-            ->where(
-                'is_active',
-                true
-            )
-            ->orderBy(
-                'sort_order'
-            )
-            ->orderBy(
-                'name'
-            )
-            ->get();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Call Dispositions
-    |--------------------------------------------------------------------------
-    */
-
-    $dispositions =
-        CallDisposition::query()
-            ->where(
-                function (
-                    Builder $query
-                ) use (
-                    $companyId
-                ) {
-                    $query
-                        ->whereNull(
-                            'company_id'
+                        ->latest(
+                            'notes.id'
                         )
-                        ->orWhere(
-                            'company_id',
-                            $companyId
-                        );
-                }
-            )
-            ->where(
-                'is_active',
-                true
-            )
-            ->orderBy(
-                'name'
-            )
-            ->get();
+                        ->limit(1),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Sources
-    |--------------------------------------------------------------------------
-    */
+                /*
+                |--------------------------------------------------------------------------
+                | Latest Note Date
+                |--------------------------------------------------------------------------
+                */
 
-    $sources =
-        LeadSource::query()
-            ->where(
-                function (
-                    Builder $query
-                ) use (
-                    $companyId
-                ) {
-                    $query
-                        ->whereNull(
-                            'company_id'
+                'latest_note_created_at' =>
+                    Note::query()
+                        ->select('created_at')
+                        ->whereColumn(
+                            'notes.lead_id',
+                            'leads.id'
                         )
-                        ->orWhere(
-                            'company_id',
-                            $companyId
-                        );
-                }
-            )
-            ->orderBy(
-                'name'
-            )
-            ->get();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Categories
-    |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    | Categories ab Lead.category string se nahi aayengi.
-    | Direct Category model/table se aayengi.
-    |
-    */
-
-    $categories =
-        Category::query()
-            ->where(
-                function (
-                    Builder $query
-                ) use (
-                    $companyId
-                ) {
-                    $query
-                        ->whereNull(
-                            'company_id'
+                        ->latest(
+                            'notes.id'
                         )
-                        ->orWhere(
-                            'company_id',
-                            $companyId
-                        );
-                }
-            )
-            
-            ->orderBy(
-                'name'
-            )
-            ->get([
-                'id',
-                'name',
+                        ->limit(1),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Latest Note User
+                |--------------------------------------------------------------------------
+                */
+
+                'latest_note_user_name' =>
+                    Note::query()
+                        ->leftJoin(
+                            'users',
+                            'users.id',
+                            '=',
+                            'notes.user_id'
+                        )
+                        ->select(
+                            'users.name'
+                        )
+                        ->whereColumn(
+                            'notes.lead_id',
+                            'leads.id'
+                        )
+                        ->latest(
+                            'notes.id'
+                        )
+                        ->limit(1),
             ]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Cities
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Latest Call Disposition Filter
+        |--------------------------------------------------------------------------
+        */
 
-    $cities =
-        Lead::query()
-            ->where(
-                'company_id',
-                $companyId
-            )
-            ->whereNotNull(
-                'city'
-            )
-            ->where(
-                'city',
-                '<>',
-                ''
-            )
-            ->select(
-                'city'
-            )
-            ->distinct()
-            ->orderBy(
-                'city'
-            )
-            ->pluck(
-                'city'
+        if (
+            $callDisposition ===
+            'no_call'
+        ) {
+
+            $query
+                ->whereDoesntHave(
+                    'calls'
+                );
+
+        } elseif (
+            $callDisposition !== ''
+            &&
+            $callDisposition !== 'all'
+        ) {
+
+            $dispositionId =
+                (int) $callDisposition;
+
+            $query->whereHas(
+                'calls',
+                function (
+                    Builder $callQuery
+                ) use (
+                    $dispositionId
+                ) {
+
+                    $callQuery
+                        ->where(
+                            'call_disposition_id',
+                            $dispositionId
+                        )
+                        ->where(
+                            'call_logs.id',
+                            '=',
+                            function (
+                                $subQuery
+                            ) {
+                                $subQuery
+                                    ->selectRaw(
+                                        'MAX(cl2.id)'
+                                    )
+                                    ->from(
+                                        'call_logs as cl2'
+                                    )
+                                    ->whereColumn(
+                                        'cl2.lead_id',
+                                        'call_logs.lead_id'
+                                    );
+                            }
+                        );
+                }
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Per Page
+        |--------------------------------------------------------------------------
+        */
+
+        $allowedPerPage = [
+            25,
+            50,
+            100,
+            200,
+        ];
+
+        $perPage =
+            (int) $request->input(
+                'per_page',
+                25
             );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Users
-    |--------------------------------------------------------------------------
-    */
+        if (
+            !in_array(
+                $perPage,
+                $allowedPerPage,
+                true
+            )
+        ) {
+            $perPage = 25;
+        }
 
-    if (
-        $hasFullAccess
-    ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Leads
+        |--------------------------------------------------------------------------
+        */
 
-        $users =
-            User::query()
+        $leads =
+            $query
+                ->latest(
+                    'leads.id'
+                )
+                ->paginate(
+                    $perPage
+                )
+                ->withQueryString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Statuses
+        |--------------------------------------------------------------------------
+        */
+
+        $statuses =
+            LeadStatus::query()
                 ->where(
-                    'company_id',
-                    $companyId
+                    function (
+                        Builder $query
+                    ) use (
+                        $companyId
+                    ) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->orderBy(
+                    'sort_order'
+                )
+                ->orderBy(
+                    'name'
+                )
+                ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Call Dispositions
+        |--------------------------------------------------------------------------
+        */
+
+        $dispositions =
+            CallDisposition::query()
+                ->where(
+                    function (
+                        Builder $query
+                    ) use (
+                        $companyId
+                    ) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
                 )
                 ->where(
                     'is_active',
@@ -862,79 +417,67 @@ public function index(Request $request): View
                 ->orderBy(
                     'name'
                 )
-                ->get([
-                    'id',
-                    'name',
-                    'employee_code',
-                    'team_id',
-                ]);
+                ->get();
 
-    } elseif (
-        $isTeamLeader
-    ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Sources
+        |--------------------------------------------------------------------------
+        */
 
-        $users =
-            User::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'is_active',
-                    true
-                )
+        $sources =
+            LeadSource::query()
                 ->where(
                     function (
                         Builder $query
                     ) use (
-                        $request,
-                        $leaderTeamIds
+                        $companyId
                     ) {
-
                         $query
-                            ->whereKey(
-                                $request
-                                    ->user()
-                                    ->id
+                            ->whereNull(
+                                'company_id'
                             )
-                            ->orWhereIn(
-                                'team_id',
-                                $leaderTeamIds
+                            ->orWhere(
+                                'company_id',
+                                $companyId
                             );
                     }
                 )
                 ->orderBy(
                     'name'
                 )
-                ->get([
-                    'id',
-                    'name',
-                    'employee_code',
-                    'team_id',
-                ]);
+                ->get();
 
-    } else {
+        /*
+        |--------------------------------------------------------------------------
+        | Categories
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Categories ab Lead.category string se nahi aayengi.
+        | Direct Category model/table se aayengi.
+        |
+        */
 
-        $users =
-            collect();
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Teams
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $hasFullAccess
-    ) {
-
-        $teams =
-            Team::query()
+        $categories =
+            Category::query()
                 ->where(
-                    'company_id',
-                    $companyId
+                    function (
+                        Builder $query
+                    ) use (
+                        $companyId
+                    ) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
                 )
+                
                 ->orderBy(
                     'name'
                 )
@@ -943,107 +486,242 @@ public function index(Request $request): View
                     'name',
                 ]);
 
-    } elseif (
-        $isTeamLeader
-    ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Cities
+        |--------------------------------------------------------------------------
+        */
 
-        $teams =
-            Team::query()
+        $cities =
+            Lead::query()
                 ->where(
                     'company_id',
                     $companyId
                 )
-                ->whereIn(
-                    'id',
-                    $leaderTeamIds
+                ->whereNotNull(
+                    'city'
+                )
+                ->where(
+                    'city',
+                    '<>',
+                    ''
+                )
+                ->select(
+                    'city'
+                )
+                ->distinct()
+                ->orderBy(
+                    'city'
+                )
+                ->pluck(
+                    'city'
+                );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $hasFullAccess
+        ) {
+
+            $users =
+                User::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->orderBy(
+                        'name'
+                    )
+                    ->get([
+                        'id',
+                        'name',
+                        'employee_code',
+                        'team_id',
+                    ]);
+
+        } elseif (
+            $isTeamLeader
+        ) {
+
+            $users =
+                User::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->where(
+                        function (
+                            Builder $query
+                        ) use (
+                            $request,
+                            $leaderTeamIds
+                        ) {
+
+                            $query
+                                ->whereKey(
+                                    $request
+                                        ->user()
+                                        ->id
+                                )
+                                ->orWhereIn(
+                                    'team_id',
+                                    $leaderTeamIds
+                                );
+                        }
+                    )
+                    ->orderBy(
+                        'name'
+                    )
+                    ->get([
+                        'id',
+                        'name',
+                        'employee_code',
+                        'team_id',
+                    ]);
+
+        } else {
+
+            $users =
+                collect();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Teams
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $hasFullAccess
+        ) {
+
+            $teams =
+                Team::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->orderBy(
+                        'name'
+                    )
+                    ->get([
+                        'id',
+                        'name',
+                    ]);
+
+        } elseif (
+            $isTeamLeader
+        ) {
+
+            $teams =
+                Team::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->whereIn(
+                        'id',
+                        $leaderTeamIds
+                    )
+                    ->orderBy(
+                        'name'
+                    )
+                    ->get([
+                        'id',
+                        'name',
+                    ]);
+
+        } else {
+
+            $teams =
+                collect();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lead Labels
+        |--------------------------------------------------------------------------
+        */
+
+        $labels =
+            LeadLabel::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->withCount(
+                    'leads'
                 )
                 ->orderBy(
                     'name'
                 )
-                ->get([
-                    'id',
-                    'name',
-                ]);
+                ->get();
 
-    } else {
+        /*
+        |--------------------------------------------------------------------------
+        | View
+        |--------------------------------------------------------------------------
+        */
 
-        $teams =
-            collect();
+        return view(
+            'manage-leads.index',
+            [
+                'leads' =>
+                    $leads,
+
+                'statuses' =>
+                    $statuses,
+
+                'dispositions' =>
+                    $dispositions,
+
+                'sources' =>
+                    $sources,
+
+                'categories' =>
+                    $categories,
+
+                'cities' =>
+                    $cities,
+
+                'perPage' =>
+                    $perPage,
+
+                'users' =>
+                    $users,
+
+                'teams' =>
+                    $teams,
+
+                'labels' =>
+                    $labels,
+
+                'hasFullAccess' =>
+                    $hasFullAccess,
+
+                'isTeamLeader' =>
+                    $isTeamLeader,
+
+                'canFilterByEmployee' =>
+                    $canFilterByEmployee,
+
+                'canFilterByTeam' =>
+                    $canFilterByTeam,
+            ]
+        );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Labels
-    |--------------------------------------------------------------------------
-    */
-
-    $labels =
-        LeadLabel::query()
-            ->where(
-                'company_id',
-                $companyId
-            )
-            ->withCount(
-                'leads'
-            )
-            ->orderBy(
-                'name'
-            )
-            ->get();
-
-    /*
-    |--------------------------------------------------------------------------
-    | View
-    |--------------------------------------------------------------------------
-    */
-
-    return view(
-        'manage-leads.index',
-        [
-            'leads' =>
-                $leads,
-
-            'statuses' =>
-                $statuses,
-
-            'dispositions' =>
-                $dispositions,
-
-            'sources' =>
-                $sources,
-
-            'categories' =>
-                $categories,
-
-            'cities' =>
-                $cities,
-
-            'perPage' =>
-                $perPage,
-
-            'users' =>
-                $users,
-
-            'teams' =>
-                $teams,
-
-            'labels' =>
-                $labels,
-
-            'hasFullAccess' =>
-                $hasFullAccess,
-
-            'isTeamLeader' =>
-                $isTeamLeader,
-
-            'canFilterByEmployee' =>
-                $canFilterByEmployee,
-
-            'canFilterByTeam' =>
-                $canFilterByTeam,
-        ]
-    );
-}
 
     public function create(Request $request): View
     {
@@ -3022,5 +2700,182 @@ public function index(Request $request): View
             403,
             'This lead is not assigned to you or your team.'
         );
+    }
+
+
+
+
+
+    public function destroyWithRelations(
+        Request $request,
+        Lead $lead
+    ): RedirectResponse {
+
+        $this->ensureFullAccess($request);
+        $this->guardCompany($request, $lead);
+
+        DB::transaction(function () use ($lead) {
+
+            // Labels pivot delete
+            if (method_exists($lead, 'labels')) {
+                $lead->labels()->detach();
+            }
+
+            // Notes delete
+            if (method_exists($lead, 'notes')) {
+                $lead->notes()->delete();
+            }
+
+            // Follow Ups delete
+            if (method_exists($lead, 'followUps')) {
+                $lead->followUps()->delete();
+            }
+
+            // Call Logs delete
+            if (method_exists($lead, 'calls')) {
+                $lead->calls()->delete();
+            }
+
+            // Assignment History delete
+            if (method_exists($lead, 'assignments')) {
+                $lead->assignments()->delete();
+            }
+
+            // Lead permanently delete
+            if (method_exists($lead, 'forceDelete')) {
+                $lead->forceDelete();
+            } else {
+                $lead->delete();
+            }
+        });
+
+        return redirect()
+            ->route('manage.leads.index')
+            ->with(
+                'success',
+                'Lead and all related records permanently deleted.'
+            );
+    }
+
+
+    public function bulkDelete(Request $request): RedirectResponse
+    {
+        $this->ensureFullAccess($request);
+
+        $companyId = $this->companyId($request);
+
+        $validated = $request->validate([
+            'lead_ids' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'lead_ids.*' => [
+                'required',
+                'integer',
+                Rule::exists('leads', 'id')->where(
+                    fn ($query) =>
+                    $query->where(
+                        'company_id',
+                        $companyId
+                    )
+                ),
+            ],
+
+            'delete_mode' => [
+                'required',
+                Rule::in([
+                    'lead_only',
+                    'with_related',
+                ]),
+            ],
+        ]);
+
+        $leads = Lead::query()
+            ->where(
+                'company_id',
+                $companyId
+            )
+            ->whereIn(
+                'id',
+                $validated['lead_ids']
+            )
+            ->get();
+
+        if ($leads->isEmpty()) {
+            return back()->with(
+                'error',
+                'No leads selected.'
+            );
+        }
+
+        DB::transaction(function () use (
+            $leads,
+            $validated
+        ) {
+
+            foreach ($leads as $lead) {
+
+                if (
+                    $validated['delete_mode']
+                    ===
+                    'with_related'
+                ) {
+
+                    $this->deleteLeadWithRelations(
+                        $lead
+                    );
+
+                } else {
+
+                    $lead->delete();
+                }
+            }
+        });
+
+        $count = $leads->count();
+
+        return back()->with(
+            'success',
+            $validated['delete_mode']
+                === 'with_related'
+
+                ? "{$count} leads and related records deleted."
+
+                : "{$count} leads deleted."
+        );
+    }
+
+
+    private function deleteLeadWithRelations(
+        Lead $lead
+    ): void {
+
+        if (method_exists($lead, 'labels')) {
+            $lead->labels()->detach();
+        }
+
+        if (method_exists($lead, 'notes')) {
+            $lead->notes()->delete();
+        }
+
+        if (method_exists($lead, 'followUps')) {
+            $lead->followUps()->delete();
+        }
+
+        if (method_exists($lead, 'calls')) {
+            $lead->calls()->delete();
+        }
+
+        if (method_exists($lead, 'assignments')) {
+            $lead->assignments()->delete();
+        }
+
+        if (method_exists($lead, 'forceDelete')) {
+            $lead->forceDelete();
+        } else {
+            $lead->delete();
+        }
     }
 }

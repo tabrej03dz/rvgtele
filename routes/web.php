@@ -165,6 +165,20 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     // Route::get('manage/leads', [ManageLeadController::class, 'index'])->middleware('permission:leads.view')->name('manage.leads.index');
 
     // Manage Leads
+
+    Route::delete(
+        '/leads/{lead}/with-relations',
+        [ManageLeadController::class, 'destroyWithRelations']
+    )->name('leads.destroy-with-relations');
+
+
+    Route::post(
+        '/manage/leads/bulk-delete',
+        [ManageLeadController::class, 'bulkDelete']
+    )->name('manage.leads.bulk-delete');
+
+
+
     Route::get(
         '/manage/leads',
         [ManageLeadController::class, 'index']
