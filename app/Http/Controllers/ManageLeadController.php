@@ -2716,37 +2716,42 @@ public function callOnMobile(
 
         DB::transaction(function () use ($lead) {
 
-            // Labels pivot delete
+            // Lead Labels Pivot Delete
             if (method_exists($lead, 'labels')) {
                 $lead->labels()->detach();
             }
 
-            // Notes delete
+            // Notes Delete
             if (method_exists($lead, 'notes')) {
                 $lead->notes()->delete();
             }
 
-            // Follow Ups delete
+            // Follow Ups Delete
             if (method_exists($lead, 'followUps')) {
                 $lead->followUps()->delete();
             }
 
-            // Call Logs delete
+            // Call Logs Delete
             if (method_exists($lead, 'calls')) {
                 $lead->calls()->delete();
             }
 
-            // Assignment History delete
+            // Lead Assignment History Delete
             if (method_exists($lead, 'assignments')) {
                 $lead->assignments()->delete();
             }
 
-            // Lead permanently delete
-            if (method_exists($lead, 'forceDelete')) {
-                $lead->forceDelete();
-            } else {
-                $lead->delete();
-            }
+            /*
+            |--------------------------------------------------------------------------
+            | Permanent Lead Delete
+            |--------------------------------------------------------------------------
+            |
+            | Lead model me SoftDeletes hai, isliye delete() use nahi karna.
+            | forceDelete() database se record permanently remove karega.
+            |
+            */
+
+            $lead->forceDelete();
         });
 
         return redirect()
@@ -2871,6 +2876,7 @@ public function callOnMobile(
         if (method_exists($lead, 'assignments')) {
             $lead->assignments()->delete();
         }
+        $lead->forceDelete();
 
         if (method_exists($lead, 'forceDelete')) {
             $lead->forceDelete();
