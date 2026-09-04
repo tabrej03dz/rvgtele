@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\LeadApiController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\WhatsappMessageTemplateController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FollowUpApiController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -18,6 +19,29 @@ Route::middleware('auth:sanctum')->group(function () {
     [LeadApiController::class, 'communicationHistory']
 );
 
+
+
+/*
+|--------------------------------------------------------------------------
+| Follow-up APIs
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('follow-ups')
+    ->controller(FollowUpApiController::class)
+    ->group(function () {
+        Route::get('/', 'index');
+        Route::get('/summary', 'summary');
+        Route::get('/reminders', 'reminders');
+        Route::get('/nearest', 'nearest');
+
+        Route::get('/{followUp}', 'show');
+
+        Route::patch('/{followUp}/complete', 'complete');
+        Route::patch('/{followUp}/snooze', 'snooze');
+        Route::patch('/{followUp}/reschedule', 'reschedule');
+        Route::patch('/{followUp}/cancel', 'cancel');
+    });
 
 
  /*
