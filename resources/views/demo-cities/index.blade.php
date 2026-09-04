@@ -436,6 +436,33 @@
                 $videos = $media
                     ->where('type', 'video')
                     ->count();
+
+
+                $bulkDownloadFiles = $media
+                    ->filter(function ($item) {
+                        return !empty($item['id'])
+                            && !empty($item['path']);
+                    })
+                    ->map(function ($item) use ($city) {
+
+                        return [
+                            'id' => $item['id'],
+
+                            'name' => $item['original_name']
+                                ?? basename($item['path']),
+
+                            'url' => route(
+                                'demo-cities.media.download',
+                                [
+                                    $city,
+                                    $item['id']
+                                ]
+                            ),
+                        ];
+
+                    })
+                    ->values()
+                    ->all();
             @endphp
 
             <section class="city-card">
@@ -550,18 +577,26 @@
 
                         </a>
 
+                        
+
                         @if($media->isNotEmpty())
 
-                            <a
-                                href="{{ route('demo-cities.download-all', $city) }}"
+                            <button
+                                type="button"
                                 class="demo-btn demo-btn-dark"
+                                onclick='downloadCityFiles(
+                                    @json($bulkDownloadFiles),
+                                    this
+                                )'
                             >
 
-                                <i data-lucide="archive"></i>
+                                <i data-lucide="download"></i>
 
-                                Download All
+                                <span class="bulk-download-text">
+                                    Bulk Download
+                                </span>
 
-                            </a>
+                            </button>
 
                         @endif
 
@@ -607,5 +642,157 @@
 
 
 </div>
+
+<script>
+    window.bulkDownloadRunning = false;
+
+    async function bulkDownloadFiles(urls, button = null) {
+
+        if (window.bulkDownloadRunning) {
+            return;
+        }
+
+        if (!Array.isArray(urls) || urls.length === 0) {
+
+            alert('No demo files available for download.');
+
+            return;
+        }
+
+
+        const total = urls.length;
+
+        const textElement = button
+            ? button.querySelector('.bulk-download-text')
+            : null;
+
+        const originalText = textElement
+            ? textElement.innerText
+            : 'Bulk Download';
+
+
+        window.bulkDownloadRunning = true;
+
+
+        if (button) {
+
+            button.disabled = true;
+            button.style.opacity = '0.65';
+            button.style.cursor = 'not-allowed';
+
+        }
+
+
+        try {
+
+            for (
+                let index = 0;
+                index < urls.length;
+                index++
+            ) {
+
+                if (textElement) {
+
+                    textElement.innerText =
+                        `Downloading ${index + 1}/${total}`;
+
+                }
+
+
+                const link =
+                    document.createElement('a');
+
+                link.href = urls[index];
+
+                link.style.display = 'none';
+
+
+                document.body.appendChild(link);
+
+                link.click();
+
+
+                setTimeout(() => {
+
+                    if (link.parentNode) {
+
+                        link.parentNode
+                            .removeChild(link);
+
+                    }
+
+                }, 1000);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | 900ms Gap
+                |--------------------------------------------------------------------------
+                */
+
+                await new Promise(resolve => {
+
+                    setTimeout(resolve, 900);
+
+                });
+
+            }
+
+
+            if (textElement) {
+
+                textElement.innerText =
+                    `${total} Files Started`;
+
+            }
+
+
+            setTimeout(() => {
+
+                if (textElement) {
+                    textElement.innerText = originalText;
+                }
+
+            }, 2500);
+
+        } catch (error) {
+
+            console.error(
+                'Bulk download error:',
+                error
+            );
+
+            alert(
+                'Some files could not be downloaded.'
+            );
+
+        } finally {
+
+            window.bulkDownloadRunning = false;
+
+
+            setTimeout(() => {
+
+                if (button) {
+
+                    button.disabled = false;
+                    button.style.opacity = '';
+                    button.style.cursor = '';
+
+                }
+
+
+                if (textElement) {
+
+                    textElement.innerText =
+                        originalText;
+
+                }
+
+            }, 1000);
+
+        }
+    }
+</script>
 
 @endsection
