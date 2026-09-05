@@ -8,6 +8,21 @@
 
     $currentStatus = request('status');
 
+    /*
+     * Leads Index ke Feedback popup ko same backend flow ke saath
+     * Follow-up Index par reuse karne ke liye dispositions yahin available rakhein.
+     * Agar controller already $dispositions bhej raha hai to wahi use hoga.
+     */
+    if (!isset($dispositions)) {
+        $dispositions = \App\Models\CallDisposition::query()
+            ->orderBy('name')
+            ->get();
+    }
+
+    $demoDisposition = $dispositions->first(
+        fn ($item) => mb_strtolower(trim((string) $item->name)) === 'demo'
+    );
+
     $tabClass = function (?string $status) use ($currentStatus) {
 
         $isActive =
@@ -213,10 +228,760 @@
         }
     }
 
+
+
+    .followup-feedback-btn {
+        display:inline-flex;
+        min-height:34px;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        border:1px solid #ddd6fe;
+        border-radius:8px;
+        background:#f5f3ff;
+        padding:0 10px;
+        color:#7c3aed;
+        font-size:11px;
+        font-weight:800;
+        transition:.18s ease;
+        white-space:nowrap;
+        cursor:pointer;
+    }
+    .followup-feedback-btn:hover {
+        background:#ede9fe;
+        border-color:#c4b5fd;
+        color:#6d28d9;
+        transform:translateY(-1px);
+    }
+    .followup-feedback-btn svg {
+        width:14px;
+        height:14px;
+    }
+
+    /* QUICK FEEDBACK BUTTON + PREMIUM MODAL */
+    .feedback-action {
+        color:#7c3aed !important;
+        background:#f5f3ff !important;
+        border-color:#ddd6fe !important;
+        padding:0 9px !important;
+        width:auto !important;
+    }
+
+    .feedback-action span {
+        font-size:9px;
+        font-weight:800;
+    }
+
+    .quick-modal-backdrop {
+        position:fixed;
+        inset:0;
+        z-index:100;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:18px;
+        background:rgba(15,23,42,.58);
+        backdrop-filter:blur(3px);
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+    }
+
+    .quick-modal {
+        width:100%;
+        max-width:800px;
+        max-height:calc(100dvh - 36px);
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+        border:1px solid #f4ddb0;
+        border-radius:18px;
+        background:
+            linear-gradient(145deg,#fffef9 0%,#fffaf0 42%,#fff 100%);
+        box-shadow:
+            0 30px 90px rgba(15,23,42,.28),
+            0 0 0 1px rgba(245,185,0,.05);
+    }
+
+    .quick-modal-head {
+        position:relative;
+        flex:0 0 auto;
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:14px;
+        padding:20px 24px 15px;
+        border-bottom:0;
+        background:
+            radial-gradient(circle at 92% 10%,rgba(245,185,0,.12),transparent 34%),
+            transparent;
+    }
+
+    .quick-modal-tag {
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        min-height:28px;
+        padding:0 10px;
+        border-radius:8px;
+        background:#fff1bf;
+        color:#9a6500;
+        font-size:9px;
+        font-weight:900;
+        text-transform:uppercase;
+        letter-spacing:.03em;
+    }
+
+    .quick-modal-tag svg {
+        width:13px;
+        height:13px;
+    }
+
+    .quick-modal-title {
+        margin-top:8px;
+        color:#111827;
+        font-size:22px;
+        line-height:1.1;
+        font-weight:900;
+        letter-spacing:-.02em;
+    }
+
+    .quick-modal-meta {
+        margin-top:8px;
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:14px;
+        color:#7c6b4d;
+        font-size:10px;
+        font-weight:600;
+    }
+
+    .quick-modal-meta span {
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+    }
+
+    .quick-modal-meta svg {
+        width:13px;
+        height:13px;
+        color:#d99b00;
+    }
+
+    .quick-close {
+        width:42px;
+        height:42px;
+        flex:0 0 42px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border:1px solid #dedede;
+        border-radius:13px;
+        background:#fff;
+        color:#475467;
+        box-shadow:0 4px 12px rgba(15,23,42,.05);
+        cursor:pointer;
+    }
+
+    .quick-close:hover {
+        background:#fff8e8;
+        border-color:#efc95a;
+        color:#111827;
+    }
+
+    .quick-close svg {
+        width:20px;
+        height:20px;
+    }
+
+    .quick-modal-body {
+        flex:1 1 auto;
+        min-height:0;
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        padding:0 24px 22px;
+        background:transparent;
+    }
+
+    .quick-summary {
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:10px;
+        margin-bottom:14px;
+    }
+
+    .quick-summary-card {
+        min-height:86px;
+        display:flex;
+        align-items:center;
+        gap:10px;
+        border:1px solid #eadfc9;
+        border-radius:13px;
+        background:rgba(255,255,255,.88);
+        padding:12px;
+        box-shadow:0 5px 16px rgba(83,63,22,.035);
+    }
+
+    .quick-summary-icon {
+        width:38px;
+        height:38px;
+        flex:0 0 38px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:50%;
+        background:#fff4cb;
+        color:#d99b00;
+    }
+
+    .quick-summary-icon svg {
+        width:17px;
+        height:17px;
+    }
+
+    .quick-summary-label {
+        font-size:8px;
+        font-weight:900;
+        color:#8a8f98;
+        text-transform:uppercase;
+        letter-spacing:.04em;
+    }
+
+    .quick-summary-value {
+        margin-top:4px;
+        font-size:11px;
+        line-height:1.35;
+        font-weight:900;
+        color:#1f2937;
+        overflow-wrap:anywhere;
+    }
+
+    .quick-top-actions {
+        display:grid;
+        grid-template-columns:1fr 1fr 1fr;
+        gap:9px;
+        margin-bottom:10px;
+    }
+
+    .quick-primary-action {
+        min-height:50px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:9px;
+        border:1px solid #f0c333;
+        border-radius:11px;
+        background:linear-gradient(180deg,#ffd22e 0%,#ffc400 100%);
+        color:#171717;
+        font-size:10px;
+        font-weight:900;
+        cursor:pointer;
+        text-decoration:none;
+        box-shadow:0 7px 16px rgba(255,196,0,.15);
+    }
+
+    .quick-primary-action.secondary {
+        background:#fff;
+        border-color:#eccd71;
+        box-shadow:none;
+    }
+
+    .quick-primary-action svg {
+        width:18px;
+        height:18px;
+    }
+
+    .quick-tabs {
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:9px;
+        margin-bottom:12px;
+    }
+
+    .quick-tab {
+        min-height:50px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        border:1px solid #e8cb78;
+        border-radius:11px;
+        background:#fff;
+        padding:0 12px;
+        color:#344054;
+        font-size:10px;
+        font-weight:900;
+        cursor:pointer;
+        text-decoration:none;
+        transition:.15s ease;
+    }
+
+    .quick-tab svg {
+        width:17px;
+        height:17px;
+    }
+
+    .quick-tab.active {
+        border-color:#f1b900;
+        background:#fff8dc;
+        color:#1f2937;
+        box-shadow:inset 0 0 0 1px rgba(241,185,0,.12);
+    }
+
+    .quick-panel {
+        border:1px solid #eadfc9;
+        border-radius:13px;
+        background:rgba(255,255,255,.90);
+        padding:16px;
+    }
+
+    .quick-grid {
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:14px;
+    }
+
+    .quick-field label {
+        display:block;
+        margin-bottom:6px;
+        color:#475569;
+        font-size:10px;
+        font-weight:900;
+    }
+
+    .quick-field input,
+    .quick-field select,
+    .quick-field textarea {
+        width:100%;
+        border:1px solid #d7dde7;
+        border-radius:10px;
+        background:#fff;
+        color:#1e293b;
+        font-size:11px;
+        outline:none;
+    }
+
+    .quick-field input,
+    .quick-field select {
+        min-height:46px;
+        padding:0 12px;
+    }
+
+    .quick-field textarea {
+        min-height:96px;
+        padding:10px 12px;
+        resize:vertical;
+    }
+
+    .quick-field input:focus,
+    .quick-field select:focus,
+    .quick-field textarea:focus {
+        border-color:#f1b900;
+        box-shadow:0 0 0 3px rgba(241,185,0,.12);
+    }
+
+    .quick-form-actions {
+        position:sticky;
+        bottom:-1px;
+        z-index:12;
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:9px;
+        margin-top:16px;
+        padding:12px 0 4px;
+        background:linear-gradient(to top, #fff 72%, rgba(255,255,255,.90) 88%, rgba(255,255,255,0));
+    }
+
+    .quick-btn {
+        min-height:42px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:7px;
+        border:1px solid #d8dee7;
+        border-radius:10px;
+        background:#fff;
+        padding:0 15px;
+        color:#475467;
+        font-size:9px;
+        font-weight:900;
+        cursor:pointer;
+        text-decoration:none;
+    }
+
+    .quick-btn-green {
+        border-color:#059669;
+        background:#059669;
+        color:#fff;
+    }
+
+    .quick-btn-blue {
+        border-color:#2563eb;
+        background:#2563eb;
+        color:#fff;
+    }
+
+    .quick-btn-violet {
+        border-color:#f1b900;
+        background:linear-gradient(180deg,#ffd22e 0%,#ffc400 100%);
+        color:#171717;
+    }
+
+    .quick-btn-dark {
+        border-color:#334155;
+        background:#334155;
+        color:#fff;
+    }
+
+    .quick-status {
+        border:1px solid #f0dfac;
+        border-radius:10px;
+        background:#fffaf0;
+        padding:12px;
+    }
+
+    @media (max-width:700px) {
+        .quick-modal-backdrop {
+            align-items:flex-start;
+            padding:8px;
+        }
+
+        .quick-modal {
+            max-height:calc(100dvh - 16px);
+            margin:auto 0;
+            border-radius:14px;
+        }
+
+        .quick-modal-head {
+            padding-top:14px;
+            padding-bottom:10px;
+        }
+
+        .quick-modal-head,
+        .quick-modal-body {
+            padding-left:14px;
+            padding-right:14px;
+        }
+
+        .quick-modal-title {
+            font-size:18px;
+        }
+
+        .quick-close {
+            width:38px;
+            height:38px;
+            flex-basis:38px;
+        }
+
+        .quick-summary {
+            grid-template-columns:repeat(2,1fr);
+            gap:8px;
+        }
+
+        .quick-summary-card {
+            min-height:74px;
+            padding:10px;
+        }
+
+        .quick-top-actions,
+        .quick-tabs,
+        .quick-grid {
+            grid-template-columns:1fr;
+        }
+
+        .quick-top-actions,
+        .quick-tabs {
+            gap:7px;
+        }
+
+        .quick-primary-action,
+        .quick-tab {
+            min-height:44px;
+        }
+
+        .quick-panel {
+            padding:12px;
+        }
+
+        .quick-form-actions {
+            margin-left:-12px;
+            margin-right:-12px;
+            padding:12px 12px 6px;
+        }
+    }
+
+    @media (max-height:720px) {
+        .quick-modal-backdrop {
+            align-items:flex-start;
+            padding-top:8px;
+            padding-bottom:8px;
+        }
+
+        .quick-modal {
+            max-height:calc(100dvh - 16px);
+            margin:auto 0;
+        }
+
+        .quick-modal-head {
+            padding-top:12px;
+            padding-bottom:10px;
+        }
+
+        .quick-modal-body {
+            padding-bottom:12px;
+        }
+    }
+
+
+    /* =========================================================
+       COMPACT QUICK ACTION MODAL
+       ========================================================= */
+    .quick-modal {
+        max-width: 720px;
+        border-radius: 14px;
+    }
+
+    .quick-modal-head {
+        gap: 10px;
+        padding: 12px 16px 9px;
+    }
+
+    .quick-modal-tag {
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 6px;
+        font-size: 8px;
+    }
+
+    .quick-modal-tag svg {
+        width: 11px;
+        height: 11px;
+    }
+
+    .quick-modal-title {
+        margin-top: 5px;
+        font-size: 18px;
+    }
+
+    .quick-modal-meta {
+        margin-top: 5px;
+        gap: 10px;
+        font-size: 9px;
+    }
+
+    .quick-modal-meta svg {
+        width: 11px;
+        height: 11px;
+    }
+
+    .quick-close {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        border-radius: 9px;
+    }
+
+    .quick-close svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .quick-modal-body {
+        padding: 0 16px 14px;
+    }
+
+    .quick-summary {
+        gap: 7px;
+        margin-bottom: 9px;
+    }
+
+    .quick-summary-card {
+        min-height: 62px;
+        gap: 8px;
+        padding: 8px 9px;
+        border-radius: 10px;
+    }
+
+    .quick-summary-icon {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+    }
+
+    .quick-summary-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-summary-label {
+        font-size: 7px;
+    }
+
+    .quick-summary-value {
+        margin-top: 2px;
+        font-size: 10px;
+        line-height: 1.2;
+    }
+
+    .quick-top-actions {
+        gap: 7px;
+        margin-bottom: 7px;
+    }
+
+    .quick-primary-action {
+        min-height: 38px;
+        gap: 6px;
+        border-radius: 8px;
+        font-size: 9px;
+    }
+
+    .quick-primary-action svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-tabs {
+        gap: 7px;
+        margin-bottom: 8px;
+    }
+
+    .quick-tab {
+        min-height: 38px;
+        gap: 6px;
+        border-radius: 8px;
+        padding: 0 9px;
+        font-size: 9px;
+    }
+
+    .quick-tab svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .quick-panel {
+        padding: 11px;
+        border-radius: 10px;
+    }
+
+    .quick-grid {
+        gap: 9px;
+    }
+
+    .quick-field label {
+        margin-bottom: 4px;
+        font-size: 9px;
+    }
+
+    .quick-field input,
+    .quick-field select,
+    .quick-field textarea {
+        border-radius: 8px;
+        font-size: 10px;
+    }
+
+    .quick-field input,
+    .quick-field select {
+        min-height: 36px;
+        padding: 0 9px;
+    }
+
+    .quick-field textarea {
+        min-height: 68px;
+        padding: 8px 9px;
+    }
+
+    .quick-status {
+        padding: 9px;
+        border-radius: 8px;
+    }
+
+    .quick-form-actions {
+        gap: 7px;
+        margin-top: 9px;
+        padding: 8px 0 2px;
+    }
+
+    .quick-btn {
+        min-height: 34px;
+        gap: 5px;
+        border-radius: 8px;
+        padding: 0 11px;
+        font-size: 8px;
+    }
+
+    .quick-btn svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    }
+
+    @media (max-width:700px) {
+        .quick-modal-head {
+            padding: 10px 11px 8px;
+        }
+
+        .quick-modal-body {
+            padding-left: 11px;
+            padding-right: 11px;
+            padding-bottom: 10px;
+        }
+
+        .quick-summary {
+            grid-template-columns: repeat(2,1fr);
+            gap: 6px;
+        }
+
+        .quick-summary-card {
+            min-height: 56px;
+            padding: 7px;
+        }
+
+        .quick-top-actions,
+        .quick-tabs {
+            grid-template-columns: repeat(3,1fr);
+            gap: 5px;
+        }
+
+        .quick-primary-action,
+        .quick-tab {
+            min-height: 36px;
+            padding: 0 6px;
+            font-size: 8px;
+        }
+
+        .quick-grid {
+            grid-template-columns:1fr;
+        }
+    }
+
+    @media (max-height:720px) {
+        .quick-modal-head {
+            padding-top:8px;
+            padding-bottom:7px;
+        }
+
+        .quick-summary-card {
+            min-height:54px;
+        }
+
+        .quick-primary-action,
+        .quick-tab {
+            min-height:34px;
+        }
+    }
+
 </style>
 
 
-<div class="followups-ui mx-auto max-w-none space-y-4">
+<div
+    class="followups-ui mx-auto max-w-none space-y-4"
+    x-data="followupIndexBoard()"
+    @keydown.escape.window="feedbackOpen = false"
+>
 
 
     {{-- =========================================================
@@ -1020,6 +1785,51 @@
 
                             };
 
+                            $popupLead = null;
+
+                            if ($followup->lead) {
+                                $lead = $followup->lead;
+
+                                $popupLatestCall = $lead->latestCall;
+
+                                $popupLastRemark = $popupLatestCall?->remarks
+                                    ?? $popupLatestCall?->remark
+                                    ?? $popupLatestCall?->auto_remarks
+                                    ?? null;
+
+                                $popupLastFeedback = $popupLastRemark
+                                    ?: ($lead->latest_note_body ?? '');
+
+                                $whatsappNumber = preg_replace(
+                                    '/\D+/',
+                                    '',
+                                    (string) ($lead->whatsapp_number ?: $lead->mobile)
+                                );
+
+                                $popupLead = [
+                                    'id' => (int) $lead->id,
+                                    'name' => $lead->name ?: 'No Name',
+                                    'business' => $lead->company_name ?: '',
+                                    'mobile' => $lead->mobile ?: '',
+                                    'whatsapp' => $whatsappNumber,
+                                    'city' => $lead->city ?: '',
+                                    'state' => $lead->state ?: '',
+                                    'category' => $lead->category ?: '',
+                                    'demoSent' => (bool) $lead->demo_send,
+                                    'showUrl' => route('leads.show', $lead),
+                                    'callStoreUrl' => route('calls.store', $lead),
+                                    'noteStoreUrl' => route('leads.notes', $lead),
+                                    'demoUpdateUrl' => route('leads.update', $lead),
+                                    'lastDisposition' => $popupLatestCall?->disposition?->name ?: '',
+                                    'lastRemark' => $popupLastFeedback ?: '',
+                                    'lastEmployee' => $popupLatestCall?->user?->name ?: '',
+                                    'lastCallAt' => $popupLatestCall?->created_at
+                                        ? $popupLatestCall->created_at->format('d M Y, h:i A')
+                                        : '',
+                                    'demoCallUrl' => route('leads.demo.store', $lead),
+                                ];
+                            }
+
                         @endphp
 
 
@@ -1282,6 +2092,19 @@
                                     class="flex items-center justify-end gap-2">
 
                                     @if($followup->lead)
+                                        <button
+                                            type="button"
+                                            class="followup-feedback-btn"
+                                            title="Feedback & Actions"
+                                            @click='openFeedback(@json($popupLead))'
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>
+                                                <path d="M8 9h8M8 13h5"/>
+                                            </svg>
+                                            Feedback
+                                        </button>
+
                                         <a
                                             href="{{ route('leads.show', $followup->lead) }}"
                                             class="followup-open-btn"
@@ -1467,9 +2290,930 @@
 
     </section>
 
+    {{-- QUICK FEEDBACK / ALL ACTIONS MODAL --}}
+    <div
+        x-show="feedbackOpen"
+        x-cloak
+        class="quick-modal-backdrop"
+        @click.self="feedbackOpen = false"
+    >
+        <div class="quick-modal" role="dialog" aria-modal="true">
+
+            <div class="quick-modal-head">
+
+                <div class="min-w-0">
+
+                    <div class="quick-modal-tag">
+                        <i data-lucide="zap"></i>
+                        Quick Lead Actions
+                    </div>
+
+                    <div
+                        class="quick-modal-title truncate"
+                        x-text="
+                            selectedLead.business
+                            ||
+                            selectedLead.name
+                            ||
+                            'Lead'
+                        "
+                    ></div>
+
+                    <div class="quick-modal-meta">
+
+                        <span>
+                            <i data-lucide="phone"></i>
+
+                            <span
+                                x-text="
+                                    selectedLead.mobile
+                                    ||
+                                    'No mobile'
+                                "
+                            ></span>
+                        </span>
+
+                        <span x-show="selectedLead.city">
+                            <i data-lucide="map-pin"></i>
+
+                            <span
+                                x-text="selectedLead.city"
+                            ></span>
+                        </span>
+
+                        <span x-show="selectedLead.category">
+                            <i data-lucide="briefcase-business"></i>
+
+                            <span
+                                x-text="selectedLead.category"
+                            ></span>
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="quick-close"
+                    @click="feedbackOpen = false"
+                    aria-label="Close"
+                >
+                    <i data-lucide="x"></i>
+                </button>
+
+            </div>
+
+
+            <div class="quick-modal-body">
+
+                <div class="quick-summary">
+
+                    <div class="quick-summary-card">
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="user"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Lead
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                x-text="
+                                    selectedLead.name
+                                    ||
+                                    '—'
+                                "
+                            ></div>
+                        </div>
+
+                    </div>
+
+
+                    <div class="quick-summary-card">
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="briefcase-business"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Business
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                x-text="
+                                    selectedLead.business
+                                    ||
+                                    '—'
+                                "
+                            ></div>
+                        </div>
+
+                    </div>
+
+
+                    <div class="quick-summary-card">
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="smartphone"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Mobile
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                x-text="
+                                    selectedLead.mobile
+                                    ||
+                                    '—'
+                                "
+                            ></div>
+                        </div>
+
+                    </div>
+
+
+                    <div class="quick-summary-card">
+
+                        <div class="quick-summary-icon">
+                            <i data-lucide="video"></i>
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="quick-summary-label">
+                                Demo
+                            </div>
+
+                            <div
+                                class="quick-summary-value"
+                                :class="
+                                    selectedLead.demoSent
+                                        ? 'text-emerald-600'
+                                        : 'text-slate-700'
+                                "
+                                x-text="
+                                    selectedLead.demoSent
+                                        ? 'Demo Sent'
+                                        : 'Not Sent'
+                                "
+                            ></div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                {{-- PREVIOUS LEAD ACTIVITY: visible even when this employee sees the lead as New Call --}}
+                <div
+                    x-show="
+                        selectedLead.lastDisposition
+                        || selectedLead.lastRemark
+                        || selectedLead.lastEmployee
+                    "
+                    x-cloak
+                    class="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3"
+                >
+                    <div class="mb-2 flex items-center gap-2">
+                        <i data-lucide="history" class="h-4 w-4 text-amber-600"></i>
+                        <span class="text-[10px] font-black text-amber-700">
+                            PREVIOUS ACTIVITY
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <div class="text-[8px] font-bold text-slate-400">
+                                LAST DISPOSITION
+                            </div>
+                            <div
+                                class="mt-1 text-[10px] font-extrabold text-slate-800"
+                                x-text="selectedLead.lastDisposition || '—'"
+                            ></div>
+                        </div>
+
+                        <div>
+                            <div class="text-[8px] font-bold text-slate-400">
+                                LAST EMPLOYEE
+                            </div>
+                            <div
+                                class="mt-1 text-[10px] font-extrabold text-slate-800"
+                                x-text="selectedLead.lastEmployee || '—'"
+                            ></div>
+                        </div>
+
+                        <div class="col-span-2">
+                            <div class="text-[8px] font-bold text-slate-400">
+                                LAST REMARK
+                            </div>
+                            <div
+                                class="mt-1 whitespace-pre-line text-[10px] font-semibold leading-5 text-slate-700"
+                                x-text="selectedLead.lastRemark || 'No previous remark'"
+                            ></div>
+                        </div>
+
+                        <div class="col-span-2" x-show="selectedLead.lastCallAt">
+                            <div class="text-[8px] font-bold text-slate-400">
+                                LAST CALL
+                            </div>
+                            <div
+                                class="mt-1 text-[9px] font-bold text-slate-600"
+                                x-text="selectedLead.lastCallAt"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="quick-top-actions">
+
+                    <button
+                        type="button"
+                        class="quick-primary-action"
+                        @click="sendCall(selectedLead.id)"
+                        :disabled="
+                            !selectedLead.id
+                            ||
+                            sendingCall === selectedLead.id
+                        "
+                    >
+                        <i data-lucide="phone"></i>
+                        Call on Mobile
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="quick-primary-action"
+                        @click="
+                            openWhatsApp(
+                                selectedLead.whatsapp
+                            )
+                        "
+                        :disabled="
+                            !selectedLead.whatsapp
+                        "
+                    >
+                        <i data-lucide="message-circle"></i>
+                        WhatsApp Web
+                    </button>
+
+
+                    <a
+                        :href="
+                            selectedLead.showUrl
+                            ||
+                            '#'
+                        "
+                        class="
+                            quick-primary-action
+                            secondary
+                        "
+                    >
+                        <i data-lucide="external-link"></i>
+                        Full Lead
+                    </a>
+
+                </div>
+
+
+                <div class="quick-tabs">
+
+                    @can('calls.create')
+                        <button
+                            type="button"
+                            class="quick-tab"
+                            :class="
+                                feedbackTab === 'call'
+                                    ? 'active'
+                                    : ''
+                            "
+                            @click="
+                                feedbackTab = 'call'
+                            "
+                        >
+                            <i data-lucide="star"></i>
+                            Save Feedback
+                        </button>
+                    @endcan
+
+
+                    @can('leads.update')
+                        <button
+                            type="button"
+                            class="quick-tab"
+                            :class="
+                                feedbackTab === 'demo'
+                                    ? 'active'
+                                    : ''
+                            "
+                            @click="
+                                openDemoTab()
+                            "
+                        >
+                            <i data-lucide="video"></i>
+                            Demo
+                        </button>
+                    @endcan
+
+
+                    @can('leads.notes.create')
+                        <button
+                            type="button"
+                            class="quick-tab"
+                            :class="
+                                feedbackTab === 'note'
+                                    ? 'active'
+                                    : ''
+                            "
+                            @click="
+                                feedbackTab = 'note'
+                            "
+                        >
+                            <i data-lucide="notebook-pen"></i>
+                            Add Note
+                        </button>
+                    @endcan
+
+                </div>
+
+
+
+                @can('calls.create')
+                    <div x-show="feedbackTab==='call'" x-cloak class="quick-panel">
+                        <form method="POST" :action="selectedLead.callStoreUrl">
+                            @csrf
+
+                            <div class="quick-grid">
+                                <div class="quick-field">
+                                    <label>Call Result <span class="text-rose-500">*</span></label>
+                                    <select
+                                        name="call_disposition_id"
+                                        required
+                                        x-model="callForm.dispositionId"
+                                        @change="dispositionChanged($event)"
+                                    >
+                                        <option value="">Select call result</option>
+                                        @foreach($dispositions as $disposition)
+                                            <option
+                                                value="{{ $disposition->id }}"
+                                                data-requires-remarks="{{ $disposition->requires_remarks ? '1' : '0' }}"
+                                                data-requires-follow-up="{{ $disposition->requires_follow_up ? '1' : '0' }}"
+                                                data-auto-remarks="{{ e($disposition->auto_remarks ?? '') }}"
+                                                data-next-followup="{{ $disposition->next_followup ?? '' }}"
+                                            >
+                                                {{ $disposition->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="quick-field">
+                                    <label>Call Duration</label>
+                                    <input type="number" min="0" name="duration_seconds"
+                                           x-model="callForm.duration"
+                                           placeholder="Seconds">
+                                </div>
+
+                                <div class="quick-field md:col-span-2" x-show="callForm.showRemarks" x-cloak>
+                                    <label>
+                                        Remarks
+                                        <span x-show="callForm.remarksRequired" class="text-rose-500">*</span>
+                                    </label>
+                                    <textarea
+                                        name="remarks"
+                                        x-model="callForm.remarks"
+                                        :required="callForm.remarksRequired"
+                                        placeholder="Customer ne kya kaha..."
+                                    ></textarea>
+                                </div>
+
+                                <div class="quick-field md:col-span-2" x-show="callForm.showFollowup" x-cloak>
+                                    <label>
+                                        Next Follow-up
+                                        <span x-show="callForm.followupRequired" class="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        name="follow_up_at"
+                                        x-model="callForm.followupAt"
+                                        :required="callForm.followupRequired"
+                                        min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="quick-form-actions">
+                                <button type="button" class="quick-btn" @click="feedbackOpen=false">Cancel</button>
+                                <button type="submit" class="quick-btn quick-btn-green">
+                                    <i data-lucide="save"></i> Save Feedback
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+
+                @can('leads.update')
+                    <div
+                        x-show="feedbackTab === 'demo'"
+                        x-cloak
+                        class="quick-panel"
+                    >
+                        <form
+                            method="POST"
+                            :action="selectedLead.callStoreUrl"
+                            @submit="prepareDemoSubmit($event)"
+                        >
+                            @csrf
+
+                            {{-- Same backend flow as normal Call Result -> Demo --}}
+                            <input type="hidden" name="mark_demo_send" value="1">
+                            <input type="hidden" name="duration_seconds" value="0">
+
+                            @if($demoDisposition)
+                                <input
+                                    type="hidden"
+                                    name="call_disposition_id"
+                                    value="{{ $demoDisposition->id }}"
+                                >
+                            @endif
+
+                            <div class="quick-grid mt-3">
+
+                                <div class="quick-field md:col-span-2">
+                                    <label>Remarks</label>
+                                    <textarea
+                                        name="remarks"
+                                        x-model="demoForm.remarks"
+                                        readonly
+                                    ></textarea>
+                                </div>
+
+                                @if(
+                                    $demoDisposition
+                                    && (
+                                        $demoDisposition->requires_follow_up
+                                        || (int) ($demoDisposition->next_followup ?? 0) > 0
+                                    )
+                                )
+                                    <div class="quick-field md:col-span-2">
+                                        <label>
+                                            Next Follow-up
+                                            @if($demoDisposition->requires_follow_up)
+                                                <span class="text-rose-500">*</span>
+                                            @endif
+                                        </label>
+
+                                        <input
+                                            type="datetime-local"
+                                            name="follow_up_at"
+                                            x-model="demoForm.followupAt"
+                                            @if($demoDisposition->requires_follow_up) required @endif
+                                            min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                                        >
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="quick-status">
+                                <div class="text-[9px] font-bold uppercase text-slate-500">
+                                    Demo Action
+                                </div>
+
+                                <div
+                                    class="mt-1 text-sm font-extrabold"
+                                    :class="selectedLead.demoSent
+                                        ? 'text-emerald-600'
+                                        : 'text-violet-700'"
+                                    x-text="selectedLead.demoSent
+                                        ? 'Demo Already Sent — Resend Allowed'
+                                        : 'Ready To Send Demo'"
+                                ></div>
+
+                                <div class="mt-2 text-[10px] leading-5 text-slate-500">
+                                    <strong>Send Demo</strong> par click karte hi
+                                    wahi flow chalega jo <strong>Call Result me Demo disposition</strong>
+                                    select karke save karne par chalta hai:
+                                    Demo status, Call Log, Auto Remark aur Next Follow-up
+                                    ek hi backend transaction me save/update honge.
+                                </div>
+                            </div>
+
+                            <div class="mt-3 rounded-lg border border-violet-100 bg-violet-50 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="text-[9px] font-bold uppercase text-violet-500">
+                                            Call Disposition
+                                        </div>
+                                        <div class="mt-1 text-sm font-extrabold text-violet-800">
+                                            Demo
+                                        </div>
+                                    </div>
+
+                                    <div class="text-right">
+                                        <div class="text-[9px] font-bold uppercase text-slate-400">
+                                            Current Demo Status
+                                        </div>
+                                        <div
+                                            class="mt-1 text-sm font-extrabold"
+                                            :class="selectedLead.demoSent
+                                                ? 'text-emerald-600'
+                                                : 'text-slate-600'"
+                                            x-text="selectedLead.demoSent
+                                                ? 'Already Sent'
+                                                : 'Not Sent'"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="quick-form-actions">
+                                <button
+                                    type="button"
+                                    class="quick-btn"
+                                    @click="feedbackOpen = false"
+                                >
+                                    Cancel
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    class="quick-btn quick-btn-violet"
+                                >
+                                    <i data-lucide="video"></i>
+                                    <span x-text="selectedLead.demoSent ? 'Resend Demo' : 'Send Demo'"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+
+                @can('leads.notes.create')
+                    <div x-show="feedbackTab==='note'" x-cloak class="quick-panel">
+                        <form method="POST" :action="selectedLead.noteStoreUrl">
+                            @csrf
+
+                            <div class="quick-field">
+                                <label>Internal Note <span class="text-rose-500">*</span></label>
+                                <textarea
+                                    name="body"
+                                    required
+                                    x-model="noteBody"
+                                    placeholder="Customer discussion, requirement ya internal note..."
+                                ></textarea>
+                            </div>
+
+                            <div class="quick-form-actions">
+                                <button type="button" class="quick-btn" @click="feedbackOpen=false">Cancel</button>
+                                <button type="submit" class="quick-btn quick-btn-dark">
+                                    <i data-lucide="plus"></i> Add Note
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+            </div>
+        </div>
+    </div>
+
 </div>
 
 
+
+{{-- =========================================================
+    Leads Index Same Feedback Popup Logic
+========================================================== --}}
+
+
+<script>
+    function followupIndexBoard() {
+        return {
+            sendingCall: null,
+            feedbackOpen: false,
+            feedbackTab: 'call',
+
+            selectedLead: {
+                id:null,
+                name:'',
+                business:'',
+                mobile:'',
+                whatsapp:'',
+                city:'',
+                state:'',
+                category:'',
+                demoSent:false,
+                lastDisposition:'',
+                lastRemark:'',
+                lastEmployee:'',
+                lastCallAt:'',
+                showUrl:'',
+                callStoreUrl:'',
+                noteStoreUrl:'',
+                demoUpdateUrl:'',
+                demoCallUrl:''
+            },
+
+            noteBody: '',
+
+            callForm: {
+                dispositionId:'',
+                duration:'',
+                remarks:'',
+                followupAt:'',
+                showRemarks:false,
+                remarksRequired:false,
+                showFollowup:false,
+                followupRequired:false
+            },
+
+            demoConfig: {
+                dispositionId: @json($demoDisposition?->id),
+                remarks: @json($demoDisposition?->auto_remarks ?? ''),
+                requiresFollowUp: {{ $demoDisposition?->requires_follow_up ? 'true' : 'false' }},
+                nextFollowupMinutes: {{ (int) ($demoDisposition?->next_followup ?? 0) }}
+            },
+
+            demoForm: {
+                remarks: @json($demoDisposition?->auto_remarks ?? ''),
+                followupAt: ''
+            },
+
+            openFeedback(lead) {
+                this.selectedLead = {
+                    ...this.selectedLead,
+                    ...lead
+                };
+
+                this.feedbackTab = 'call';
+                this.noteBody = '';
+
+                this.callForm = {
+                    dispositionId:'',
+                    duration:'',
+                    remarks:'',
+                    followupAt:'',
+                    showRemarks:false,
+                    remarksRequired:false,
+                    showFollowup:false,
+                    followupRequired:false
+                };
+
+                this.feedbackOpen = true;
+
+                this.$nextTick(() => {
+                    if (window.lucide) {
+                        window.lucide.createIcons();
+                    }
+                });
+            },
+
+            openDemoTab() {
+                this.feedbackTab = 'demo';
+
+                this.demoForm.remarks =
+                    String(this.demoConfig.remarks || '').trim();
+
+                const minutes =
+                    Number(this.demoConfig.nextFollowupMinutes || 0);
+
+                this.demoForm.followupAt =
+                    Number.isFinite(minutes) && minutes > 0
+                        ? this.datetimeLocalAfterMinutes(minutes)
+                        : '';
+
+                this.$nextTick(() => {
+                    if (window.lucide) {
+                        window.lucide.createIcons();
+                    }
+                });
+            },
+
+            datetimeLocalAfterMinutes(minutes) {
+                const value = Number(minutes);
+
+                if (!Number.isFinite(value) || value <= 0) {
+                    return '';
+                }
+
+                const d =
+                    new Date(Date.now() + value * 60 * 1000);
+
+                const pad =
+                    n => String(n).padStart(2, '0');
+
+                return d.getFullYear()
+                    + '-'
+                    + pad(d.getMonth() + 1)
+                    + '-'
+                    + pad(d.getDate())
+                    + 'T'
+                    + pad(d.getHours())
+                    + ':'
+                    + pad(d.getMinutes());
+            },
+
+            prepareDemoSubmit(event) {
+                const form = event?.target;
+
+                if (!form) {
+                    return;
+                }
+
+                if (
+                    this.demoConfig.requiresFollowUp
+                    && !this.demoForm.followupAt
+                ) {
+                    event.preventDefault();
+
+                    alert(
+                        'Demo disposition ke liye Next Follow-up date and time required hai.'
+                    );
+
+                    return;
+                }
+
+                if (!this.demoForm.followupAt) {
+                    const minutes =
+                        Number(
+                            this.demoConfig.nextFollowupMinutes || 0
+                        );
+
+                    if (
+                        Number.isFinite(minutes)
+                        && minutes > 0
+                    ) {
+                        this.demoForm.followupAt =
+                            this.datetimeLocalAfterMinutes(minutes);
+                    }
+                }
+            },
+
+            dispositionChanged(event) {
+                const option =
+                    event.target.options[
+                        event.target.selectedIndex
+                    ];
+
+                if (!option || !option.value) {
+                    this.callForm.remarks = '';
+                    this.callForm.followupAt = '';
+                    this.callForm.showRemarks = false;
+                    this.callForm.remarksRequired = false;
+                    this.callForm.showFollowup = false;
+                    this.callForm.followupRequired = false;
+                    return;
+                }
+
+                const requiresRemarks =
+                    option.dataset.requiresRemarks === '1';
+
+                const requiresFollowUp =
+                    option.dataset.requiresFollowUp === '1';
+
+                const autoRemarks =
+                    String(
+                        option.dataset.autoRemarks || ''
+                    ).trim();
+
+                const nextMinutes =
+                    Number(
+                        option.dataset.nextFollowup || 0
+                    );
+
+                const hasAutoFollowup =
+                    Number.isFinite(nextMinutes)
+                    && nextMinutes > 0;
+
+                this.callForm.remarks =
+                    autoRemarks;
+
+                this.callForm.remarksRequired =
+                    requiresRemarks;
+
+                this.callForm.showRemarks =
+                    requiresRemarks
+                    || autoRemarks !== '';
+
+                this.callForm.followupAt =
+                    hasAutoFollowup
+                        ? this.datetimeLocalAfterMinutes(
+                            nextMinutes
+                        )
+                        : '';
+
+                this.callForm.followupRequired =
+                    requiresFollowUp
+                    || hasAutoFollowup;
+
+                this.callForm.showFollowup =
+                    requiresFollowUp
+                    || hasAutoFollowup;
+            },
+
+            async sendCall(leadId) {
+                if (!leadId || this.sendingCall) {
+                    return;
+                }
+
+                this.sendingCall =
+                    leadId;
+
+                try {
+                    const token =
+                        document.querySelector(
+                            'meta[name=csrf-token]'
+                        )?.content || '';
+
+                    const response =
+                        await fetch(
+                            `/leads/${leadId}/call-on-mobile`,
+                            {
+                                method:'POST',
+                                headers:{
+                                    'X-CSRF-TOKEN':token,
+                                    'Accept':'application/json',
+                                    'Content-Type':'application/json'
+                                },
+                                body:JSON.stringify({})
+                            }
+                        );
+
+                    let data = {};
+
+                    try {
+                        data =
+                            await response.json();
+                    } catch (e) {}
+
+                    if (
+                        !response.ok
+                        || !data.status
+                    ) {
+                        throw new Error(
+                            data.message
+                            || 'Unable to send call to mobile.'
+                        );
+                    }
+
+                    alert(
+                        data.message
+                        || 'Call sent to mobile successfully.'
+                    );
+
+                } catch (error) {
+                    alert(
+                        error.message
+                        || 'Unable to send call to mobile.'
+                    );
+                } finally {
+                    this.sendingCall =
+                        null;
+                }
+            },
+
+            openWhatsApp(number) {
+                const clean =
+                    String(number || '')
+                        .replace(/\D/g, '');
+
+                if (!clean) {
+                    alert(
+                        'WhatsApp number is missing.'
+                    );
+                    return;
+                }
+
+                const url =
+                    `https://web.whatsapp.com/send?phone=${encodeURIComponent(clean)}`;
+
+                const whatsappTab =
+                    window.open(
+                        '',
+                        'rvg_whatsapp_web'
+                    );
+
+                if (whatsappTab) {
+                    whatsappTab.location.href =
+                        url;
+
+                    whatsappTab.focus();
+                } else {
+                    alert(
+                        'Browser popup blocked hai. Popups allow karke dobara try karein.'
+                    );
+                }
+            }
+        };
+    }
+</script>
 
 {{-- =========================================================
     Live Reminder Countdown

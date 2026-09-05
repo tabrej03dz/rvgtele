@@ -229,6 +229,83 @@
         #followUpReminderCard { max-height: none !important; }
     }
 
+
+    /* =========================================================
+       AUTO FOLLOW-UP POPUP - SAME PREMIUM FEEDBACK STYLE
+       ========================================================= */
+    .auto-feedback-backdrop {
+        background: rgba(15,23,42,.58);
+        backdrop-filter: blur(3px);
+    }
+    .auto-feedback-card {
+        width: 100%;
+        max-width: 820px;
+        max-height: calc(100dvh - 28px);
+        border: 1px solid #f4ddb0;
+        border-radius: 18px;
+        background: linear-gradient(145deg,#fffef9 0%,#fffaf0 42%,#fff 100%);
+        box-shadow: 0 30px 90px rgba(15,23,42,.28), 0 0 0 1px rgba(245,185,0,.05);
+    }
+    .auto-feedback-head {
+        background: radial-gradient(circle at 92% 10%,rgba(245,185,0,.14),transparent 34%);
+    }
+    .auto-feedback-tag {
+        display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 9px;
+        border-radius:7px;background:#fff1bf;color:#9a6500;font-size:9px;font-weight:900;
+        text-transform:uppercase;letter-spacing:.03em;
+    }
+    .auto-feedback-close {
+        width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;
+        border:1px solid #dedede;border-radius:12px;background:#fff;color:#475467;
+        box-shadow:0 4px 12px rgba(15,23,42,.05);
+    }
+    .auto-feedback-summary {
+        display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;
+    }
+    .auto-feedback-summary-card {
+        min-height:72px;display:flex;align-items:center;gap:9px;border:1px solid #eadfc9;
+        border-radius:12px;background:rgba(255,255,255,.9);padding:10px;
+    }
+    .auto-feedback-icon {
+        width:34px;height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;
+        border-radius:50%;background:#fff4cb;color:#d99b00;
+    }
+    .auto-feedback-primary {
+        min-height:42px;display:flex;align-items:center;justify-content:center;gap:8px;
+        border:1px solid #f0c333;border-radius:10px;background:linear-gradient(180deg,#ffd22e 0%,#ffc400 100%);
+        color:#171717;font-size:10px;font-weight:900;text-decoration:none;
+    }
+    .auto-feedback-primary.secondary {background:#fff;border-color:#eccd71;}
+    .auto-feedback-panel {
+        border:1px solid #eadfc9;border-radius:13px;background:rgba(255,255,255,.92);padding:14px;
+    }
+    .auto-feedback-field label,.auto-feedback-field .label {
+        display:block;margin-bottom:5px;color:#475569;font-size:10px;font-weight:900;
+    }
+    .auto-feedback-field select,.auto-feedback-field textarea,.auto-feedback-field input[type=datetime-local] {
+        width:100%;border:1px solid #d7dde7;border-radius:10px;background:#fff;color:#1e293b;font-size:11px;outline:none;
+    }
+    .auto-feedback-field select,.auto-feedback-field input[type=datetime-local] {min-height:42px;padding:0 11px;}
+    .auto-feedback-field textarea {min-height:76px;padding:9px 11px;resize:vertical;}
+    .auto-feedback-field select:focus,.auto-feedback-field textarea:focus,.auto-feedback-field input:focus {
+        border-color:#f1b900;box-shadow:0 0 0 3px rgba(241,185,0,.12);
+    }
+    .auto-feedback-snooze {
+        min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+        border:1px solid #e5d7b2;border-radius:9px;background:#fff;color:#5f6470;padding:0 11px;
+        font-size:10px;font-weight:900;
+    }
+    .auto-feedback-footer {
+        background:linear-gradient(to top,#fff 82%,rgba(255,255,255,.94));
+    }
+    @media(max-width:700px){
+        .auto-feedback-card{max-height:calc(100dvh - 12px);border-radius:14px;}
+        .auto-feedback-summary{grid-template-columns:1fr;}
+        .auto-feedback-actions{grid-template-columns:1fr !important;}
+        .auto-feedback-form-grid{grid-template-columns:1fr !important;}
+        .auto-feedback-footer-row{align-items:stretch !important;flex-direction:column;}
+    }
+
 </style>
 </head>
 
@@ -1047,327 +1124,185 @@
 
 {{-- ============================================================= --}}
 {{-- GLOBAL FOLLOW-UP REMINDER BACKDROP --}}
-{{-- ============================================================= --}}
-
-<div
-    id="followUpReminderBackdrop"
-    class="fixed inset-0 z-[99998] hidden bg-slate-950/70 backdrop-blur-sm"
-></div>
+<div id="followUpReminderBackdrop" class="auto-feedback-backdrop fixed inset-0 z-[99998] hidden"></div>
 
 {{-- ============================================================= --}}
-{{-- GLOBAL FOLLOW-UP REMINDER MODAL - WIDE / NO VERTICAL SCROLL --}}
+{{-- GLOBAL FOLLOW-UP REMINDER MODAL - FEEDBACK STYLE + SNOOZE --}}
 {{-- ============================================================= --}}
+<div id="followUpReminderModal" class="fixed inset-0 z-[99999] hidden items-center justify-center overflow-y-auto p-2 sm:p-4">
+    <div id="followUpReminderCard" class="auto-feedback-card relative flex flex-col overflow-hidden">
 
-<div
-    id="followUpReminderModal"
-    class="fixed inset-0 z-[99999] hidden items-center justify-center overflow-hidden p-3 sm:p-4"
->
-    <div
-        id="followUpReminderCard"
-        class="relative flex w-full max-w-[1180px] flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl ring-1 ring-black/5"
-        style="max-height: calc(100vh - 24px);"
-    >
-        {{-- ========================= HEADER ========================= --}}
-        <div
-            id="followUpReminderTop"
-            class="shrink-0 bg-rose-600 px-6 py-4 text-white"
-        >
-            <div class="flex items-center justify-between gap-5">
-                <div class="flex min-w-0 items-center gap-3.5">
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-rose-600 shadow-sm">
-                        <i data-lucide="bell-ring" class="h-5 w-5"></i>
+        {{-- HEADER --}}
+        <div id="followUpReminderTop" class="auto-feedback-head shrink-0 px-4 pb-3 pt-4 sm:px-5">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="auto-feedback-tag">
+                        <i data-lucide="bell-ring" class="h-3.5 w-3.5"></i>
+                        Follow-up Reminder
                     </div>
-
-                    <div class="min-w-0">
-                        <div class="text-[19px] font-extrabold leading-tight tracking-tight">
-                            Follow-up Reminder
-                        </div>
-                        <div id="followUpReminderHeading" class="mt-0.5 text-[12px] font-medium text-white/85">
-                            Follow-up is overdue
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Header Actions: Timer + Popup ON/OFF + Close --}}
-                <div class="flex shrink-0 items-center gap-2.5">
-
-                    {{-- Existing timer ids are kept so current JS continues to work --}}
-                    <div
-                        id="followUpTimerBox"
-                        class="rounded-lg border border-white/25 bg-white px-3.5 py-2 text-rose-600 shadow-sm"
-                    >
-                        <div class="flex items-center gap-2 whitespace-nowrap">
-                            <i data-lucide="clock-3" class="h-4 w-4"></i>
-                            <span id="followUpTimerLabel" class="text-xs font-bold">Overdue by</span>
-                            <span id="followUpCountdown" class="text-xs font-black tabular-nums">00:00:00</span>
-                        </div>
-                    </div>
-
-                    {{-- Popup ON / OFF --}}
-                    <label
-                        class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-3 text-xs font-bold text-white transition hover:bg-white/20"
-                        title="Follow-up reminder popup on/off"
-                    >
-                        <input
-                            type="checkbox"
-                            id="followUpReminderEnabledToggle"
-                            class="peer sr-only"
-                            checked
-                        >
-
-                        <span
-                            class="relative h-5 w-9 rounded-full bg-white/30 transition
-                                   after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4
-                                   after:rounded-full after:bg-white after:shadow-sm after:transition-all
-                                   peer-checked:bg-emerald-400
-                                   peer-checked:after:translate-x-4"
-                        ></span>
-
-                        <span id="followUpReminderEnabledText" class="whitespace-nowrap">
-                            Popup ON
+                    <div id="followUpReminderHeading" class="mt-2 text-[20px] font-black leading-tight text-slate-900">Follow-up is overdue</div>
+                    <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-slate-500">
+                        <span id="followUpTimerBox" class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-700">
+                            <i data-lucide="clock-3" class="h-3.5 w-3.5"></i>
+                            <span id="followUpTimerLabel">Overdue by</span>
+                            <span id="followUpCountdown" class="font-black tabular-nums">00:00:00</span>
                         </span>
-                    </label>
-
-                    {{-- Close current reminder --}}
-                    <button
-                        type="button"
-                        id="followUpReminderClose"
-                        class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/25 bg-white/15 text-white transition hover:bg-white/25"
-                        title="Close reminder"
-                        aria-label="Close reminder"
-                    >
-                        <i data-lucide="x" class="h-5 w-5"></i>
-                    </button>
-
+                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                            <input type="checkbox" id="followUpReminderEnabledToggle" class="peer sr-only" checked>
+                            <span class="relative h-4 w-8 rounded-full bg-slate-300 transition after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:transition peer-checked:bg-emerald-500 peer-checked:after:translate-x-4"></span>
+                            <span id="followUpReminderEnabledText">Popup ON</span>
+                        </label>
+                    </div>
                 </div>
+                <button type="button" id="followUpReminderClose" class="auto-feedback-close shrink-0" title="Close reminder" aria-label="Close reminder">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
             </div>
         </div>
 
-        {{-- ========================== BODY ========================== --}}
-        <div class="min-h-0 flex-1 overflow-hidden px-6 py-5">
+        {{-- SCROLLABLE BODY --}}
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-3 sm:px-5">
 
-            {{-- Lead + Scheduled + Actions --}}
-            <div class="grid grid-cols-[1.2fr_.8fr_auto] items-center gap-6 border-b border-slate-100 pb-4">
-                <div class="flex min-w-0 items-center gap-4">
-                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                        <i data-lucide="store" class="h-7 w-7"></i>
-                    </div>
-
+            {{-- SUMMARY --}}
+            <div class="auto-feedback-summary mb-3">
+                <div class="auto-feedback-summary-card">
+                    <span class="auto-feedback-icon"><i data-lucide="store" class="h-4 w-4"></i></span>
                     <div class="min-w-0">
-                        <div class="text-[10px] font-extrabold uppercase tracking-[0.13em] text-indigo-500">Lead</div>
-                        <div id="followUpLeadName" class="mt-1 truncate text-[18px] font-extrabold text-slate-900">-</div>
-                        <div class="mt-1 flex items-center gap-2 text-[13px] font-semibold text-slate-500">
-                            <i data-lucide="phone" class="h-4 w-4"></i>
-                            <span id="followUpMobile">-</span>
-                        </div>
+                        <div class="text-[8px] font-black uppercase tracking-wide text-slate-400">Lead / Business</div>
+                        <div id="followUpLeadName" class="mt-1 truncate text-[11px] font-black text-slate-800">-</div>
                     </div>
                 </div>
-
-                <div class="border-l border-slate-200 pl-6">
-                    <div class="flex items-start gap-3">
-                        <i data-lucide="calendar-days" class="mt-0.5 h-5 w-5 text-slate-500"></i>
-                        <div>
-                            <div class="text-[12px] font-semibold text-slate-500">Scheduled</div>
-                            <div id="followUpScheduledAt" class="mt-1 text-[13px] font-bold text-slate-700">-</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex shrink-0 items-center gap-2.5">
-                    <a
-                        id="followUpCallButton"
-                        href="#"
-                        class="hidden h-10 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 text-[13px] font-bold text-indigo-700 transition hover:bg-indigo-50"
-                    >
-                        <i data-lucide="phone" class="h-4 w-4"></i>
-                        Call Now
-                    </a>
-
-                    <a
-                        id="followUpOpenLeadButton"
-                        href="#"
-                        class="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-bold text-indigo-700 transition hover:bg-slate-50"
-                    >
-                        <i data-lucide="square-arrow-out-up-right" class="h-4 w-4"></i>
-                        Open Lead
-                    </a>
-                </div>
-            </div>
-
-            {{-- Previous Note --}}
-            <div
-                id="followUpNotesWrapper"
-                class="mt-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/85 to-violet-50/65 px-4 py-3"
-            >
-                <div class="flex gap-3">
-                    <i data-lucide="message-square-text" class="mt-0.5 h-5 w-5 shrink-0 text-indigo-500"></i>
+                <div class="auto-feedback-summary-card">
+                    <span class="auto-feedback-icon"><i data-lucide="phone" class="h-4 w-4"></i></span>
                     <div class="min-w-0">
-                        <div class="text-[11px] font-extrabold uppercase tracking-wide text-indigo-500">
-                            Follow-up Note <span class="normal-case font-medium">(Previous)</span>
-                        </div>
-                        <div id="followUpNotes" class="mt-1 line-clamp-2 whitespace-pre-line text-[13px] font-medium leading-5 text-slate-700">-</div>
+                        <div class="text-[8px] font-black uppercase tracking-wide text-slate-400">Mobile</div>
+                        <div id="followUpMobile" class="mt-1 truncate text-[11px] font-black text-slate-800">-</div>
+                    </div>
+                </div>
+                <div class="auto-feedback-summary-card">
+                    <span class="auto-feedback-icon"><i data-lucide="calendar-clock" class="h-4 w-4"></i></span>
+                    <div class="min-w-0">
+                        <div class="text-[8px] font-black uppercase tracking-wide text-slate-400">Scheduled</div>
+                        <div id="followUpScheduledAt" class="mt-1 text-[11px] font-black text-slate-800">-</div>
                     </div>
                 </div>
             </div>
 
-            {{-- Call Result --}}
+            {{-- TOP ACTIONS --}}
+            <div class="auto-feedback-actions mb-3 grid grid-cols-2 gap-2">
+                <a id="followUpCallButton" href="#" class="auto-feedback-primary hidden">
+                    <i data-lucide="phone-call" class="h-4 w-4"></i> Call Now
+                </a>
+                <a id="followUpOpenLeadButton" href="#" class="auto-feedback-primary secondary">
+                    <i data-lucide="external-link" class="h-4 w-4"></i> Open Lead
+                </a>
+            </div>
+
+            {{-- PREVIOUS FOLLOW-UP NOTE --}}
+            <div id="followUpNotesWrapper" class="mb-3 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5">
+                <div class="flex gap-2">
+                    <i data-lucide="message-square-text" class="mt-0.5 h-4 w-4 shrink-0 text-violet-600"></i>
+                    <div class="min-w-0">
+                        <div class="text-[8px] font-black uppercase tracking-wide text-violet-500">Previous Follow-up Note</div>
+                        <div id="followUpNotes" class="mt-1 whitespace-pre-line text-[10px] font-semibold leading-5 text-slate-700">-</div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- FEEDBACK FORM --}}
             @can('calls.create')
-            <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div class="mb-3 flex items-center gap-2 text-[14px] font-extrabold text-slate-700">
-                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                        <i data-lucide="phone-call" class="h-4 w-4"></i>
-                    </span>
-                    Call Result
+            <div class="auto-feedback-panel">
+                <div class="mb-3 flex items-center gap-2">
+                    <span class="auto-feedback-icon !h-8 !w-8 !basis-8"><i data-lucide="message-square-text" class="h-4 w-4"></i></span>
+                    <div>
+                        <div class="text-[12px] font-black text-slate-800">Save Feedback</div>
+                        <div class="text-[9px] font-semibold text-slate-400">Same feedback flow as Leads Index</div>
+                    </div>
                 </div>
 
                 <form id="followUpPopupCallForm" method="POST" action="">
                     @csrf
-
-                    <div class="grid grid-cols-[1fr_.9fr_1.25fr] gap-4">
-                        <label class="block min-w-0">
-                            <span class="mb-1.5 block text-[12px] font-semibold text-slate-600">Call Disposition</span>
-                            <select
-                                id="followUpPopupDisposition"
-                                name="call_disposition_id"
-                                required
-                                class="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                            >
+                    <input type="hidden" name="from_followup_popup" value="1">
+                    <input type="hidden" id="followUpPopupFollowUpId" name="follow_up_id" value="">
+                    <div class="auto-feedback-form-grid grid grid-cols-2 gap-3">
+                        <div class="auto-feedback-field">
+                            <label>Call Result <span class="text-rose-500">*</span></label>
+                            <select id="followUpPopupDisposition" name="call_disposition_id" required>
                                 <option value="">Select disposition</option>
                             </select>
-                            <div id="followUpPopupDispositionHint" class="hidden"></div>
-                        </label>
+                            <div id="followUpPopupDispositionHint" class="mt-1 hidden text-[9px] font-semibold text-amber-700"></div>
+                        </div>
 
-                        <label class="block min-w-0">
-                            <span class="mb-1.5 block text-[12px] font-semibold text-slate-600">Duration</span>
-                            <div class="relative flex h-11 items-center rounded-lg border border-slate-300 bg-white px-3">
-                                <i data-lucide="clock-3" class="mr-3 h-4 w-4 shrink-0 text-slate-500"></i>
-                                <span id="followUpPopupDurationDisplay" class="text-[13px] font-semibold tabular-nums text-slate-600">00:00</span>
-                                <span class="ml-auto text-[11px] font-medium text-slate-400">mm:ss</span>
+                        <div class="auto-feedback-field">
+                            <span class="label">Call Duration</span>
+                            <div class="flex min-h-[42px] items-center rounded-[10px] border border-slate-300 bg-white px-3">
+                                <i data-lucide="clock-3" class="mr-2 h-4 w-4 text-slate-400"></i>
+                                <span id="followUpPopupDurationDisplay" class="text-[11px] font-black tabular-nums text-slate-700">00:00</span>
+                                <span class="ml-auto text-[9px] font-semibold text-slate-400">mm:ss</span>
                                 <input id="followUpPopupDuration" name="duration_seconds" type="hidden" value="0">
                             </div>
-                        </label>
+                        </div>
 
-                        <label id="followUpPopupRemarksWrapper" class="block min-w-0">
-                            <span class="mb-1.5 block text-[12px] font-semibold text-slate-600">
-                                Remark / Notes <span class="font-normal text-slate-400">(Optional)</span>
-                                <span id="followUpPopupRemarksRequired" class="hidden text-rose-500">*</span>
-                            </span>
-                            <textarea
-                                id="followUpPopupRemarks"
-                                name="remarks"
-                                rows="2"
-                                maxlength="500"
-                                placeholder="Add note..."
-                                class="h-[72px] w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[13px] text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                            ></textarea>
-                        </label>
+                        <div id="followUpPopupRemarksWrapper" class="auto-feedback-field col-span-2">
+                            <label>Remarks <span id="followUpPopupRemarksRequired" class="hidden text-rose-500">*</span></label>
+                            <textarea id="followUpPopupRemarks" name="remarks" maxlength="500" placeholder="Customer ne kya kaha..."></textarea>
+                        </div>
                     </div>
 
-                    {{-- Required by existing save logic, kept hidden visually --}}
-                    <div id="followUpPopupNextFollowUpWrapper" class="hidden">
+                    <div id="followUpPopupNextFollowUpWrapper" class="auto-feedback-field mt-3 hidden">
+                        <label>Next Follow-up <span id="followUpPopupNextFollowUpRequired" class="hidden text-rose-500">*</span></label>
                         <input id="followUpPopupNextFollowUp" name="follow_up_at" type="datetime-local">
-                        <span id="followUpPopupNextFollowUpRequired" class="hidden"></span>
                     </div>
 
-                    <div class="mt-4 grid grid-cols-2 gap-4">
+                    <div class="mt-3">
                         <button
                             type="submit"
                             id="followUpPopupSaveCall"
-                            class="flex h-12 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 text-[14px] font-bold text-indigo-600 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 px-4 text-[11px] font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <i data-lucide="message-square-text" class="h-5 w-5"></i>
+                            <i data-lucide="save" class="h-4 w-4"></i>
                             Save Feedback
-                        </button>
-
-                        <button
-                            type="button"
-                            id="followUpSendDemoButton"
-                            class="flex h-12 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 text-[14px] font-bold text-emerald-700 transition hover:bg-emerald-100"
-                        >
-                            <i data-lucide="circle-play" class="h-5 w-5"></i>
-                            Send Demo
                         </button>
                     </div>
                 </form>
             </div>
             @endcan
 
-            {{-- Queue / AJAX message: overlay, so layout height never grows --}}
-            <div id="followUpQueueInfo" class="hidden"></div>
-            <div
-                id="followUpActionMessage"
-                class="absolute left-1/2 top-[78px] z-20 hidden -translate-x-1/2 rounded-lg px-4 py-2 text-xs font-bold shadow-lg"
-            ></div>
+            <div id="followUpQueueInfo" class="mt-2 hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[9px] font-bold text-amber-700"></div>
+            <div id="followUpActionMessage" class="mt-2 hidden rounded-lg px-3 py-2 text-[10px] font-bold"></div>
         </div>
 
-        {{-- ========================= FOOTER ========================= --}}
-        <div class="relative shrink-0 border-t border-slate-200 bg-white px-6 py-3.5">
-            <div class="flex items-center justify-between gap-4">
-                <div class="flex items-center gap-4">
-                    <button
-                        type="button"
-                        id="followUpRescheduleToggle"
-                        class="flex h-10 items-center gap-2 rounded-lg px-2 text-[13px] font-bold text-indigo-600 transition hover:bg-indigo-50"
-                    >
-                        <i data-lucide="calendar-days" class="h-5 w-5"></i>
-                        Reschedule
+        {{-- FOOTER: KEEP SNOOZE --}}
+        <div class="auto-feedback-footer shrink-0 border-t border-amber-100 px-4 py-3 sm:px-5">
+            <div class="auto-feedback-footer-row flex items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" id="followUpRescheduleToggle" class="auto-feedback-snooze text-indigo-700">
+                        <i data-lucide="calendar-days" class="h-4 w-4"></i> Reschedule
                     </button>
-
-                    <span class="h-7 w-px bg-slate-200"></span>
-                    <span class="text-[12px] font-semibold text-slate-600">Snooze</span>
-
-                    <button type="button" data-snooze="10" class="followup-snooze-btn flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 hover:bg-slate-50">
-                        <i data-lucide="clock-3" class="h-4 w-4"></i> 10 Min
-                    </button>
-                    <button type="button" data-snooze="30" class="followup-snooze-btn flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 hover:bg-slate-50">
-                        <i data-lucide="clock-3" class="h-4 w-4"></i> 30 Min
-                    </button>
-                    <button type="button" data-snooze="60" class="followup-snooze-btn flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 hover:bg-slate-50">
-                        <i data-lucide="clock-3" class="h-4 w-4"></i> 1 Hour
-                    </button>
+                    <span class="text-[9px] font-black uppercase tracking-wide text-slate-400">Snooze</span>
+                    <button type="button" data-snooze="10" class="followup-snooze-btn auto-feedback-snooze">10 Min</button>
+                    <button type="button" data-snooze="30" class="followup-snooze-btn auto-feedback-snooze">30 Min</button>
+                    <button type="button" data-snooze="60" class="followup-snooze-btn auto-feedback-snooze">1 Hour</button>
                 </div>
 
-                <button
-                    type="button"
-                    id="followUpCompleteButton"
-                    class="flex h-10 min-w-[145px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-[13px] font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <i data-lucide="circle-check" class="h-5 w-5"></i>
-                    Complete
-                </button>
+
             </div>
 
-            {{-- Reschedule opens as floating panel; modal height stays unchanged --}}
-            <div
-                id="followUpReschedulePanel"
-                class="absolute bottom-[62px] left-6 z-30 hidden w-[360px] rounded-xl border border-indigo-200 bg-white p-4 shadow-2xl"
-            >
-                <label for="followUpRescheduleInput" class="block text-xs font-bold uppercase tracking-wider text-indigo-700">
-                    New Date & Time
-                </label>
-                <input
-                    type="datetime-local"
-                    id="followUpRescheduleInput"
-                    class="mt-2 h-10 w-full rounded-lg border border-indigo-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                >
+            <div id="followUpReschedulePanel" class="absolute bottom-[62px] left-4 z-30 hidden w-[360px] max-w-[calc(100%-32px)] rounded-xl border border-amber-200 bg-white p-4 shadow-2xl">
+                <label for="followUpRescheduleInput" class="block text-[9px] font-black uppercase tracking-wide text-amber-700">New Date & Time</label>
+                <input type="datetime-local" id="followUpRescheduleInput" class="mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
                 <div class="mt-3 flex gap-2">
-                    <button type="button" id="followUpRescheduleSave" class="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
-                        Save New Time
-                    </button>
-                    <button type="button" id="followUpRescheduleClose" class="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">
-                        Close
-                    </button>
+                    <button type="button" id="followUpRescheduleSave" class="flex-1 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-black text-slate-900 hover:bg-amber-500 disabled:opacity-60">Save New Time</button>
+                    <button type="button" id="followUpRescheduleClose" class="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Close</button>
                 </div>
             </div>
 
-            {{-- Hidden compatibility controls --}}
             <button type="button" id="followUpRemindFiveButton" class="hidden"></button>
             <button type="button" id="followUpCancelButton" class="hidden"></button>
         </div>
     </div>
 </div>
 
-{{-- ============================================================= --}}
 {{-- GLOBAL FOLLOW-UP REMINDER SCRIPT --}}
 {{-- ============================================================= --}}
 
@@ -1522,6 +1457,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const reminderEnabledText = document.getElementById('followUpReminderEnabledText');
 
     const popupCallForm = document.getElementById('followUpPopupCallForm');
+    const popupFollowUpId = document.getElementById('followUpPopupFollowUpId');
     const popupSaveCallButton = document.getElementById('followUpPopupSaveCall');
     const popupDisposition = document.getElementById('followUpPopupDisposition');
     const popupDispositionHint = document.getElementById('followUpPopupDispositionHint');
@@ -2049,9 +1985,34 @@ document.addEventListener('DOMContentLoaded', function () {
             popupRemarksRequired?.classList.add('hidden');
         }
 
-        // Next follow-up field visually hidden hi rahega.
-        popupNextFollowUpWrapper.classList.add('hidden');
-        popupNextFollowUpRequired?.classList.add('hidden');
+        /*
+        |--------------------------------------------------------------------------
+        | Next Follow-up Date & Time Visibility
+        |--------------------------------------------------------------------------
+        | IMPORTANT:
+        | requires_follow_up = true OR next_followup minutes > 0
+        | => Date & Time field ALWAYS visible.
+        |
+        | next_followup configured hai:
+        | => date/time automatic calculate + fill hoga
+        | => user us date/time ko manually edit bhi kar sakta hai
+        |
+        | Follow-up required nahi hai:
+        | => field hidden rahega
+        */
+        if (requiresFollowUp || hasAutoNextFollowup) {
+
+            popupNextFollowUpWrapper.classList.remove('hidden');
+            popupNextFollowUpRequired?.classList.remove('hidden');
+
+        } else {
+
+            popupNextFollowUpWrapper.classList.add('hidden');
+            popupNextFollowUpRequired?.classList.add('hidden');
+
+            // Follow-up required nahi hai to stale date/time submit na ho.
+            popupNextFollowUp.value = '';
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -2082,12 +2043,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (hasAutoNextFollowup) {
                     rules.push(
-                        'Next follow-up in '
+                        'Next follow-up auto set: '
                         + nextFollowupMinutes
                         + ' min'
                     );
                 } else if (requiresFollowUp) {
-                    rules.push('Follow-up required');
+                    rules.push('Select next follow-up date & time');
                 }
 
                 if (requiresRemarks) {
@@ -2122,6 +2083,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         popupCallForm.action =
             reminder.call_store_url || '';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Exact Existing Follow-up ID
+        |--------------------------------------------------------------------------
+        | Controller isi follow-up ko update karega. Koi naya follow-up create nahi hoga.
+        */
+        if (popupFollowUpId) {
+            popupFollowUpId.value = reminder.id
+                ? String(reminder.id)
+                : '';
+        }
 
         if (popupNextFollowUp) {
             popupNextFollowUp.min = minimumDatetimeLocalValue();
@@ -3755,7 +3728,35 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             try {
-                await savePopupCallResult(true);
+                await savePopupCallResult(false);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Save Feedback Success
+                |--------------------------------------------------------------------------
+                | Feedback existing backend flow se save ho chuka hai.
+                | Follow-up ko complete/cancel nahi karna hai.
+                | Sirf current popup close karke reminder queue continue karni hai.
+                */
+                const savedReminderId = currentReminder
+                    ? Number(currentReminder.id)
+                    : null;
+
+                if (savedReminderId !== null) {
+                    reminderQueue = reminderQueue.filter(
+                        item => Number(item.id) !== savedReminderId
+                    );
+
+                    // Same reminder turant dobara popup na ho.
+                    hideTemporarily(savedReminderId, 1);
+                }
+
+                closeModal(true);
+
+                // Fresh reminder/nearest timer state sync.
+                fetchReminders();
+                fetchSidebarNearestFollowUp();
+
             } catch (error) {
                 showActionMessage(
                     error.message || 'Unable to save call result.',
