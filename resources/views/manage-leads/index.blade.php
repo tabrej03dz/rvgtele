@@ -133,6 +133,13 @@
         <div class="chips disposition-chips">
             <a href="{{ $urlWith(['call_disposition' => 'all']) }}" class="chip {{ $currentDisposition === 'all' ? 'active' : '' }}">ALL</a>
             <a href="{{ $urlWith(['call_disposition' => 'no_call']) }}" class="chip {{ $currentDisposition === 'no_call' ? 'active' : '' }}">NO CALL YET</a>
+            <a href="{{ $urlWith([
+                    'assigned_to' => 'unassigned',
+                    'call_disposition' => 'no_call'
+                ]) }}"
+                class="chip {{ request('assigned_to') === 'unassigned' ? 'active' : '' }}">
+                UNASSIGNED
+            </a>
             @foreach($dispositions as $disposition)
                 <a href="{{ $urlWith(['call_disposition' => $disposition->id]) }}"
                    class="chip {{ $currentDisposition === (string)$disposition->id ? 'active' : '' }}">
