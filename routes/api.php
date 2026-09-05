@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\WhatsappMessageTemplateController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FollowUpApiController;
 use App\Http\Controllers\Api\CallDispositionApiController;
+use App\Http\Controllers\Api\CallingSettingController;
+use App\Http\Controllers\Api\DeviceCallLogController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -19,6 +21,45 @@ Route::middleware('auth:sanctum')->group(function () {
     '/leads/{lead}/communication-history',
     [LeadApiController::class, 'communicationHistory']
 );
+
+
+
+  /*
+    |--------------------------------------------------------------------------
+    | Employee Work SIM
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/calling-settings',
+        [CallingSettingController::class, 'show']
+    );
+
+    Route::post(
+        '/calling-settings',
+        [CallingSettingController::class, 'store']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Device Call Logs
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        '/leads/{lead}/device-call-log',
+        [DeviceCallLogController::class, 'store']
+    );
+
+    Route::put(
+        '/call-logs/{callLog}',
+        [DeviceCallLogController::class, 'update']
+    );
+
+    Route::get(
+        '/leads/{lead}/call-history',
+        [DeviceCallLogController::class, 'history']
+    );
 
 
 
