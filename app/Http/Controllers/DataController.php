@@ -843,6 +843,7 @@ class DataController extends Controller
             */
             $lead = Lead::create([
                 'company_id' => $data->company_id,
+                'category_id' => $data->category_id,
 
                 'branch_id' => $request->branch_id,
                 'team_id' => $request->team_id,
@@ -1066,6 +1067,7 @@ class DataController extends Controller
                 */
                 $lead = Lead::create([
                     'company_id' => $data->company_id,
+                    'category_id' => $data->category_id,
 
                     'branch_id' => $request->branch_id,
                     'team_id' => $request->team_id,
