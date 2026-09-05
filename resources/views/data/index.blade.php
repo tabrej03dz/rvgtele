@@ -262,7 +262,14 @@
     x-data="{
         selected: [],
         selectAll: false,
-        showFilters: @js(request()->hasAny(['company_id', 'converted'])),
+        showFilters: @js(
+            request()->hasAny([
+                'company_id',
+                'converted',
+                'city',
+                'per_page'
+            ])
+        ),
         toggleAll(ids) {
             this.selected = this.selectAll ? [...ids] : [];
         }
@@ -313,34 +320,169 @@
         </div>
 
         <div class="border-t border-slate-100 p-3">
-            <form method="GET" action="{{ route('data.index') }}" class="flex flex-col gap-2 sm:flex-row">
-                @foreach(request()->except(['page', 'q']) as $key => $value)
-                    @if(is_scalar($value) && $value !== '')
-                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                    @endif
-                @endforeach
+            <form
+                method="GET"
+                action="{{ route('data.index') }}"
+                class="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-5"
+            >
 
-                <div class="relative flex-1">
-                    <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+                {{-- Search preserve --}}
+                @if(request()->filled('q'))
                     <input
-                        type="text"
+                        type="hidden"
                         name="q"
                         value="{{ request('q') }}"
-                        placeholder="Search by name, mobile, business, city..."
-                        class="!pl-10"
                     >
+                @endif
+
+
+                {{-- Category preserve --}}
+                @if(request()->filled('category_id'))
+                    <input
+                        type="hidden"
+                        name="category_id"
+                        value="{{ request('category_id') }}"
+                    >
+                @endif
+
+
+                {{-- Deleted preserve --}}
+                @if(request('show') === 'deleted')
+                    <input
+                        type="hidden"
+                        name="show"
+                        value="deleted"
+                    >
+                @endif
+
+
+                {{-- Company --}}
+                <div>
+                    <label class="data-label">
+                        Company
+                    </label>
+
+                    <select name="company_id">
+                        <option value="">
+                            All Companies
+                        </option>
+
+                        @foreach($companies as $company)
+
+                            <option
+                                value="{{ $company->id }}"
+                                @selected(
+                                    (string) request('company_id')
+                                    ===
+                                    (string) $company->id
+                                )
+                            >
+                                {{ $company->name }}
+                            </option>
+
+                        @endforeach
+                    </select>
                 </div>
 
-                <button type="submit" class="data-btn data-btn-primary">
-                    <i data-lucide="search"></i>
-                    SEARCH
-                </button>
 
-                @if(request()->filled('q'))
-                    <a href="{{ route('data.index', request()->except(['page', 'q'])) }}" class="data-btn">
-                        CLEAR
-                    </a>
-                @endif
+                {{-- City --}}
+                <div>
+                    <label class="data-label">
+                        City
+                    </label>
+
+                    <select name="city">
+
+                        <option value="">
+                            All Cities
+                        </option>
+
+                        @foreach($cities as $city)
+
+                            <option
+                                value="{{ $city }}"
+                                @selected(
+                                    request('city') === $city
+                                )
+                            >
+                                {{ $city }}
+                            </option>
+
+                        @endforeach
+
+                    </select>
+                </div>
+
+
+                {{-- Conversion --}}
+                <div>
+                    <label class="data-label">
+                        Conversion
+                    </label>
+
+                    <select name="converted">
+
+                        <option value="">
+                            All
+                        </option>
+
+                        <option
+                            value="0"
+                            @selected(request('converted') === '0')
+                        >
+                            Not Converted
+                        </option>
+
+                        <option
+                            value="1"
+                            @selected(request('converted') === '1')
+                        >
+                            Converted
+                        </option>
+
+                    </select>
+                </div>
+
+
+                {{-- Per Page --}}
+                <div>
+                    <label class="data-label">
+                        Items Per Page
+                    </label>
+
+                    <select name="per_page">
+
+                        @foreach([25, 50, 100, 250, 500] as $size)
+
+                            <option
+                                value="{{ $size }}"
+                                @selected(
+                                    (int) request('per_page', 25)
+                                    === $size
+                                )
+                            >
+                                {{ $size }} Items
+                            </option>
+
+                        @endforeach
+
+                    </select>
+                </div>
+
+
+                {{-- Apply --}}
+                <div class="flex items-end">
+
+                    <button
+                        type="submit"
+                        class="data-btn data-btn-primary w-full"
+                    >
+                        <i data-lucide="check"></i>
+                        APPLY FILTERS
+                    </button>
+
+                </div>
+
             </form>
         </div>
     </section>
@@ -419,6 +561,60 @@
             >
                 DELETED
             </a>
+
+
+            <form
+                method="GET"
+                action="{{ route('data.index') }}"
+                class="flex items-center gap-2"
+            >
+
+                @foreach(request()->except(['page', 'per_page']) as $key => $value)
+
+                    @if(is_scalar($value) && $value !== '')
+
+                        <input
+                            type="hidden"
+                            name="{{ $key }}"
+                            value="{{ $value }}"
+                        >
+
+                    @endif
+
+                @endforeach
+
+
+                <label
+                    class="whitespace-nowrap text-[9px] font-extrabold uppercase text-slate-400"
+                >
+                    Show
+                </label>
+
+
+                <select
+                    name="per_page"
+                    onchange="this.form.submit()"
+                    class="!min-h-[32px] !w-[95px]"
+                >
+
+                    @foreach([25, 50, 100, 250, 500] as $size)
+
+                        <option
+                            value="{{ $size }}"
+                            @selected(
+                                (int) request('per_page', 25)
+                                === $size
+                            )
+                        >
+                            {{ $size }}
+                        </option>
+
+                    @endforeach
+
+                </select>
+
+            </form>
+
         </div>
     </section>
 

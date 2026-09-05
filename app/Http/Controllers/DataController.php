@@ -17,13 +17,83 @@ class DataController extends Controller
      * Display listing of data.
      */
 
+    // public function index(Request $request)
+    // {
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Main listing query
+    //     |--------------------------------------------------------------------------
+    //     */
+    //     $query = Data::query()->with([
+    //         'company',
+    //         'lead',
+    //         'categoryInfo',
+    //     ]);
+
+    //     $this->applyIndexFilters($query, $request, true);
+
+    //     $data = $query
+    //         ->latest('id')
+    //         ->paginate(25)
+    //         ->withQueryString();
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Dynamic category tabs + counts
+    //     |--------------------------------------------------------------------------
+    //     | Category count same active filters ko respect karega, bas category_id ko
+    //     | ignore karega. Isliye tab change karte waqt count stable aur correct rahega.
+    //     */
+    //     $countQuery = Data::query();
+    //     $this->applyIndexFilters($countQuery, $request, false);
+
+    //     $allCategoryCount = (clone $countQuery)->count();
+
+    //     $categoryCounts = (clone $countQuery)
+    //         ->select('category_id', DB::raw('COUNT(*) as total'))
+    //         ->groupBy('category_id')
+    //         ->pluck('total', 'category_id');
+
+    //     $companies = Company::query()
+    //         ->orderBy('name')
+    //         ->get();
+
+    //     $categories = Category::query()
+    //         ->orderBy('name')
+    //         ->get();
+
+    //     return view('data.index', compact(
+    //         'data',
+    //         'companies',
+    //         'categories',
+    //         'categoryCounts',
+    //         'allCategoryCount'
+    //     ));
+    // }
+
     public function index(Request $request)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Pagination
+        |--------------------------------------------------------------------------
+        */
+
+        $allowedPerPage = [25, 50, 100, 250, 500];
+
+        $perPage = (int) $request->get('per_page', 25);
+
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 25;
+        }
+
+
         /*
         |--------------------------------------------------------------------------
         | Main listing query
         |--------------------------------------------------------------------------
         */
+
         $query = Data::query()->with([
             'company',
             'lead',
@@ -34,17 +104,22 @@ class DataController extends Controller
 
         $data = $query
             ->latest('id')
-            ->paginate(25)
+            ->paginate($perPage)
             ->withQueryString();
+
 
         /*
         |--------------------------------------------------------------------------
         | Dynamic category tabs + counts
         |--------------------------------------------------------------------------
-        | Category count same active filters ko respect karega, bas category_id ko
-        | ignore karega. Isliye tab change karte waqt count stable aur correct rahega.
+        |
+        | Category count same active filters ko respect karega,
+        | bas category_id ko ignore karega.
+        |
         */
+
         $countQuery = Data::query();
+
         $this->applyIndexFilters($countQuery, $request, false);
 
         $allCategoryCount = (clone $countQuery)->count();
@@ -54,20 +129,56 @@ class DataController extends Controller
             ->groupBy('category_id')
             ->pluck('total', 'category_id');
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Companies
+        |--------------------------------------------------------------------------
+        */
+
         $companies = Company::query()
             ->orderBy('name')
             ->get();
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Categories
+        |--------------------------------------------------------------------------
+        */
+
         $categories = Category::query()
             ->orderBy('name')
             ->get();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cities
+        |--------------------------------------------------------------------------
+        |
+        | Sirf existing unique cities dropdown me dikhengi.
+        | Null / blank city ko remove kar diya gaya hai.
+        |
+        */
+
+        $cities = Data::query()
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->select('city')
+            ->distinct()
+            ->orderBy('city')
+            ->pluck('city');
+
 
         return view('data.index', compact(
             'data',
             'companies',
             'categories',
             'categoryCounts',
-            'allCategoryCount'
+            'allCategoryCount',
+            'cities',
+            'perPage'
         ));
     }
 
@@ -77,47 +188,199 @@ class DataController extends Controller
      * $includeCategory = false category tab counts ke liye use hota hai,
      * taaki selected category ka filter count query ko restrict na kare.
      */
-    private function applyIndexFilters($query, Request $request, bool $includeCategory = true): void
-    {
-        if ($request->get('show') === 'deleted') {
-            $query->onlyTrashed();
-        }
+    // private function applyIndexFilters($query, Request $request, bool $includeCategory = true): void
+    // {
+    //     if ($request->get('show') === 'deleted') {
+    //         $query->onlyTrashed();
+    //     }
 
-        if ($request->filled('company_id')) {
-            $query->where('company_id', $request->integer('company_id'));
-        }
+    //     if ($request->filled('company_id')) {
+    //         $query->where('company_id', $request->integer('company_id'));
+    //     }
 
-        if ($includeCategory && $request->filled('category_id')) {
-            $query->where('category_id', $request->integer('category_id'));
-        }
+    //     if ($includeCategory && $request->filled('category_id')) {
+    //         $query->where('category_id', $request->integer('category_id'));
+    //     }
 
-        if ($request->filled('q')) {
-            $search = trim((string) $request->q);
+    //     if ($request->filled('q')) {
+    //         $search = trim((string) $request->q);
 
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('company_name', 'like', "%{$search}%")
-                    ->orWhere('mobile', 'like', "%{$search}%")
-                    ->orWhere('alternate_mobile', 'like', "%{$search}%")
-                    ->orWhere('whatsapp_number', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%")
-                    ->orWhere('district', 'like', "%{$search}%")
-                    ->orWhere('state', 'like', "%{$search}%")
-                    ->orWhereHas('categoryInfo', function ($categoryQuery) use ($search) {
-                        $categoryQuery->where('name', 'like', "%{$search}%");
-                    });
-            });
-        }
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('name', 'like', "%{$search}%")
+    //                 ->orWhere('company_name', 'like', "%{$search}%")
+    //                 ->orWhere('mobile', 'like', "%{$search}%")
+    //                 ->orWhere('alternate_mobile', 'like', "%{$search}%")
+    //                 ->orWhere('whatsapp_number', 'like', "%{$search}%")
+    //                 ->orWhere('email', 'like', "%{$search}%")
+    //                 ->orWhere('city', 'like', "%{$search}%")
+    //                 ->orWhere('district', 'like', "%{$search}%")
+    //                 ->orWhere('state', 'like', "%{$search}%")
+    //                 ->orWhereHas('categoryInfo', function ($categoryQuery) use ($search) {
+    //                     $categoryQuery->where('name', 'like', "%{$search}%");
+    //                 });
+    //         });
+    //     }
 
-        if ($request->filled('converted')) {
-            if ($request->converted === '1') {
-                $query->where('converted', true);
-            } elseif ($request->converted === '0') {
-                $query->where('converted', false);
-            }
+    //     if ($request->filled('converted')) {
+    //         if ($request->converted === '1') {
+    //             $query->where('converted', true);
+    //         } elseif ($request->converted === '0') {
+    //             $query->where('converted', false);
+    //         }
+    //     }
+    // }
+
+    private function applyIndexFilters(
+    $query,
+    Request $request,
+    bool $includeCategory = true
+): void {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Deleted
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->get('show') === 'deleted') {
+        $query->onlyTrashed();
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('company_id')) {
+        $query->where(
+            'company_id',
+            $request->integer('company_id')
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Category Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $includeCategory &&
+        $request->filled('category_id')
+    ) {
+        $query->where(
+            'category_id',
+            $request->integer('category_id')
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | City Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('city')) {
+
+        $city = trim((string) $request->city);
+
+        $query->where('city', $city);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('q')) {
+
+        $search = trim((string) $request->q);
+
+        $query->where(function ($q) use ($search) {
+
+            $q->where(
+                'name',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'company_name',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'mobile',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'alternate_mobile',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'whatsapp_number',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'email',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'city',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'district',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhere(
+                'state',
+                'like',
+                "%{$search}%"
+            )
+            ->orWhereHas(
+                'categoryInfo',
+                function ($categoryQuery) use ($search) {
+                    $categoryQuery->where(
+                        'name',
+                        'like',
+                        "%{$search}%"
+                    );
+                }
+            );
+        });
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Conversion Filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('converted')) {
+
+        if ($request->converted === '1') {
+
+            $query->where('converted', true);
+
+        } elseif ($request->converted === '0') {
+
+            $query->where('converted', false);
         }
     }
+}
 
     /**
      * Show create form.
