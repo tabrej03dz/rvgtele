@@ -167,32 +167,36 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
 
     // Manage Leads
 
+    Route::get(
+        '/manage/leads',
+        [ManageLeadController::class, 'index']
+    )
+        ->middleware('permission:leads.view')
+        ->name('manage.leads.index');
+
+
     Route::delete(
-        '/leads/{lead}/with-relations',
-        [ManageLeadController::class, 'destroyWithRelations']
-    )->name('leads.destroy-with-relations');
+        '/manage/leads/{lead}/delete',
+        [ManageLeadController::class, 'destroy']
+    )
+        ->middleware('permission:leads.delete')
+        ->name('manage.leads.destroy');
 
 
     Route::post(
         '/manage/leads/bulk-delete',
         [ManageLeadController::class, 'bulkDelete']
-    )->name('manage.leads.bulk-delete');
-
-
-
-    Route::get(
-        '/manage/leads',
-        [ManageLeadController::class, 'index']
     )
-    ->middleware('permission:leads.view')
-    ->name('manage.leads.index');
+        ->middleware('permission:leads.delete')
+        ->name('manage.leads.bulk-delete');
+
 
     Route::post(
         '/manage/leads/bulk-assign',
         [ManageLeadController::class, 'bulkAssign']
     )
-    ->middleware('permission:leads.assign')
-    ->name('manage.leads.bulk-assign');
+        ->middleware('permission:leads.assign')
+        ->name('manage.leads.bulk-assign');
 
 
     // Leads CRUD

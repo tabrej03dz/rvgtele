@@ -1198,22 +1198,54 @@ public function callOnMobile(
         Request $request,
         Lead $lead
     ): RedirectResponse {
-        $this->ensureFullAccess(
-            $request
-        );
+
+        $this->ensureFullAccess($request);
 
         $this->guardCompany(
             $request,
             $lead
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Soft Delete
+        |--------------------------------------------------------------------------
+        */
+
         $lead->delete();
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Verify Soft Delete
+        |--------------------------------------------------------------------------
+        */
+
+        $deletedLead = Lead::withTrashed()
+            ->whereKey($lead->id)
+            ->first();
+
+
+        if (
+            !$deletedLead
+            ||
+            is_null($deletedLead->deleted_at)
+        ) {
+
+            return redirect()
+                ->route('manage.leads.index')
+                ->with(
+                    'error',
+                    'Lead Recycle Bin me move nahi hua. SoftDeletes configuration check karein.'
+                );
+        }
+
+
         return redirect()
-            ->route('leads.index')
+            ->route('manage.leads.index')
             ->with(
                 'success',
-                'Lead moved to trash.'
+                'Lead moved to Recycle Bin successfully.'
             );
     }
 
@@ -2763,8 +2795,10 @@ public function callOnMobile(
     }
 
 
-    public function bulkDelete(Request $request): RedirectResponse
-    {
+    public function bulkDelete(
+        Request $request
+    ): RedirectResponse {
+
         $this->ensureFullAccess($request);
 
         $companyId = $this->companyId($request);
@@ -2779,23 +2813,22 @@ public function callOnMobile(
             'lead_ids.*' => [
                 'required',
                 'integer',
-                Rule::exists('leads', 'id')->where(
-                    fn ($query) =>
-                    $query->where(
-                        'company_id',
-                        $companyId
-                    )
-                ),
-            ],
 
-            'delete_mode' => [
-                'required',
-                Rule::in([
-                    'lead_only',
-                    'with_related',
-                ]),
+                Rule::exists('leads', 'id')
+                    ->where(
+                        fn ($query) =>
+                            $query
+                                ->where(
+                                    'company_id',
+                                    $companyId
+                                )
+                                ->whereNull(
+                                    'deleted_at'
+                                )
+                    ),
             ],
         ]);
+
 
         $leads = Lead::query()
             ->where(
@@ -2808,47 +2841,41 @@ public function callOnMobile(
             )
             ->get();
 
+
         if ($leads->isEmpty()) {
+
             return back()->with(
                 'error',
                 'No leads selected.'
             );
         }
 
-        DB::transaction(function () use (
-            $leads,
-            $validated
-        ) {
 
-            foreach ($leads as $lead) {
+        DB::transaction(
+            function () use (
+                $leads
+            ) {
 
-                if (
-                    $validated['delete_mode']
-                    ===
-                    'with_related'
-                ) {
+                foreach ($leads as $lead) {
 
-                    $this->deleteLeadWithRelations(
-                        $lead
-                    );
-
-                } else {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Soft Delete Only
+                    |--------------------------------------------------------------------------
+                    */
 
                     $lead->delete();
                 }
             }
-        });
+        );
+
 
         $count = $leads->count();
 
+
         return back()->with(
             'success',
-            $validated['delete_mode']
-                === 'with_related'
-
-                ? "{$count} leads and related records deleted."
-
-                : "{$count} leads deleted."
+            "{$count} lead(s) moved to Recycle Bin successfully."
         );
     }
 

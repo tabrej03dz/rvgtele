@@ -537,7 +537,7 @@
             ];
 
             $menuIcons = [
-                'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard',
+                'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard','recycle-bin.index' => 'trash-2',
                 'data.index' => 'database',
                 'leads.index' => 'users',
                 'manage.leads.index' => 'users',

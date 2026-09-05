@@ -237,16 +237,17 @@
                                     <a class="icon-action whatsapp" title="WhatsApp" href="https://wa.me/{{ $wa }}" target="_blank" rel="noopener">◉</a>
                                 @endif
                                 @if($hasFullAccess)
+
                                     <button
                                         type="button"
                                         class="icon-action delete-lead-btn"
-                                        title="Delete Lead"
+                                        title="Move Lead to Recycle Bin"
                                         data-lead-name="{{ e($displayName) }}"
-                                        data-delete-url="{{ route('leads.destroy', $lead) }}"
-                                        data-delete-all-url="{{ route('leads.destroy-with-relations', $lead) }}"
+                                        data-delete-url="{{ route('manage.leads.destroy', $lead) }}"
                                     >
                                         ✕
                                     </button>
+
                                 @endif
                             </div>
                         </td>
@@ -282,83 +283,74 @@
 
 
 @if($hasFullAccess)
-<div
-    class="modal"
-    id="deleteLeadModal"
-    aria-hidden="true"
->
-    <div class="modal-card">
 
-        <div class="modal-title-row">
+    <div
+        class="modal"
+        id="deleteLeadModal"
+        aria-hidden="true"
+    >
 
-            <div>
-                <h3>Delete Lead</h3>
+        <div class="modal-card">
 
-                <div
-                    class="muted"
-                    id="deleteLeadName"
-                ></div>
+            <div class="modal-title-row">
+
+                <div>
+                    <h3>Move Lead to Recycle Bin</h3>
+
+                    <div
+                        class="muted"
+                        id="deleteLeadName"
+                    ></div>
+                </div>
+
+                <button
+                    type="button"
+                    class="modal-close"
+                >
+                    ×
+                </button>
+
             </div>
 
-            <button
-                type="button"
-                class="modal-close"
-            >
-                ×
-            </button>
 
-        </div>
+            <p class="muted">
+                Ye lead permanently delete nahi hogi.
+                Lead Recycle Bin me move hogi aur wahan se restore ya force delete ki ja sakti hai.
+            </p>
 
-        <p class="muted">
-            Select how you want to delete this lead.
-        </p>
 
-        <div
-            class="modal-actions"
-            style="flex-direction:column;"
-        >
+            <div class="modal-actions">
 
-            <button
-                type="button"
-                class="btn btn-danger"
-                id="deleteLeadOnlyBtn"
-                style="width:100%;"
-            >
-                DELETE LEAD ONLY
-            </button>
+                <button
+                    type="button"
+                    class="btn btn-soft modal-close"
+                >
+                    CANCEL
+                </button>
 
-            <div class="muted">
-                Related calls, follow-ups and notes will remain.
-            </div>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    id="deleteLeadOnlyBtn"
+                >
+                    🗑 MOVE TO RECYCLE BIN
+                </button>
 
-            <button
-                type="button"
-                class="btn btn-danger"
-                id="deleteLeadAllBtn"
-                style="width:100%;margin-top:10px;"
-            >
-                DELETE LEAD + ALL RECORDS
-            </button>
-
-            <div class="muted">
-                Calls, notes, follow-ups, assignments and labels will also be permanently deleted.
             </div>
 
         </div>
 
     </div>
-</div>
 
 
-<form
-    method="POST"
-    id="singleDeleteForm"
-    style="display:none;"
->
-    @csrf
-    @method('DELETE')
-</form>
-
+    <form
+        method="POST"
+        id="singleDeleteForm"
+        style="display:none;"
+    >
+        @csrf
+        @method('DELETE')
+    </form>
 
 @endif
 
@@ -761,101 +753,163 @@
         });
     });
 
+    // ------------------------------------------------------------------
+    // Delete Lead -> Recycle Bin
+    // ------------------------------------------------------------------
 
-    // ------------------------------------------------------------------
-    // Delete Lead
-    // ------------------------------------------------------------------
     let currentDeleteUrl = '';
-    let currentDeleteAllUrl = '';
 
-    document.querySelectorAll('.delete-lead-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            currentDeleteUrl = button.dataset.deleteUrl || '';
-            currentDeleteAllUrl = button.dataset.deleteAllUrl || '';
 
-            const leadName = document.getElementById('deleteLeadName');
-            if (leadName) {
-                leadName.textContent = button.dataset.leadName || '';
-            }
+    document
+        .querySelectorAll('.delete-lead-btn')
+        .forEach(button => {
 
-            openModal('deleteLeadModal');
+            button.addEventListener(
+                'click',
+                () => {
+
+                    currentDeleteUrl =
+                        button.dataset.deleteUrl || '';
+
+
+                    const leadName =
+                        document.getElementById(
+                            'deleteLeadName'
+                        );
+
+
+                    if (leadName) {
+
+                        leadName.textContent =
+                            button.dataset.leadName || '';
+                    }
+
+
+                    openModal(
+                        'deleteLeadModal'
+                    );
+                }
+            );
         });
-    });
 
-    document.getElementById('deleteLeadOnlyBtn')?.addEventListener('click', () => {
-        if (!currentDeleteUrl) {
-            alert('Delete URL not found.');
-            return;
-        }
 
-        if (!confirm('Sirf lead delete karna hai? Related records safe rahenge.')) {
-            return;
-        }
+    document
+        .getElementById(
+            'deleteLeadOnlyBtn'
+        )
+        ?.addEventListener(
+            'click',
+            () => {
 
-        const form = document.getElementById('singleDeleteForm');
+                if (!currentDeleteUrl) {
 
-        if (!form) {
-            alert('Delete form not found.');
-            return;
-        }
+                    alert(
+                        'Delete URL not found.'
+                    );
 
-        form.action = currentDeleteUrl;
-        form.submit();
-    });
+                    return;
+                }
 
-    document.getElementById('deleteLeadAllBtn')?.addEventListener('click', () => {
-        if (!currentDeleteAllUrl) {
-            alert('Permanent delete URL not found.');
-            return;
-        }
 
-        if (!confirm(
-            'WARNING! Lead ke saath calls, follow-ups, notes, assignments aur labels bhi permanently delete honge. Ye action undo nahi hoga. Continue?'
-        )) {
-            return;
-        }
+                if (
+                    !confirm(
+                        'Lead ko Recycle Bin me move karna hai?'
+                    )
+                ) {
 
-        const form = document.getElementById('singleDeleteForm');
+                    return;
+                }
 
-        if (!form) {
-            alert('Delete form not found.');
-            return;
-        }
 
-        form.action = currentDeleteAllUrl;
-        form.submit();
-    });
+                const form =
+                    document.getElementById(
+                        'singleDeleteForm'
+                    );
 
-    const bulkDeleteForm = document.getElementById('bulkDeleteForm');
+
+                if (!form) {
+
+                    alert(
+                        'Delete form not found.'
+                    );
+
+                    return;
+                }
+
+
+                form.action =
+                    currentDeleteUrl;
+
+
+                form.submit();
+            }
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bulk Delete -> Recycle Bin
+    |--------------------------------------------------------------------------
+    */
+
+    const bulkDeleteForm =
+        document.getElementById(
+            'bulkDeleteForm'
+        );
+
 
     if (bulkDeleteForm) {
-        bulkDeleteForm.addEventListener('submit', event => {
-            const ids = populateSelectedInputs(bulkDeleteForm);
 
-            if (ids.length === 0) {
-                event.preventDefault();
-                alert('Please select at least one lead.');
-                return;
+        bulkDeleteForm.addEventListener(
+            'submit',
+            event => {
+
+                const ids =
+                    populateSelectedInputs(
+                        bulkDeleteForm
+                    );
+
+
+                if (ids.length === 0) {
+
+                    event.preventDefault();
+
+                    alert(
+                        'Please select at least one lead.'
+                    );
+
+                    return;
+                }
+
+
+                if (
+                    !confirm(
+                        `${ids.length} selected lead(s) Recycle Bin me move hongi. Continue?`
+                    )
+                ) {
+
+                    event.preventDefault();
+
+                    return;
+                }
+
+
+                const submitButton =
+                    bulkDeleteForm.querySelector(
+                        'button[type="submit"]'
+                    );
+
+
+                if (submitButton) {
+
+                    submitButton.disabled =
+                        true;
+
+                    submitButton.textContent =
+                        'MOVING...';
+                }
             }
-
-            const mode = bulkDeleteForm.querySelector('[name="delete_mode"]')?.value;
-
-            const message = mode === 'with_related'
-                ? `${ids.length} selected lead(s) aur unke ALL RELATED RECORDS permanently delete honge. Ye action undo nahi hoga. Continue?`
-                : `${ids.length} selected lead(s) delete honge. Related records safe rahenge. Continue?`;
-
-            if (!confirm(message)) {
-                event.preventDefault();
-                return;
-            }
-
-            const submitButton = bulkDeleteForm.querySelector('button[type="submit"]');
-
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.textContent = 'DELETING...';
-            }
-        });
+        );
     }
 
     window.toggleFullScreen = async function () {
