@@ -24,6 +24,12 @@ class Lead extends Model
         ];
     }
 
+
+    public function callLogs()
+{
+    return $this->hasMany(CallLog::class);
+}
+
     public function company()
     {
         return $this->belongsTo(Company::class);
@@ -119,5 +125,5 @@ class Lead extends Model
     {
         return $this->hasOne(FollowUp::class)->latestOfMany();
     }
-    
+
 }

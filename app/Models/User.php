@@ -99,4 +99,16 @@ class User extends Authenticatable implements PasskeyUser
 
 
 
+
+public function callingSetting()
+{
+    return $this->hasOne(CallingSetting::class);
+}
+
+public function callLogs()
+{
+    return $this->hasMany(CallLog::class);
+}
+
+
 }
