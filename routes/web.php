@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\DemoCityController;
 use App\Http\Controllers\ManageLeadController;
+use App\Http\Controllers\RecycleBinController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
 
 
@@ -360,6 +361,79 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
 
 
 
+    /*
+|--------------------------------------------------------------------------
+| Recycle Bin
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('recycle-bin')
+    ->name('recycle-bin.')
+    ->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recycle Bin Page
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/',
+            [
+                RecycleBinController::class,
+                'index'
+            ]
+        )->name('index');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Bulk Restore / Force Delete
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/bulk-action',
+            [
+                RecycleBinController::class,
+                'bulkAction'
+            ]
+        )->name('bulk-action');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Restore Single Record
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/{table}/{id}/restore',
+            [
+                RecycleBinController::class,
+                'restore'
+            ]
+        )
+        ->whereNumber('id')
+        ->name('restore');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Permanently Delete Single Record
+        |--------------------------------------------------------------------------
+        */
+
+        Route::delete(
+            '/{table}/{id}/force-delete',
+            [
+                RecycleBinController::class,
+                'forceDelete'
+            ]
+        )
+        ->whereNumber('id')
+        ->name('force-delete');
+    });
 
 
     // Generic CRUD registrar.

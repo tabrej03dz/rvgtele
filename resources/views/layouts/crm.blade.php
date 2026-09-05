@@ -366,6 +366,12 @@
                         'manage.leads.*',
                         'manage.leads.view'
                     ],
+                    [
+                        'Recycle Bin',
+                        'recycle-bin.index',
+                        'recycle-bin.*',
+                        'leads.view'
+                    ],
 
                     [
                         'Data',
