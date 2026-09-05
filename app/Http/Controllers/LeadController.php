@@ -3798,83 +3798,183 @@ public function index(Request $request): View
             });
         }
 
+        // if ($state === 'connected') {
+        //     return $query->where(function (Builder $stateQuery) use ($assignmentBoundarySql) {
+        //         $stateQuery
+        //             ->where(function (Builder $assigned) use ($assignmentBoundarySql) {
+        //                 $assigned
+        //                     ->whereNotNull('leads.assigned_to')
+        //                     ->whereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
+        //                         $calls
+        //                             ->whereColumn('call_logs.user_id', 'leads.assigned_to')
+        //                             ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}");
+        //                     })
+        //                     ->where(function (Builder $connected) use ($assignmentBoundarySql) {
+        //                         // Note must also belong to current assigned employee after reassignment.
+        //                         $connected->whereHas('notes', function (Builder $notes) use ($assignmentBoundarySql) {
+        //                             $notes
+        //                                 ->whereColumn('notes.user_id', 'leads.assigned_to')
+        //                                 ->whereRaw("notes.created_at >= {$assignmentBoundarySql}");
+        //                         });
+
+        //                         if (Schema::hasColumn('call_logs', 'remarks')) {
+        //                             $connected->orWhereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
+        //                                 $calls
+        //                                     ->whereColumn('call_logs.user_id', 'leads.assigned_to')
+        //                                     ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}")
+        //                                     ->whereNotNull('remarks')
+        //                                     ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
+        //                             });
+        //                         }
+
+        //                         if (Schema::hasColumn('call_logs', 'remark')) {
+        //                             $connected->orWhereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
+        //                                 $calls
+        //                                     ->whereColumn('call_logs.user_id', 'leads.assigned_to')
+        //                                     ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}")
+        //                                     ->whereNotNull('remark')
+        //                                     ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
+        //                             });
+        //                         }
+
+        //                         if (Schema::hasColumn('call_logs', 'auto_remarks')) {
+        //                             $connected->orWhereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
+        //                                 $calls
+        //                                     ->whereColumn('call_logs.user_id', 'leads.assigned_to')
+        //                                     ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}")
+        //                                     ->whereNotNull('auto_remarks')
+        //                                     ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
+        //                             });
+        //                         }
+        //                     });
+        //             })
+        //             ->orWhere(function (Builder $unassigned) {
+        //                 // Existing/global connected behavior for unassigned admin leads.
+        //                 $unassigned
+        //                     ->whereNull('leads.assigned_to')
+        //                     ->whereHas('calls')
+        //                     ->where(function (Builder $connected) {
+        //                         $connected->whereHas('notes');
+
+        //                         if (Schema::hasColumn('call_logs', 'remarks')) {
+        //                             $connected->orWhereHas('calls', function (Builder $calls) {
+        //                                 $calls->whereNotNull('remarks')
+        //                                     ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
+        //                             });
+        //                         }
+
+        //                         if (Schema::hasColumn('call_logs', 'remark')) {
+        //                             $connected->orWhereHas('calls', function (Builder $calls) {
+        //                                 $calls->whereNotNull('remark')
+        //                                     ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
+        //                             });
+        //                         }
+
+        //                         if (Schema::hasColumn('call_logs', 'auto_remarks')) {
+        //                             $connected->orWhereHas('calls', function (Builder $calls) {
+        //                                 $calls->whereNotNull('auto_remarks')
+        //                                     ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
+        //                             });
+        //                         }
+        //                     });
+        //             });
+        //     });
+        // }
+
         if ($state === 'connected') {
+
             return $query->where(function (Builder $stateQuery) use ($assignmentBoundarySql) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Assigned Lead
+                |--------------------------------------------------------------------------
+                |
+                | Connected ONLY when current assigned employee ke call log me
+                | actual remarks available hain.
+                |
+                | Notes connected ka proof nahi hain.
+                |
+                */
+
                 $stateQuery
                     ->where(function (Builder $assigned) use ($assignmentBoundarySql) {
+
                         $assigned
                             ->whereNotNull('leads.assigned_to')
                             ->whereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
+
                                 $calls
-                                    ->whereColumn('call_logs.user_id', 'leads.assigned_to')
-                                    ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}");
-                            })
-                            ->where(function (Builder $connected) use ($assignmentBoundarySql) {
-                                // Note must also belong to current assigned employee after reassignment.
-                                $connected->whereHas('notes', function (Builder $notes) use ($assignmentBoundarySql) {
-                                    $notes
-                                        ->whereColumn('notes.user_id', 'leads.assigned_to')
-                                        ->whereRaw("notes.created_at >= {$assignmentBoundarySql}");
-                                });
+                                    ->whereColumn(
+                                        'call_logs.user_id',
+                                        'leads.assigned_to'
+                                    )
+                                    ->whereRaw(
+                                        "call_logs.created_at >= {$assignmentBoundarySql}"
+                                    );
+
+                                /*
+                                |----------------------------------------------------------
+                                | ONLY REMARKS = CONNECTED
+                                |----------------------------------------------------------
+                                */
 
                                 if (Schema::hasColumn('call_logs', 'remarks')) {
-                                    $connected->orWhereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
-                                        $calls
-                                            ->whereColumn('call_logs.user_id', 'leads.assigned_to')
-                                            ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}")
-                                            ->whereNotNull('remarks')
-                                            ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
-                                    });
-                                }
 
-                                if (Schema::hasColumn('call_logs', 'remark')) {
-                                    $connected->orWhereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
-                                        $calls
-                                            ->whereColumn('call_logs.user_id', 'leads.assigned_to')
-                                            ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}")
-                                            ->whereNotNull('remark')
-                                            ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
-                                    });
-                                }
+                                    $calls
+                                        ->whereNotNull('remarks')
+                                        ->whereRaw(
+                                            "TRIM(COALESCE(call_logs.remarks, '')) <> ''"
+                                        );
 
-                                if (Schema::hasColumn('call_logs', 'auto_remarks')) {
-                                    $connected->orWhereHas('calls', function (Builder $calls) use ($assignmentBoundarySql) {
-                                        $calls
-                                            ->whereColumn('call_logs.user_id', 'leads.assigned_to')
-                                            ->whereRaw("call_logs.created_at >= {$assignmentBoundarySql}")
-                                            ->whereNotNull('auto_remarks')
-                                            ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
-                                    });
+                                } elseif (Schema::hasColumn('call_logs', 'remark')) {
+
+                                    // Legacy column fallback
+                                    $calls
+                                        ->whereNotNull('remark')
+                                        ->whereRaw(
+                                            "TRIM(COALESCE(call_logs.remark, '')) <> ''"
+                                        );
+
+                                } else {
+
+                                    // Remarks column hi nahi hai to connected kuch nahi.
+                                    $calls->whereRaw('1 = 0');
                                 }
                             });
                     })
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Unassigned Lead / Admin View
+                    |--------------------------------------------------------------------------
+                    */
+
                     ->orWhere(function (Builder $unassigned) {
-                        // Existing/global connected behavior for unassigned admin leads.
+
                         $unassigned
                             ->whereNull('leads.assigned_to')
-                            ->whereHas('calls')
-                            ->where(function (Builder $connected) {
-                                $connected->whereHas('notes');
+                            ->whereHas('calls', function (Builder $calls) {
 
                                 if (Schema::hasColumn('call_logs', 'remarks')) {
-                                    $connected->orWhereHas('calls', function (Builder $calls) {
-                                        $calls->whereNotNull('remarks')
-                                            ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
-                                    });
-                                }
 
-                                if (Schema::hasColumn('call_logs', 'remark')) {
-                                    $connected->orWhereHas('calls', function (Builder $calls) {
-                                        $calls->whereNotNull('remark')
-                                            ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
-                                    });
-                                }
+                                    $calls
+                                        ->whereNotNull('remarks')
+                                        ->whereRaw(
+                                            "TRIM(COALESCE(call_logs.remarks, '')) <> ''"
+                                        );
 
-                                if (Schema::hasColumn('call_logs', 'auto_remarks')) {
-                                    $connected->orWhereHas('calls', function (Builder $calls) {
-                                        $calls->whereNotNull('auto_remarks')
-                                            ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
-                                    });
+                                } elseif (Schema::hasColumn('call_logs', 'remark')) {
+
+                                    $calls
+                                        ->whereNotNull('remark')
+                                        ->whereRaw(
+                                            "TRIM(COALESCE(call_logs.remark, '')) <> ''"
+                                        );
+
+                                } else {
+
+                                    $calls->whereRaw('1 = 0');
                                 }
                             });
                     });
