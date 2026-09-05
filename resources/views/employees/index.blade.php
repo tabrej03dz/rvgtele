@@ -102,6 +102,93 @@
         </div>
     </div>
 
+    {{-- Search --}}
+    <form method="GET" action="{{ route('employees.index') }}">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+
+                <div class="relative flex-1">
+
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg
+                            class="h-5 w-5 text-slate-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.3-4.3"/>
+                        </svg>
+                    </div>
+
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ request('q') }}"
+                        placeholder="Search employee by name, phone, email, code, company, branch, team..."
+                        autocomplete="off"
+                        class="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+
+                </div>
+
+                <button
+                    type="submit"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                >
+                    <svg
+                        class="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                    </svg>
+
+                    Search
+                </button>
+
+                @if(request()->filled('q'))
+                    <a
+                        href="{{ route('employees.index') }}"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                        <svg
+                            class="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path d="M18 6 6 18M6 6l12 12"/>
+                        </svg>
+
+                        Clear
+                    </a>
+                @endif
+
+            </div>
+
+            @if(request()->filled('q'))
+                <div class="mt-3 text-sm text-slate-500">
+                    Search result for:
+                    <span class="font-semibold text-slate-800">
+                        "{{ request('q') }}"
+                    </span>
+
+                    <span class="ml-1">
+                        — {{ $employees->total() }} employee(s) found
+                    </span>
+                </div>
+            @endif
+
+        </div>
+    </form>
+
     {{-- Employee Table --}}
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
