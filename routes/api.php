@@ -9,19 +9,150 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FollowUpApiController;
 use App\Http\Controllers\Api\CallDispositionApiController;
 use App\Http\Controllers\Api\CallingSettingController;
+use App\Http\Controllers\Api\DemoCityController;
 use App\Http\Controllers\Api\DeviceCallLogController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
       Route::get('/dashboard', [DashboardController::class, 'index']);
-    Route::get('/user', [AuthController::class, 'user']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get(
-    '/leads/{lead}/communication-history',
-    [LeadApiController::class, 'communicationHistory']
-);
+        Route::get('/user', [AuthController::class, 'user']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get(
+        '/leads/{lead}/communication-history',
+        [LeadApiController::class, 'communicationHistory']
+    );
 
+
+     /*
+    |--------------------------------------------------------------------------
+    | Demo Categories
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'categories',
+        [DemoCityController::class, 'categories']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Cities
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/demo-cities',
+        [DemoCityController::class, 'index']
+    );
+
+
+    Route::post(
+        '/demo-cities',
+        [DemoCityController::class, 'store']
+    );
+
+
+    Route::get(
+        '/demo-cities/{demoCity}',
+        [DemoCityController::class, 'show']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update
+    |--------------------------------------------------------------------------
+    |
+    | POST ko bhi rakha hai because multipart file upload ke saath
+    | mobile/Postman me POST easiest/reliable rahega.
+    |
+    */
+
+    Route::match(
+        ['put', 'patch', 'post'],
+        '/demo-cities/{demoCity}/update',
+        [DemoCityController::class, 'update']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Upload Multiple Files
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        '/demo-cities/{demoCity}/media',
+        [DemoCityController::class, 'uploadMedia']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Upload ZIP
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        '/demo-cities/{demoCity}/zip',
+        [DemoCityController::class, 'uploadZip']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Single Media Download
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/demo-cities/{demoCity}/media/{mediaId}/download',
+        [DemoCityController::class, 'downloadMedia']
+    )
+        ->name(
+            'api.demo-cities.media.download'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Single Media
+    |--------------------------------------------------------------------------
+    */
+
+    Route::delete(
+        '/demo-cities/{demoCity}/media/{mediaId}',
+        [DemoCityController::class, 'destroyMedia']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Download Complete City ZIP
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/demo-cities/{demoCity}/download-all',
+        [DemoCityController::class, 'downloadAll']
+    )
+        ->name(
+            'api.demo-cities.download-all'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Complete City
+    |--------------------------------------------------------------------------
+    */
+
+    Route::delete(
+        '/demo-cities/{demoCity}',
+        [DemoCityController::class, 'destroy']
+    );
 
 
   /*

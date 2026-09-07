@@ -270,32 +270,6 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.delete')->name('employees.destroy');
 
 
-    // Route::resource('demo-cities', DemoCityController::class);
-
-    // Route::prefix('demo-cities/{demoCity}')
-    //     ->name('demo-cities.')
-    //     ->group(function () {
-
-    //         // Media
-    //         Route::post('media', [DemoCityController::class, 'uploadMedia'])
-    //             ->name('media.upload');
-
-    //         Route::get('media/{mediaId}/download', [DemoCityController::class, 'downloadMedia'])
-    //             ->name('media.download');
-
-    //         Route::delete('media/{mediaId}', [DemoCityController::class, 'destroyMedia'])
-    //             ->name('media.destroy');
-
-    //         // ZIP
-    //         Route::post('zip', [DemoCityController::class, 'uploadZip'])
-    //             ->name('zip.upload');
-
-    //         Route::get('download-all', [DemoCityController::class, 'downloadAll'])
-    //             ->name('download-all');
-    // });
-
-
-
     Route::get('/demo-cities', [DemoCityController::class, 'index'])
         ->name('demo-cities.index');
 
