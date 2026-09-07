@@ -9,6 +9,12 @@ use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+use App\Models\User;
+
+
+
+
+
 
 class SendFollowUpReminderNotifications extends Command
 {
@@ -284,13 +290,426 @@ class SendFollowUpReminderNotifications extends Command
         }
     }
 
+
+
+/**
+ * Single follow-up reminder भेजें।
+ *
+ * Follow-up किसी ने भी बनाया हो, notification हमेशा उस user को जाएगी
+ * जिसके नाम lead assigned है।
+ */
+private function sendReminder(
+    FollowUp $followUp,
+    FirebasePushService $firebase,
+    CarbonInterface $currentTime
+): void {
+    /*
+    |--------------------------------------------------------------------------
+    | Follow-up Processing Information
+    |--------------------------------------------------------------------------
+    */
+
+    $this->line(
+        "Processing follow-up #{$followUp->id}"
+    );
+
+    Log::info(
+        'PROCESSING FOLLOW-UP REMINDER',
+        [
+            'follow_up_id' => $followUp->id,
+            'lead_id' => $followUp->lead_id,
+            'follow_up_assigned_to' => $followUp->assigned_to,
+            'lead_assigned_to' => $followUp->lead?->assigned_to,
+            'status' => $followUp->status,
+
+            'scheduled_at' => $followUp->scheduled_at
+                ? $followUp->scheduled_at->toDateTimeString()
+                : null,
+
+            'reminder_notified_at' => $followUp->reminder_notified_at
+                ? $followUp->reminder_notified_at->toDateTimeString()
+                : null,
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recheck Database Record
+    |--------------------------------------------------------------------------
+    */
+
+    $freshFollowUp = FollowUp::query()
+        ->with('lead')
+        ->whereKey($followUp->id)
+        ->where('status', 'pending')
+        ->whereNull('reminder_notified_at')
+        ->first();
+
+    if (!$freshFollowUp) {
+        $this->warn(
+            "Follow-up #{$followUp->id} "
+            . 'was already processed or cancelled.'
+        );
+
+        Log::warning(
+            'FOLLOW-UP SKIPPED AFTER RECHECK',
+            [
+                'follow_up_id' => $followUp->id,
+            ]
+        );
+
+        return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Check
+    |--------------------------------------------------------------------------
+    */
+
+    if (!$freshFollowUp->lead) {
+        $this->error(
+            "Follow-up #{$freshFollowUp->id}: "
+            . 'lead does not exist.'
+        );
+
+        Log::error(
+            'FOLLOW-UP LEAD NOT FOUND',
+            [
+                'follow_up_id' => $freshFollowUp->id,
+                'lead_id' => $freshFollowUp->lead_id,
+            ]
+        );
+
+        return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Correct Notification Recipient
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | Follow-up बनाने वाले user या follow_up.assigned_to को recipient
+    | नहीं बनाया जाएगा।
+    |
+    | Notification केवल leads.assigned_to वाले user को जाएगी।
+    |
+    */
+
+    $recipientUserId = (int) (
+        $freshFollowUp->lead->assigned_to ?? 0
+    );
+
+    if ($recipientUserId <= 0) {
+        $this->error(
+            "Follow-up #{$freshFollowUp->id}: "
+            . 'lead is not assigned to any user.'
+        );
+
+        Log::error(
+            'FOLLOW-UP LEAD HAS NO ASSIGNED USER',
+            [
+                'follow_up_id' => $freshFollowUp->id,
+                'lead_id' => $freshFollowUp->lead_id,
+                'follow_up_assigned_to' =>
+                    $freshFollowUp->assigned_to,
+                'lead_assigned_to' =>
+                    $freshFollowUp->lead->assigned_to,
+            ]
+        );
+
+        return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recipient User Exists Check
+    |--------------------------------------------------------------------------
+    */
+
+    $recipientUserExists = User::query()
+        ->whereKey($recipientUserId)
+        ->exists();
+
+    if (!$recipientUserExists) {
+        $this->error(
+            "Follow-up #{$freshFollowUp->id}: "
+            . "lead assigned user #{$recipientUserId} does not exist."
+        );
+
+        Log::error(
+            'FOLLOW-UP LEAD ASSIGNED USER NOT FOUND',
+            [
+                'follow_up_id' => $freshFollowUp->id,
+                'lead_id' => $freshFollowUp->lead_id,
+                'recipient_user_id' => $recipientUserId,
+            ]
+        );
+
+        return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scheduled Date Parse
+    |--------------------------------------------------------------------------
+    */
+
+    $scheduledAt = $freshFollowUp->scheduled_at;
+
+    if (!$scheduledAt instanceof CarbonInterface) {
+        $scheduledAt = Carbon::parse(
+            $freshFollowUp->scheduled_at,
+            config('app.timezone', 'Asia/Kolkata')
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Information
+    |--------------------------------------------------------------------------
+    */
+
+    $leadName = $freshFollowUp->lead->name
+        ?: 'Customer';
+
+    $mobile = $freshFollowUp->lead->mobile
+        ?: $freshFollowUp->lead->alternate_mobile
+        ?: '';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Overdue Check
+    |--------------------------------------------------------------------------
+    */
+
+    $isOverdue = $scheduledAt->lt($currentTime);
+
+    $scheduledTime = $scheduledAt->format(
+        'd M Y, h:i A'
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Title And Body
+    |--------------------------------------------------------------------------
+    */
+
+    $title = $isOverdue
+        ? "Overdue Follow-up: {$leadName}"
+        : "Follow-up Reminder: {$leadName}";
+
+    if ($isOverdue) {
+        $body = "Follow-up overdue hai. Customer: {$leadName}";
+    } else {
+        $body = "Follow-up {$scheduledTime} par scheduled hai.";
+    }
+
+    if ($mobile !== '') {
+        $body .= " Mobile: {$mobile}";
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Firebase Notification
+    |--------------------------------------------------------------------------
+    |
+    | केवल lead assigned user के registered devices पर जाएगा।
+    |
+    */
+
+    $result = $firebase->sendToUser(
+        userId: $recipientUserId,
+
+        title: $title,
+
+        body: $body,
+
+        data: [
+            'type' => 'follow_up_reminder',
+            'action' => 'open_follow_up',
+            'screen' => 'follow_up_detail',
+
+            'follow_up_id' =>
+                (string) $freshFollowUp->id,
+
+            'lead_id' =>
+                (string) ($freshFollowUp->lead_id ?? ''),
+
+            'assigned_user_id' =>
+                (string) $recipientUserId,
+
+            'lead_name' =>
+                (string) $leadName,
+
+            'mobile' =>
+                (string) $mobile,
+
+            'scheduled_at' =>
+                $scheduledAt->toIso8601String(),
+
+            'is_overdue' =>
+                $isOverdue ? '1' : '0',
+
+            'click_action' =>
+                'FLUTTER_NOTIFICATION_CLICK',
+
+            'sent_at' =>
+                now()->toIso8601String(),
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Firebase Result Log
+    |--------------------------------------------------------------------------
+    */
+
+    Log::info(
+        'FOLLOW-UP FIREBASE RESULT',
+        [
+            'follow_up_id' => $freshFollowUp->id,
+            'lead_id' => $freshFollowUp->lead_id,
+
+            'recipient_user_id' =>
+                $recipientUserId,
+
+            'lead_assigned_to' =>
+                $freshFollowUp->lead->assigned_to,
+
+            'follow_up_assigned_to' =>
+                $freshFollowUp->assigned_to,
+
+            'total_tokens' =>
+                $result['total_tokens'] ?? 0,
+
+            'sent' =>
+                $result['sent'] ?? 0,
+
+            'failed' =>
+                $result['failed'] ?? 0,
+
+            'result' => $result,
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Successfully Sent
+    |--------------------------------------------------------------------------
+    */
+
+    if ((int) ($result['sent'] ?? 0) > 0) {
+        /*
+         * Conditional update duplicate notification से बचाता है।
+         */
+        $updated = FollowUp::query()
+            ->whereKey($freshFollowUp->id)
+            ->whereNull('reminder_notified_at')
+            ->update([
+                'reminder_notified_at' => now(),
+            ]);
+
+        if ($updated === 1) {
+            $this->info(
+                'Reminder sent for follow-up '
+                . "#{$freshFollowUp->id} "
+                . "to user #{$recipientUserId}"
+            );
+
+            Log::info(
+                'FOLLOW-UP REMINDER SENT SUCCESSFULLY',
+                [
+                    'follow_up_id' =>
+                        $freshFollowUp->id,
+
+                    'lead_id' =>
+                        $freshFollowUp->lead_id,
+
+                    'recipient_user_id' =>
+                        $recipientUserId,
+
+                    'sent_devices' =>
+                        $result['sent'],
+
+                    'notified_at' =>
+                        now()->toDateTimeString(),
+                ]
+            );
+        } else {
+            $this->warn(
+                "Follow-up #{$freshFollowUp->id}: "
+                . 'notification sent but record was already marked.'
+            );
+        }
+
+        return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Failed
+    |--------------------------------------------------------------------------
+    */
+
+    $totalTokens = (int) (
+        $result['total_tokens'] ?? 0
+    );
+
+    $failedTokens = (int) (
+        $result['failed'] ?? 0
+    );
+
+    $this->error(
+        "Follow-up #{$freshFollowUp->id}: "
+        . 'notification failed. '
+        . "Recipient user: {$recipientUserId}, "
+        . "Total tokens: {$totalTokens}, "
+        . "Failed: {$failedTokens}"
+    );
+
+    Log::error(
+        'FOLLOW-UP REMINDER NOT DELIVERED',
+        [
+            'follow_up_id' =>
+                $freshFollowUp->id,
+
+            'lead_id' =>
+                $freshFollowUp->lead_id,
+
+            'recipient_user_id' =>
+                $recipientUserId,
+
+            'lead_assigned_to' =>
+                $freshFollowUp->lead->assigned_to,
+
+            'follow_up_assigned_to' =>
+                $freshFollowUp->assigned_to,
+
+            'result' =>
+                $result,
+        ]
+    );
+}
+
+
+
+
+
+
+
+
+
+
+
     /**
      * Single follow-up reminder भेजें।
      *
      * CarbonInterface इस्तेमाल किया गया है क्योंकि Laravel 13 में
      * now() CarbonImmutable return कर सकता है।
      */
-    private function sendReminder(
+    private function sendReminderildlddl(
         FollowUp $followUp,
         FirebasePushService $firebase,
         CarbonInterface $currentTime
