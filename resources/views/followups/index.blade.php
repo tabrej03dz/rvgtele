@@ -2091,7 +2091,11 @@
                                 <div
                                     class="flex items-center justify-end gap-2">
 
-                                    @if($followup->lead)
+                                    {{-- Feedback: sirf assigned user ko dikhega --}}
+                                    @if(
+                                        $followup->lead
+                                        && (int) $followup->assigned_to === (int) auth()->id()
+                                    )
                                         <button
                                             type="button"
                                             class="followup-feedback-btn"
@@ -2104,7 +2108,10 @@
                                             </svg>
                                             Feedback
                                         </button>
+                                    @endif
 
+                                    {{-- Open: hierarchy ke hisaab se visible lead ko normal open kar sake --}}
+                                    @if($followup->lead)
                                         <a
                                             href="{{ route('leads.show', $followup->lead) }}"
                                             class="followup-open-btn"
