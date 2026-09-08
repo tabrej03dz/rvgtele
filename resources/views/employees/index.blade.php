@@ -376,7 +376,6 @@
                             <td class="px-4 py-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     @if ($employee->can_employee_view ?? false)
-                                        @can('employees.impersonate')
                                         <form
                                             method="POST"
                                             action="{{ route('employees.impersonate', $employee) }}"
@@ -396,7 +395,6 @@
                                                 Employee View
                                             </button>
                                         </form>
-                                        @endcan
                                     @endif
 
                                     @if ($employee->can_employee_manage ?? false)

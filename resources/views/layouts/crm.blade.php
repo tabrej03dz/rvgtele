@@ -447,7 +447,7 @@
                         'Recycle Bin',
                         'recycle-bin.index',
                         'recycle-bin.*',
-                        'leads.view'
+                        'recycle-bin.view',
                     ],
 
                     [
