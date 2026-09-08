@@ -8,6 +8,7 @@ use App\Models\FollowUp;
 use App\Models\Lead;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -103,6 +104,34 @@ class DashboardController extends Controller
             'admin',
         ]);
 
+        $leaderTeamIds = $hasFullAccess
+            ? []
+            : Team::query()
+                ->where('company_id', $companyId)
+                ->where('leader_id', $userId)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+        $isTeamLeader = !$hasFullAccess && !empty($leaderTeamIds);
+
+        $visibleUserIds = collect([$userId]);
+
+        if ($isTeamLeader) {
+            $visibleUserIds = $visibleUserIds->merge(
+                User::query()
+                    ->where('company_id', $companyId)
+                    ->whereIn('team_id', $leaderTeamIds)
+                    ->pluck('id')
+            );
+        }
+
+        $visibleUserIds = $visibleUserIds
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
         /*
         |--------------------------------------------------------------------------
         | Base Lead Query
@@ -110,16 +139,10 @@ class DashboardController extends Controller
         */
 
         $leadQuery = Lead::query()
-            ->where(
-                'company_id',
-                $companyId
-            );
+            ->where('company_id', $companyId);
 
         if (!$hasFullAccess) {
-            $leadQuery->where(
-                'assigned_to',
-                $userId
-            );
+            $leadQuery->whereIn('assigned_to', $visibleUserIds);
         }
 
         /*
@@ -130,16 +153,10 @@ class DashboardController extends Controller
 
         $visibleLeadIdsQuery = Lead::query()
             ->select('id')
-            ->where(
-                'company_id',
-                $companyId
-            );
+            ->where('company_id', $companyId);
 
         if (!$hasFullAccess) {
-            $visibleLeadIdsQuery->where(
-                'assigned_to',
-                $userId
-            );
+            $visibleLeadIdsQuery->whereIn('assigned_to', $visibleUserIds);
         }
 
         /*
@@ -452,14 +469,8 @@ class DashboardController extends Controller
         */
 
         $followUpsDueQuery = FollowUp::query()
-            ->where(
-                'company_id',
-                $companyId
-            )
-            ->where(
-                'status',
-                'pending'
-            );
+            ->where('company_id', $companyId)
+            ->where('status', 'pending');
 
         if (!$hasFullAccess) {
             $followUpsDueQuery->whereIn(
@@ -468,13 +479,19 @@ class DashboardController extends Controller
             );
         }
 
-        $applyPeriod(
-            $followUpsDueQuery,
-            'scheduled_at'
-        );
+        if ($period === 'today') {
+            $followUpsDueQuery->whereBetween('scheduled_at', [
+                now()->startOfDay(),
+                now()->endOfDay(),
+            ]);
+        } elseif ($period === 'month') {
+            $followUpsDueQuery->whereBetween('scheduled_at', [
+                now()->startOfMonth(),
+                now()->endOfMonth(),
+            ]);
+        }
 
-        $followUpsDue = $followUpsDueQuery
-            ->count();
+        $followUpsDue = $followUpsDueQuery->count();
 
         /*
         |--------------------------------------------------------------------------
@@ -586,18 +603,20 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $activeUsers = $hasFullAccess
-            ? User::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'is_active',
-                    true
-                )
-                ->count()
-            : 1;
+        if ($hasFullAccess) {
+            $activeUsers = User::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->count();
+        } elseif ($isTeamLeader) {
+            $activeUsers = User::query()
+                ->where('company_id', $companyId)
+                ->whereIn('id', $visibleUserIds)
+                ->where('is_active', true)
+                ->count();
+        } else {
+            $activeUsers = 1;
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -623,7 +642,7 @@ class DashboardController extends Controller
 
         $dashboardMode = $hasFullAccess
             ? 'admin'
-            : 'employee';
+            : ($isTeamLeader ? 'team_leader' : 'employee');
 
         /*
         |--------------------------------------------------------------------------
@@ -702,6 +721,10 @@ class DashboardController extends Controller
             'dashboardMode' => $dashboardMode,
 
             'hasFullAccess' => $hasFullAccess,
+
+            'isTeamLeader' => $isTeamLeader,
+
+            'visibleUserIds' => $visibleUserIds,
 
             /*
              * Filter

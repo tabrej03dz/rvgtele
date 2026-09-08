@@ -5,13 +5,6 @@
 @section('content')
 
 @php
-
-    /*
-    |--------------------------------------------------------------------------
-    | Main Dashboard Stats
-    |--------------------------------------------------------------------------
-    */
-
     $stats = [
 
         [
@@ -33,38 +26,11 @@
         ],
 
         [
-            'label' => 'Demo Sent',
-            'sub_label' => $periodLabel,
-            'value' => number_format($todayLeadSend),
-            'accent' => 'text-green-700',
-            'bg' => 'bg-green-50',
-            'url' => route('leads.index'),
-        ],
-
-        [
-            'label' => 'Total Demo Sent',
-            'sub_label' => 'All Time',
-            'value' => number_format($totalLeadSend),
-            'accent' => 'text-teal-700',
-            'bg' => 'bg-teal-50',
-            'url' => route('leads.index'),
-        ],
-
-        [
             'label' => 'Total Calls',
             'sub_label' => $periodLabel,
             'value' => number_format($callsToday),
             'accent' => 'text-sky-700',
             'bg' => 'bg-sky-50',
-            'url' => route('calls.index'),
-        ],
-
-        [
-            'label' => 'Connected Calls',
-            'sub_label' => $periodLabel,
-            'value' => number_format($connectedToday),
-            'accent' => 'text-emerald-700',
-            'bg' => 'bg-emerald-50',
             'url' => route('calls.index'),
         ],
 
