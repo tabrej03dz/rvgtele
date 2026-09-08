@@ -462,7 +462,7 @@
                         </h2>
 
                         <p class="mt-0.5 text-sm text-slate-500">
-                            {{ $periodLabel }} disposition wise call statistics
+                            {{ $dispositionPeriodLabel }} disposition wise call statistics
                         </p>
 
                     </div>
@@ -474,18 +474,27 @@
 
             <div class="flex flex-wrap items-center gap-2">
 
-                <div
-                    class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
-                >
+                <form method="GET" action="{{ url()->current() }}"
+                    class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                    <input type="hidden" name="period" value="{{ $period }}">
+
+                    @foreach(['today' => 'Today', 'month' => 'Month', 'all' => 'All'] as $key => $label)
+                        <button type="submit" name="disposition_period" value="{{ $key }}"
+                            class="rounded-md px-3 py-1.5 text-xs font-semibold transition
+                            {{ $dispositionPeriod === $key
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-600 hover:bg-white hover:text-slate-900' }}">
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                </form>
+
+                <div class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
                     Total Calls:
                     <span class="text-slate-900">
-                        {{ number_format($callsToday) }}
+                        {{ number_format($dispositionTotalCalls) }}
                     </span>
                 </div>
-
-
-
-
 
             </div>
 
@@ -569,8 +578,8 @@
                             };
 
 
-                            $percentage = $callsToday > 0
-                                ? ($disposition['total'] / $callsToday) * 100
+                            $percentage = $dispositionTotalCalls > 0
+                                ? ($disposition['total'] / $dispositionTotalCalls) * 100
                                 : 0;
 
                         @endphp
@@ -721,8 +730,8 @@
 
                         @php
 
-                            $withoutDispositionPercentage = $callsToday > 0
-                                ? ($withoutDisposition / $callsToday) * 100
+                            $withoutDispositionPercentage = $dispositionTotalCalls > 0
+                                ? ($withoutDisposition / $dispositionTotalCalls) * 100
                                 : 0;
 
                         @endphp

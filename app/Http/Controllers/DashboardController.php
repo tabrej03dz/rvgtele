@@ -55,6 +55,22 @@ class DashboardController extends Controller
             default => 'Today',
         };
 
+        $dispositionPeriod = $request->get('disposition_period', $period);
+
+        if (!in_array($dispositionPeriod, [
+            'today',
+            'month',
+            'all',
+        ], true)) {
+            $dispositionPeriod = $period;
+        }
+
+        $dispositionPeriodLabel = match ($dispositionPeriod) {
+            'month' => 'This Month',
+            'all' => 'All Time',
+            default => 'Today',
+        };
+
         /*
         |--------------------------------------------------------------------------
         | Period Filter Helper
@@ -89,6 +105,28 @@ class DashboardController extends Controller
             /*
              * all = No date restriction
              */
+
+            return $query;
+        };
+
+        $applyDispositionPeriod = function (
+            Builder $query,
+            string $column = 'created_at'
+        ) use ($dispositionPeriod): Builder {
+
+            if ($dispositionPeriod === 'today') {
+                $query->whereBetween($column, [
+                    now()->startOfDay(),
+                    now(),
+                ]);
+            }
+
+            if ($dispositionPeriod === 'month') {
+                $query->whereBetween($column, [
+                    now()->startOfMonth(),
+                    now(),
+                ]);
+            }
 
             return $query;
         };
@@ -313,10 +351,19 @@ class DashboardController extends Controller
 
         $dispositionCountQuery = clone $callsBaseQuery;
 
-        $applyPeriod(
+        $applyDispositionPeriod(
             $dispositionCountQuery,
             'created_at'
         );
+
+        $dispositionTotalCallsQuery = clone $callsBaseQuery;
+
+        $applyDispositionPeriod(
+            $dispositionTotalCallsQuery,
+            'created_at'
+        );
+
+        $dispositionTotalCalls = $dispositionTotalCallsQuery->count();
 
         $dispositionCounts = $dispositionCountQuery
             ->whereNotNull(
@@ -451,7 +498,7 @@ class DashboardController extends Controller
 
         $withoutDispositionQuery = clone $callsBaseQuery;
 
-        $applyPeriod(
+        $applyDispositionPeriod(
             $withoutDispositionQuery,
             'created_at'
         );
@@ -725,6 +772,16 @@ class DashboardController extends Controller
             'isTeamLeader' => $isTeamLeader,
 
             'visibleUserIds' => $visibleUserIds,
+
+            /*
+             * Disposition Filter
+             */
+
+            'dispositionPeriod' => $dispositionPeriod,
+
+            'dispositionPeriodLabel' => $dispositionPeriodLabel,
+
+            'dispositionTotalCalls' => $dispositionTotalCalls,
 
             /*
              * Filter
