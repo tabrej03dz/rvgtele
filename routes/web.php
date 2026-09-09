@@ -364,8 +364,7 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
                 ->name('latest');
 
 
-            Route::get('/{mobileApk}/download', [MobileApkController::class, 'download'])
-                ->name('download');
+
 
             Route::patch('/{mobileApk}/toggle-status', [MobileApkController::class, 'toggleStatus'])
                 ->name('toggle-status');
