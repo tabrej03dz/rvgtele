@@ -609,6 +609,13 @@
                         'call-dispositions.view'
                     ],
 
+                    [
+                        'Mobile APKs',
+                        'mobile-apks.index',
+                        'mobile-apks.*',
+                        'mobile-apks.view'
+                    ],
+
                 ],
 
             ];
@@ -619,6 +626,7 @@
                 'leads.index' => 'users',
                 'manage.leads.index' => 'users',
                 'demo-cities.index' => 'gallery-vertical-end',
+                'mobile-apks.index' => 'smartphone',
                 
                 'pipeline.index' => 'workflow',
                 'followups.index' => 'phone-forwarded', 'calls.index' => 'phone',

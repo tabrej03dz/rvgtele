@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\DemoCityController;
 use App\Http\Controllers\ManageLeadController;
+use App\Http\Controllers\MobileApkController;
 use App\Http\Controllers\RecycleBinController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
 
@@ -338,6 +339,48 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     )->name('demo-cities.download-all');
 
 
+    Route::prefix('mobile-apks')
+        ->name('mobile-apks.')
+        ->group(function () {
+
+            Route::get('/', [MobileApkController::class, 'index'])
+                ->name('index');
+
+            Route::get('/create', [MobileApkController::class, 'create'])
+                ->name('create');
+
+            Route::post('/', [MobileApkController::class, 'store'])
+                ->name('store');
+
+            /*
+            |--------------------------------------------------------------------------
+            | Latest ko dynamic {mobileApk} route ke upar rakho
+            |--------------------------------------------------------------------------
+            */
+            Route::get('/latest', [MobileApkController::class, 'latest'])
+                ->name('latest');
+
+
+            Route::get('/{mobileApk}/download', [MobileApkController::class, 'download'])
+                ->name('download');
+
+            Route::patch('/{mobileApk}/toggle-status', [MobileApkController::class, 'toggleStatus'])
+                ->name('toggle-status');
+
+            Route::get('/{mobileApk}/edit', [MobileApkController::class, 'edit'])
+                ->name('edit');
+
+            Route::put('/{mobileApk}', [MobileApkController::class, 'update'])
+                ->name('update');
+
+            Route::delete('/{mobileApk}', [MobileApkController::class, 'destroy'])
+                ->name('destroy');
+
+            Route::get('/{mobileApk}', [MobileApkController::class, 'show'])
+                ->name('show');
+        });
+
+
 
     /*
 |--------------------------------------------------------------------------
@@ -345,125 +388,125 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('recycle-bin')
-    ->name('recycle-bin.')
-    ->group(function () {
+    Route::prefix('recycle-bin')
+        ->name('recycle-bin.')
+        ->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Recycle Bin Page
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Recycle Bin Page
+            |--------------------------------------------------------------------------
+            */
 
-        Route::get(
-            '/',
-            [
-                RecycleBinController::class,
-                'index'
-            ]
-        )->name('index');
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Bulk Restore / Force Delete
-        |--------------------------------------------------------------------------
-        */
-
-        Route::post(
-            '/bulk-action',
-            [
-                RecycleBinController::class,
-                'bulkAction'
-            ]
-        )->name('bulk-action');
+            Route::get(
+                '/',
+                [
+                    RecycleBinController::class,
+                    'index'
+                ]
+            )->name('index');
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Restore Single Record
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Bulk Restore / Force Delete
+            |--------------------------------------------------------------------------
+            */
 
-        Route::post(
-            '/{table}/{id}/restore',
-            [
-                RecycleBinController::class,
-                'restore'
-            ]
-        )
-        ->whereNumber('id')
-        ->name('restore');
+            Route::post(
+                '/bulk-action',
+                [
+                    RecycleBinController::class,
+                    'bulkAction'
+                ]
+            )->name('bulk-action');
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Permanently Delete Single Record
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Restore Single Record
+            |--------------------------------------------------------------------------
+            */
 
-        Route::delete(
-            '/{table}/{id}/force-delete',
-            [
-                RecycleBinController::class,
-                'forceDelete'
-            ]
-        )
-        ->whereNumber('id')
-        ->name('force-delete');
+            Route::post(
+                '/{table}/{id}/restore',
+                [
+                    RecycleBinController::class,
+                    'restore'
+                ]
+            )
+            ->whereNumber('id')
+            ->name('restore');
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Permanently Delete Single Record
+            |--------------------------------------------------------------------------
+            */
+
+            Route::delete(
+                '/{table}/{id}/force-delete',
+                [
+                    RecycleBinController::class,
+                    'forceDelete'
+                ]
+            )
+            ->whereNumber('id')
+            ->name('force-delete');
+        });
+
+
+        // Generic CRUD registrar.
+        $crud = static function (string $uri, string $routeName, string $controller, string $permission, string $parameter = 'item'): void {
+            Route::get("/{$uri}", [$controller, 'index'])->middleware("permission:{$permission}.view")->name("{$routeName}.index");
+            Route::get("/{$uri}/create", [$controller, 'create'])->middleware("permission:{$permission}.create")->name("{$routeName}.create");
+            Route::post("/{$uri}", [$controller, 'store'])->middleware("permission:{$permission}.create")->name("{$routeName}.store");
+            Route::get("/{$uri}/{{$parameter}}/edit", [$controller, 'edit'])->middleware("permission:{$permission}.update")->name("{$routeName}.edit");
+            Route::put("/{$uri}/{{$parameter}}", [$controller, 'update'])->middleware("permission:{$permission}.update")->name("{$routeName}.update");
+            Route::patch("/{$uri}/{{$parameter}}", [$controller, 'update'])->middleware("permission:{$permission}.update");
+            Route::delete("/{$uri}/{{$parameter}}", [$controller, 'destroy'])->middleware("permission:{$permission}.delete")->name("{$routeName}.destroy");
+        };
+
+        $crud('branches', 'branches', BranchController::class, 'branches');
+        $crud('teams', 'teams', TeamController::class, 'teams');
+        $crud('campaigns', 'campaigns', CampaignController::class, 'campaigns');
+        $crud('products', 'products', ProductController::class, 'products');
+        $crud('customers', 'customers', CustomerController::class, 'customers');
+        $crud('tasks', 'tasks', TaskController::class, 'tasks');
+        $crud('orders', 'orders', OrderController::class, 'orders');
+        $crud('payments', 'payments', PaymentController::class, 'payments');
+
+        Route::resource(
+            'categories',
+            CategoryController::class
+        );
+
+        Route::prefix('settings')->name('crm-settings.')->group(function () use ($crud) {
+            $crud(
+                'lead-sources',
+                'lead-sources',
+                LeadSourceController::class,
+                'lead-sources'
+            );
+
+            $crud(
+                'lead-statuses',
+                'lead-statuses',
+                LeadStatusController::class,
+                'lead-statuses'
+            );
+
+            $crud(
+                'call-dispositions',
+                'call-dispositions',
+                CallDispositionController::class,
+                'call-dispositions'
+            );
+        });
+
+        Route::get('/reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
     });
-
-
-    // Generic CRUD registrar.
-    $crud = static function (string $uri, string $routeName, string $controller, string $permission, string $parameter = 'item'): void {
-        Route::get("/{$uri}", [$controller, 'index'])->middleware("permission:{$permission}.view")->name("{$routeName}.index");
-        Route::get("/{$uri}/create", [$controller, 'create'])->middleware("permission:{$permission}.create")->name("{$routeName}.create");
-        Route::post("/{$uri}", [$controller, 'store'])->middleware("permission:{$permission}.create")->name("{$routeName}.store");
-        Route::get("/{$uri}/{{$parameter}}/edit", [$controller, 'edit'])->middleware("permission:{$permission}.update")->name("{$routeName}.edit");
-        Route::put("/{$uri}/{{$parameter}}", [$controller, 'update'])->middleware("permission:{$permission}.update")->name("{$routeName}.update");
-        Route::patch("/{$uri}/{{$parameter}}", [$controller, 'update'])->middleware("permission:{$permission}.update");
-        Route::delete("/{$uri}/{{$parameter}}", [$controller, 'destroy'])->middleware("permission:{$permission}.delete")->name("{$routeName}.destroy");
-    };
-
-    $crud('branches', 'branches', BranchController::class, 'branches');
-    $crud('teams', 'teams', TeamController::class, 'teams');
-    $crud('campaigns', 'campaigns', CampaignController::class, 'campaigns');
-    $crud('products', 'products', ProductController::class, 'products');
-    $crud('customers', 'customers', CustomerController::class, 'customers');
-    $crud('tasks', 'tasks', TaskController::class, 'tasks');
-    $crud('orders', 'orders', OrderController::class, 'orders');
-    $crud('payments', 'payments', PaymentController::class, 'payments');
-
-    Route::resource(
-        'categories',
-        CategoryController::class
-    );
-
-    Route::prefix('settings')->name('crm-settings.')->group(function () use ($crud) {
-        $crud(
-            'lead-sources',
-            'lead-sources',
-            LeadSourceController::class,
-            'lead-sources'
-        );
-
-        $crud(
-            'lead-statuses',
-            'lead-statuses',
-            LeadStatusController::class,
-            'lead-statuses'
-        );
-
-        $crud(
-            'call-dispositions',
-            'call-dispositions',
-            CallDispositionController::class,
-            'call-dispositions'
-        );
-    });
-
-    Route::get('/reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
-});
 
 
 
