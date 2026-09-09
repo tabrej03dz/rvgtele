@@ -53,89 +53,226 @@ class MobileApkController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['nullable', 'string', 'max:255'],
-            'apk' => ['required', 'file', 'max:512000'],
+            'name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-            'images' => ['nullable', 'array'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'apk' => [
+                'required',
+                'file',
+
+                // 600 MB
+                'max:614400',
+            ],
+
+            'images' => [
+                'nullable',
+                'array',
+            ],
+
+            'images.*' => [
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+            ],
         ]);
-
-        $file = $request->file('apk');
-
-        if (strtolower($file->getClientOriginalExtension()) !== 'apk') {
-            return back()
-                ->withErrors([
-                    'apk' => 'Please upload a valid APK file.',
-                ])
-                ->withInput();
-        }
-
-        $nextVersion = (MobileApk::max('version') ?? 0) + 1;
-
-        $name = $request->filled('name')
-            ? trim($request->name)
-            : 'CRM';
-
-        $safeName = Str::slug($name);
-
-        if (empty($safeName)) {
-            $safeName = 'crm';
-        }
-
-        $fileName = $safeName . '-v' . $nextVersion . '.apk';
-
-        $filePath = $file->storeAs(
-            'apks',
-            $fileName,
-            'public'
-        );
 
 
         /*
         |--------------------------------------------------------------------------
-        | Multiple Images Upload
+        | APK
+        |--------------------------------------------------------------------------
+        */
+
+        $file = $request->file('apk');
+
+
+        if (
+            strtolower(
+                $file->getClientOriginalExtension()
+            ) !== 'apk'
+        ) {
+
+            return response()->json([
+                'message' => 'Please upload a valid APK file.',
+
+                'errors' => [
+                    'apk' => [
+                        'Please upload a valid APK file.',
+                    ],
+                ],
+            ], 422);
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Version
+        |--------------------------------------------------------------------------
+        */
+
+        $nextVersion =
+            (MobileApk::max('version') ?? 0) + 1;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Name
+        |--------------------------------------------------------------------------
+        */
+
+        $name =
+            $request->filled('name')
+                ? trim($request->name)
+                : 'CRM';
+
+
+        $safeName =
+            \Illuminate\Support\Str::slug($name);
+
+
+        if (empty($safeName)) {
+
+            $safeName = 'crm';
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | APK filename
+        |--------------------------------------------------------------------------
+        */
+
+        $apkFileName =
+            $safeName
+            . '-v'
+            . $nextVersion
+            . '.apk';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | APK Store
+        |--------------------------------------------------------------------------
+        */
+
+        $filePath =
+            $file->storeAs(
+                'apks',
+                $apkFileName,
+                'public'
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Multiple Screenshots
         |--------------------------------------------------------------------------
         */
 
         $imagePaths = [];
 
+
         if ($request->hasFile('images')) {
 
-            foreach ($request->file('images') as $image) {
+            foreach (
+                $request->file('images')
+                as $image
+            ) {
 
                 $imageName =
-                    $safeName .
-                    '-v' .
-                    $nextVersion .
-                    '-' .
-                    uniqid() .
-                    '.' .
-                    $image->getClientOriginalExtension();
+                    $safeName
+                    . '-v'
+                    . $nextVersion
+                    . '-'
+                    . uniqid()
+                    . '.'
+                    . $image->getClientOriginalExtension();
 
-                $imagePath = $image->storeAs(
-                    'apk-images',
-                    $imageName,
-                    'public'
-                );
 
-                $imagePaths[] = $imagePath;
+                $imagePath =
+                    $image->storeAs(
+                        'apk-images',
+                        $imageName,
+                        'public'
+                    );
+
+
+                $imagePaths[] =
+                    $imagePath;
+
             }
+
         }
 
 
-        MobileApk::create([
-            'name' => $name,
-            'version' => $nextVersion,
-            'file_path' => $filePath,
-            'images' => $imagePaths,
-            'is_active' => true,
-        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Database
+        |--------------------------------------------------------------------------
+        */
+
+        $mobileApk =
+            MobileApk::create([
+
+                'name' =>
+                    $name,
+
+                'version' =>
+                    $nextVersion,
+
+                'file_path' =>
+                    $filePath,
+
+                'images' =>
+                    $imagePaths,
+
+                'is_active' =>
+                    true,
+
+            ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | AJAX Request
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->expectsJson()) {
+
+            return response()->json([
+                'status' => true,
+
+                'message' =>
+                    'APK uploaded successfully.',
+
+                'version' =>
+                    $mobileApk->version,
+
+                'redirect' =>
+                    route('mobile-apks.index'),
+            ]);
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normal Request
+        |--------------------------------------------------------------------------
+        */
 
         return redirect()
             ->route('mobile-apks.index')
             ->with(
                 'success',
-                'APK uploaded successfully. Version v' . $nextVersion
+                'APK uploaded successfully. Version v'
+                . $nextVersion
             );
     }
 
