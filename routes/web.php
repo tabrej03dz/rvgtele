@@ -35,6 +35,9 @@ use App\Http\Controllers\WhatsappMessageTemplateController;
 
 Route::view('/', 'welcome')->name('home');
 
+Route::get('mobile-apks/{mobileApk}/download', [MobileApkController::class, 'download'])
+                ->name('mobile-apks.download');
+
 Route::middleware(['auth'])->group(function () {
 
 
