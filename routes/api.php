@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\CallDispositionApiController;
 use App\Http\Controllers\Api\CallingSettingController;
 use App\Http\Controllers\Api\DemoCityController;
 use App\Http\Controllers\Api\DeviceCallLogController;
+use App\Http\Controllers\Api\MobileApkController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -21,6 +22,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get(
         '/leads/{lead}/communication-history',
         [LeadApiController::class, 'communicationHistory']
+    );
+
+
+
+    Route::get(
+        '/mobile-apk/latest',
+        [MobileApkController::class, 'latest']
     );
 
 
