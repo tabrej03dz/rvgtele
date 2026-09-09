@@ -1316,6 +1316,125 @@
         </div>
     </div>
 
+
+    {{-- =========================================================
+        EMPLOYEE QUICK FILTER
+        Team Leader  : Self + own team members
+        Admin/Super Admin : All active company users
+        Normal Employee : hidden
+    ========================================================== --}}
+    @if($canFilterByEmployee && $users->isNotEmpty())
+        @php
+            /*
+             * Employee chip click par:
+             * - Current search/category/source/etc. preserve rahenge.
+             * - Purane employee-specific filters/pagination clear honge.
+             * - Global assigned_to apply hoga, jo tino board columns par chalega.
+             */
+            $employeeQuickBaseQuery = request()->except([
+                'assigned_to',
+                'new_assigned_to',
+                'dialed_assigned_to',
+                'connected_assigned_to',
+                'new_page',
+                'dialed_page',
+                'connected_page',
+                'page',
+            ]);
+
+            $selectedEmployeeId = request('assigned_to');
+
+            // Current logged-in user ko list me sabse pehle dikhana.
+            $quickFilterUsers = $users
+                ->sortBy(function ($item) {
+                    return (int) $item->id === (int) auth()->id()
+                        ? '0_' . mb_strtolower((string) $item->name)
+                        : '1_' . mb_strtolower((string) $item->name);
+                })
+                ->values();
+        @endphp
+
+        <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <div class="text-xs font-extrabold uppercase tracking-wide text-slate-700">
+                        Employee Leads
+                    </div>
+
+                    <div class="mt-1 text-[10px] text-slate-500">
+                        @if($isTeamLeader)
+                            Apni ya apne team member ki leads dekhne ke liye naam par click karein.
+                        @else
+                            Kisi employee ki leads dekhne ke liye naam par click karein.
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    {{-- ALL ACCESSIBLE --}}
+                    <a
+                        href="{{ route('leads.index', $employeeQuickBaseQuery) }}"
+                        class="inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-extrabold transition
+                            {{ blank($selectedEmployeeId)
+                                ? 'border-amber-400 bg-amber-50 text-amber-800'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:bg-amber-50'
+                            }}"
+                    >
+                        <i data-lucide="users" class="h-3.5 w-3.5"></i>
+
+                        @if($isTeamLeader)
+                            All My Team
+                        @else
+                            All Employees
+                        @endif
+                    </a>
+
+                    {{-- SELF + ALLOWED EMPLOYEES --}}
+                    @foreach($quickFilterUsers as $filterUser)
+                        @php
+                            $isSelf = (int) $filterUser->id === (int) auth()->id();
+                            $isSelected = (string) $selectedEmployeeId === (string) $filterUser->id;
+
+                            $employeeFilterUrl = route(
+                                'leads.index',
+                                array_merge(
+                                    $employeeQuickBaseQuery,
+                                    ['assigned_to' => $filterUser->id]
+                                )
+                            );
+                        @endphp
+
+                        <a
+                            href="{{ $employeeFilterUrl }}"
+                            title="{{ $isSelf ? 'Show my leads' : 'Show '.$filterUser->name.' leads' }}"
+                            class="inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-extrabold transition
+                                {{ $isSelected
+                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'
+                                }}"
+                        >
+                            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full
+                                {{ $isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600' }}">
+                                {{ mb_strtoupper(mb_substr($filterUser->name ?: 'U', 0, 1)) }}
+                            </span>
+
+                            <span>
+                                {{ $isSelf ? 'My Leads' : $filterUser->name }}
+                            </span>
+
+                            @if(!$isSelf && $filterUser->employee_code)
+                                <span class="text-[8px] font-bold opacity-60">
+                                    {{ $filterUser->employee_code }}
+                                </span>
+                            @endif
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    @endif
+
+
     {{-- STAT CARDS --}}
     <div class="stats-grid">
         <div class="stat-card">
@@ -1909,15 +2028,18 @@
 
     @endif
 
-                                    <button
-                                        type="button"
-                                        class="round-action feedback-action"
-                                        title="Feedback & Actions"
-                                        @click='openFeedback(@json($popupLead))'
-                                    >
-                                        <i data-lucide="message-square-text"></i>
-                                        <span>Feedback</span>
-                                    </button>
+                                    {{-- Feedback sirf assigned employee ko dikhega --}}
+                                    @if((int) $lead->assigned_to === (int) auth()->id())
+                                        <button
+                                            type="button"
+                                            class="round-action feedback-action"
+                                            title="Feedback & Actions"
+                                            @click='openFeedback(@json($popupLead))'
+                                        >
+                                            <i data-lucide="message-square-text"></i>
+                                            <span>Feedback</span>
+                                        </button>
+                                    @endif
 
                                     <a href="{{ $leadUrl }}" class="round-action open-action" title="Open full lead">
                                         <i data-lucide="external-link"></i>

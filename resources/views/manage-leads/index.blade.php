@@ -112,11 +112,11 @@
                 <button class="btn btn-soft selection-action" type="button" data-open-modal="bulkUnassignModal" disabled>♧ BULK UNASSIGN</button>
             @endcan
 
-            @if($hasFullAccess)
+            @can('manage.leads.delete')
                 <button class="btn btn-danger selection-action" type="button" data-open-modal="bulkDeleteModal" disabled>
                     🗑 DELETE SELECTED
                 </button>
-            @endif
+            @endcan
 
             @can('leads.import')
                 <a class="btn btn-soft" href="{{ route('leads.import.create') }}">⇧ IMPORT</a>
@@ -236,8 +236,7 @@
                                 @if($wa)
                                     <a class="icon-action whatsapp" title="WhatsApp" href="https://wa.me/{{ $wa }}" target="_blank" rel="noopener">◉</a>
                                 @endif
-                                @if($hasFullAccess)
-
+                                @can('manage.leads.delete')
                                     <button
                                         type="button"
                                         class="icon-action delete-lead-btn"
@@ -247,8 +246,7 @@
                                     >
                                         ✕
                                     </button>
-
-                                @endif
+                                @endcan
                             </div>
                         </td>
                         <td>
@@ -927,6 +925,4 @@
     updateSelection();
 })();
 </script>
-
-
 @endsection

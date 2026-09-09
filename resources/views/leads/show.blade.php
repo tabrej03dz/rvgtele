@@ -843,238 +843,239 @@
                 SAVE CALL
             ================================================== --}}
             @can('calls.create')
+                @if((int) $lead->assigned_to === (int) auth()->id())
 
-                <form
-                    id="saveCallForm"
-                    method="POST"
-                    action="{{ route('calls.store', $lead) }}"
-                    class="lead-card overflow-hidden"
-                >
+                    <form
+                        id="saveCallForm"
+                        method="POST"
+                        action="{{ route('calls.store', $lead) }}"
+                        class="lead-card overflow-hidden"
+                    >
 
-                    @csrf
-
-
-                    <div class="border-b border-slate-200 px-5 py-4">
-
-                        <h3 class="font-bold text-slate-900">
-                            Save Call Feedback
-                        </h3>
-
-                        <p class="mt-1 text-xs text-slate-500">
-                            Customer se baat hone ke baad result save karein.
-                        </p>
-
-                    </div>
+                        @csrf
 
 
-                    <div class="space-y-4 p-5">
+                        <div class="border-b border-slate-200 px-5 py-4">
 
+                            <h3 class="font-bold text-slate-900">
+                                Save Call Feedback
+                            </h3>
 
-                        {{-- CALL RESULT --}}
-                        <div>
-
-                            <label
-                                for="callDispositionSelect"
-                                class="field-label"
-                            >
-                                Call Result
-
-                                <span class="text-red-500">
-                                    *
-                                </span>
-                            </label>
-
-
-                            <select
-                                id="callDispositionSelect"
-                                name="call_disposition_id"
-                                required
-                                onchange="updateDispositionFields()"
-                            >
-
-                                <option
-                                    value=""
-                                    data-requires-remarks="0"
-                                    data-requires-follow-up="0"
-                                    data-auto-remarks=""
-                                    data-next-followup=""
-                                >
-                                    Select call result
-                                </option>
-
-
-                                @foreach ($dispositions as $disposition)
-
-                                    <option
-                                        value="{{ $disposition->id }}"
-                                        data-requires-remarks="{{ $disposition->requires_remarks ? '1' : '0' }}"
-                                        data-requires-follow-up="{{ $disposition->requires_follow_up ? '1' : '0' }}"
-                                        data-auto-remarks="{{ e($disposition->auto_remarks ?? '') }}"
-                                        data-next-followup="{{ $disposition->next_followup ?? '' }}"
-                                        @selected(
-                                            (string) old('call_disposition_id')
-                                            ===
-                                            (string) $disposition->id
-                                        )
-                                    >
-                                        {{ $disposition->name }}
-                                    </option>
-
-                                @endforeach
-
-                            </select>
-
-
-                            @error('call_disposition_id')
-
-                                <div class="mt-1 text-xs text-red-600">
-                                    {{ $message }}
-                                </div>
-
-                            @enderror
+                            <p class="mt-1 text-xs text-slate-500">
+                                Customer se baat hone ke baad result save karein.
+                            </p>
 
                         </div>
 
 
-
-                        {{-- DURATION --}}
-                        <div>
-
-                            <label
-                                for="duration_seconds"
-                                class="field-label"
-                            >
-                                Call Duration
-                            </label>
+                        <div class="space-y-4 p-5">
 
 
-                            <div class="relative">
+                            {{-- CALL RESULT --}}
+                            <div>
 
-                                <input
-                                    id="duration_seconds"
-                                    name="duration_seconds"
-                                    type="number"
-                                    min="0"
-                                    value="{{ old('duration_seconds') }}"
-                                    placeholder="0"
-                                    class="pr-16"
+                                <label
+                                    for="callDispositionSelect"
+                                    class="field-label"
+                                >
+                                    Call Result
+
+                                    <span class="text-red-500">
+                                        *
+                                    </span>
+                                </label>
+
+
+                                <select
+                                    id="callDispositionSelect"
+                                    name="call_disposition_id"
+                                    required
+                                    onchange="updateDispositionFields()"
                                 >
 
-                                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                                    sec
-                                </span>
+                                    <option
+                                        value=""
+                                        data-requires-remarks="0"
+                                        data-requires-follow-up="0"
+                                        data-auto-remarks=""
+                                        data-next-followup=""
+                                    >
+                                        Select call result
+                                    </option>
+
+
+                                    @foreach ($dispositions as $disposition)
+
+                                        <option
+                                            value="{{ $disposition->id }}"
+                                            data-requires-remarks="{{ $disposition->requires_remarks ? '1' : '0' }}"
+                                            data-requires-follow-up="{{ $disposition->requires_follow_up ? '1' : '0' }}"
+                                            data-auto-remarks="{{ e($disposition->auto_remarks ?? '') }}"
+                                            data-next-followup="{{ $disposition->next_followup ?? '' }}"
+                                            @selected(
+                                                (string) old('call_disposition_id')
+                                                ===
+                                                (string) $disposition->id
+                                            )
+                                        >
+                                            {{ $disposition->name }}
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+
+                                @error('call_disposition_id')
+
+                                    <div class="mt-1 text-xs text-red-600">
+                                        {{ $message }}
+                                    </div>
+
+                                @enderror
 
                             </div>
 
 
-                            @error('duration_seconds')
 
-                                <div class="mt-1 text-xs text-red-600">
-                                    {{ $message }}
-                                </div>
+                            {{-- DURATION --}}
+                            <div>
 
-                            @enderror
-
-                        </div>
-
-
-
-                        {{-- REMARKS --}}
-                        <div
-                            id="remarksFieldWrapper"
-                            class="hidden"
-                        >
-
-                            <label
-                                for="callRemarks"
-                                class="field-label"
-                            >
-                                Remarks
-
-                                <span
-                                    id="remarksRequiredMark"
-                                    class="hidden text-red-500"
+                                <label
+                                    for="duration_seconds"
+                                    class="field-label"
                                 >
-                                    *
-                                </span>
-                            </label>
+                                    Call Duration
+                                </label>
 
 
-                            <textarea
-                                id="callRemarks"
-                                name="remarks"
-                                rows="4"
-                                placeholder="Customer ne kya kaha..."
-                            >{{ old('remarks') }}</textarea>
+                                <div class="relative">
 
+                                    <input
+                                        id="duration_seconds"
+                                        name="duration_seconds"
+                                        type="number"
+                                        min="0"
+                                        value="{{ old('duration_seconds') }}"
+                                        placeholder="0"
+                                        class="pr-16"
+                                    >
 
-                            @error('remarks')
+                                    <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                                        sec
+                                    </span>
 
-                                <div class="mt-1 text-xs text-red-600">
-                                    {{ $message }}
                                 </div>
 
-                            @enderror
 
-                        </div>
+                                @error('duration_seconds')
+
+                                    <div class="mt-1 text-xs text-red-600">
+                                        {{ $message }}
+                                    </div>
+
+                                @enderror
+
+                            </div>
 
 
 
-                        {{-- FOLLOW-UP --}}
-                        <div
-                            id="followUpFieldWrapper"
-                            class="hidden"
-                        >
-
-                            <label
-                                for="followUpAt"
-                                class="field-label"
+                            {{-- REMARKS --}}
+                            <div
+                                id="remarksFieldWrapper"
+                                class="hidden"
                             >
-                                Next Follow-up
 
-                                <span
-                                    id="followUpRequiredMark"
-                                    class="hidden text-red-500"
+                                <label
+                                    for="callRemarks"
+                                    class="field-label"
                                 >
-                                    *
-                                </span>
-                            </label>
+                                    Remarks
+
+                                    <span
+                                        id="remarksRequiredMark"
+                                        class="hidden text-red-500"
+                                    >
+                                        *
+                                    </span>
+                                </label>
 
 
-                            <input
-                                id="followUpAt"
-                                name="follow_up_at"
-                                type="datetime-local"
-                                value="{{ old('follow_up_at') }}"
-                                min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                                <textarea
+                                    id="callRemarks"
+                                    name="remarks"
+                                    rows="4"
+                                    placeholder="Customer ne kya kaha..."
+                                >{{ old('remarks') }}</textarea>
+
+
+                                @error('remarks')
+
+                                    <div class="mt-1 text-xs text-red-600">
+                                        {{ $message }}
+                                    </div>
+
+                                @enderror
+
+                            </div>
+
+
+
+                            {{-- FOLLOW-UP --}}
+                            <div
+                                id="followUpFieldWrapper"
+                                class="hidden"
                             >
 
+                                <label
+                                    for="followUpAt"
+                                    class="field-label"
+                                >
+                                    Next Follow-up
 
-                            @error('follow_up_at')
+                                    <span
+                                        id="followUpRequiredMark"
+                                        class="hidden text-red-500"
+                                    >
+                                        *
+                                    </span>
+                                </label>
 
-                                <div class="mt-1 text-xs text-red-600">
-                                    {{ $message }}
-                                </div>
 
-                            @enderror
+                                <input
+                                    id="followUpAt"
+                                    name="follow_up_at"
+                                    type="datetime-local"
+                                    value="{{ old('follow_up_at') }}"
+                                    min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                                >
+
+
+                                @error('follow_up_at')
+
+                                    <div class="mt-1 text-xs text-red-600">
+                                        {{ $message }}
+                                    </div>
+
+                                @enderror
+
+                            </div>
+
+
+
+                            {{-- SAVE BUTTON --}}
+                            <button
+                                type="button"
+                                onclick="openSaveCallConfirmation()"
+                                class="form-btn form-btn-green"
+                            >
+                                Save Feedback
+                            </button>
 
                         </div>
 
-
-
-                        {{-- SAVE BUTTON --}}
-                        <button
-                            type="button"
-                            onclick="openSaveCallConfirmation()"
-                            class="form-btn form-btn-green"
-                        >
-                            Save Feedback
-                        </button>
-
-                    </div>
-
-                </form>
-
+                    </form>
+                @endif
             @endcan
 
 

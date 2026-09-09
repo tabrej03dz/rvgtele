@@ -2,6 +2,20 @@
 
 @section('content')
 
+@php
+    $user = auth()->user();
+
+    abort_unless($user->can('recycle-bin.view'), 403);
+
+    $canRestore = $user->can('recycle-bin.restore');
+    $canForceDelete = $user->can('recycle-bin.force-delete');
+    $canBulkRestore = $user->can('recycle-bin.bulk-restore');
+    $canBulkForceDelete = $user->can('recycle-bin.bulk-force-delete');
+
+    $canBulk = $canBulkRestore || $canBulkForceDelete;
+    $canAction = $canRestore || $canForceDelete;
+@endphp
+
 <style>
     :root {
         --rb-primary: #5b4df7;
@@ -613,8 +627,10 @@
                 </form>
 
 
+                @if($canBulk)
                 <div class="recycle-actions">
 
+                    @can('recycle-bin.bulk-restore')
                     <button
                         type="button"
                         class="recycle-btn recycle-btn-success"
@@ -623,7 +639,9 @@
                     >
                         ↶ RESTORE SELECTED
                     </button>
+                    @endcan
 
+                    @can('recycle-bin.bulk-force-delete')
                     <button
                         type="button"
                         class="recycle-btn recycle-btn-danger"
@@ -632,8 +650,10 @@
                     >
                         🗑 FORCE DELETE SELECTED
                     </button>
+                    @endcan
 
                 </div>
+                @endif
 
             </div>
 
@@ -650,12 +670,14 @@
 
                         <tr>
 
+                            @if($canBulk)
                             <th>
                                 <input
                                     type="checkbox"
                                     id="selectAll"
                                 >
                             </th>
+                            @endif
 
                             @foreach($columns as $column)
 
@@ -665,9 +687,11 @@
 
                             @endforeach
 
+                            @if($canAction)
                             <th>
                                 ACTION
                             </th>
+                            @endif
 
                         </tr>
 
@@ -682,6 +706,7 @@
 
                                 {{-- Checkbox --}}
 
+                                @if($canBulk)
                                 <td>
                                     <input
                                         type="checkbox"
@@ -689,6 +714,7 @@
                                         value="{{ $record->id }}"
                                     >
                                 </td>
+                                @endif
 
 
                                 {{-- Dynamic columns --}}
@@ -720,13 +746,13 @@
 
                                 {{-- Actions --}}
 
+                                @if($canAction)
                                 <td>
 
                                     <div class="record-actions">
 
-
                                         {{-- Restore --}}
-
+                                        @can('recycle-bin.restore')
                                         <form
                                             method="POST"
                                             action="{{ route('recycle-bin.restore', [
@@ -746,10 +772,11 @@
                                             </button>
 
                                         </form>
+                                        @endcan
 
 
                                         {{-- Permanent Delete --}}
-
+                                        @can('recycle-bin.force-delete')
                                         <form
                                             method="POST"
                                             action="{{ route('recycle-bin.force-delete', [
@@ -770,10 +797,12 @@
                                             </button>
 
                                         </form>
+                                        @endcan
 
                                     </div>
 
                                 </td>
+                                @endif
 
                             </tr>
 
@@ -781,7 +810,7 @@
 
                             <tr>
 
-                                <td colspan="{{ count($columns) + 2 }}">
+                                <td colspan="{{ count($columns) + ($canBulk ? 1 : 0) + ($canAction ? 1 : 0) }}">
 
                                     <div class="recycle-empty">
 
@@ -847,6 +876,7 @@
         {{-- HIDDEN BULK FORM --}}
         {{-- ===================================================== --}}
 
+        @if($canBulk)
         <form
             method="POST"
             action="{{ route('recycle-bin.bulk-action') }}"
@@ -872,6 +902,7 @@
             <div id="bulkSelectedInputs"></div>
 
         </form>
+        @endif
 
     @endif
 
@@ -880,6 +911,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    const canBulkRestore = @json($canBulkRestore);
+    const canBulkForceDelete = @json($canBulkForceDelete);
 
     /*
     |--------------------------------------------------------------------------
@@ -1037,6 +1071,16 @@ document.addEventListener('DOMContentLoaded', function () {
     */
 
     function submitBulk(action) {
+
+        if (action === 'restore' && !canBulkRestore) {
+            alert('You do not have permission to bulk restore records.');
+            return;
+        }
+
+        if (action === 'force_delete' && !canBulkForceDelete) {
+            alert('You do not have permission to permanently delete records.');
+            return;
+        }
 
         const ids =
             selectedIds();
