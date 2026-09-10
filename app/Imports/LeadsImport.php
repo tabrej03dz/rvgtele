@@ -127,7 +127,7 @@ class LeadsImport implements
         */
 
         $name = $this->clean(
-            $row->get('name')
+            $this->field($row, 'name')
         );
 
         /*
@@ -137,7 +137,7 @@ class LeadsImport implements
         */
 
         $mobile = $this->cleanPhone(
-            $row->get('mobile')
+            $this->field($row, 'mobile')
         );
 
         if (!$name) {
@@ -195,7 +195,7 @@ class LeadsImport implements
         */
 
         $category = $this->clean(
-            $row->get('category')
+            $this->field($row, 'category')
         );
 
         /*
@@ -206,8 +206,7 @@ class LeadsImport implements
 
         $sourceId =
             $this->resolveSourceId(
-                $row->get('lead_source')
-                    ?? $row->get('source')
+                $this->field($row, 'lead_source')
             );
 
         /*
@@ -218,8 +217,7 @@ class LeadsImport implements
 
         $statusId =
             $this->resolveStatusId(
-                $row->get('lead_status')
-                    ?? $row->get('status')
+                $this->field($row, 'lead_status')
             );
 
         /*
@@ -230,9 +228,7 @@ class LeadsImport implements
 
         $assignedTo =
             $this->resolveAssignedTo(
-                $row->get('assigned_employee_email')
-                    ?? $row->get('assigned_to')
-                    ?? $row->get('employee_email')
+                $this->field($row, 'assigned_to')
             );
 
         /*
@@ -243,8 +239,7 @@ class LeadsImport implements
 
         $teamId =
             $this->resolveTeamId(
-                $row->get('team')
-                    ?? $row->get('team_name')
+                $this->field($row, 'team')
             );
 
         /*
@@ -256,7 +251,7 @@ class LeadsImport implements
         $priority =
             strtolower(
                 $this->clean(
-                    $row->get('priority')
+                    $this->field($row, 'priority')
                 ) ?? 'normal'
             );
 
@@ -285,7 +280,7 @@ class LeadsImport implements
         $temperature =
             strtolower(
                 $this->clean(
-                    $row->get('temperature')
+                    $this->field($row, 'temperature')
                 ) ?? 'cold'
             );
 
@@ -321,28 +316,22 @@ class LeadsImport implements
 
             'alternate_mobile' =>
                 $this->cleanPhone(
-                    $row->get(
-                        'alternate_mobile'
-                    )
+                    $this->field($row, 'alternate_mobile')
                 ),
 
             'whatsapp_number' =>
                 $this->cleanPhone(
-                    $row->get(
-                        'whatsapp_number'
-                    )
+                    $this->field($row, 'whatsapp_number')
                 ),
 
             'email' =>
                 $this->clean(
-                    $row->get('email')
+                    $this->field($row, 'email')
                 ),
 
             'company_name' =>
                 $this->clean(
-                    $row->get(
-                        'company_name'
-                    )
+                    $this->field($row, 'company_name')
                 ),
 
             /*
@@ -359,69 +348,57 @@ class LeadsImport implements
 
             'preferred_language' =>
                 $this->clean(
-                    $row->get(
-                        'preferred_language'
-                    )
+                    $this->field($row, 'preferred_language')
                 ),
 
             'address' =>
                 $this->clean(
-                    $row->get('address')
+                    $this->field($row, 'address')
                 ),
 
             'city' =>
                 $this->clean(
-                    $row->get('city')
+                    $this->field($row, 'city')
                 ),
 
             'district' =>
                 $this->clean(
-                    $row->get('district')
+                    $this->field($row, 'district')
                 ),
 
             'state' =>
                 $this->clean(
-                    $row->get('state')
+                    $this->field($row, 'state')
                 ),
 
             'pincode' =>
                 $this->clean(
-                    $row->get('pincode')
+                    $this->field($row, 'pincode')
                 ),
 
             'required_product' =>
                 $this->clean(
-                    $row->get(
-                        'required_product'
-                    )
+                    $this->field($row, 'required_product')
                 ),
 
             'estimated_budget' =>
                 $this->numericOrNull(
-                    $row->get(
-                        'estimated_budget'
-                    )
+                    $this->field($row, 'estimated_budget')
                 ),
 
             'expected_deal_value' =>
                 $this->numericOrNull(
-                    $row->get(
-                        'expected_deal_value'
-                    )
+                    $this->field($row, 'expected_deal_value')
                 ),
 
             'expected_closing_date' =>
                 $this->dateOrNull(
-                    $row->get(
-                        'expected_closing_date'
-                    )
+                    $this->field($row, 'expected_closing_date')
                 ),
 
             'next_follow_up_at' =>
                 $this->dateTimeOrNull(
-                    $row->get(
-                        'next_follow_up_at'
-                    )
+                    $this->field($row, 'next_follow_up_at')
                 ),
 
             'lead_source_id' =>
@@ -685,6 +662,430 @@ class LeadsImport implements
         );
 
         $this->imported++;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Flexible Excel Heading Mapping
+    |--------------------------------------------------------------------------
+    |
+    | Excel headings do not need to match strictly.
+    | Example:
+    |   Mobile, Mobile No, Mobile Number, Phone, Contact Number => mobile
+    |   Name, Customer Name, Lead Name, Client Name             => name
+    |
+    */
+
+    private const HEADING_ALIASES = [
+        'name' => [
+            'name',
+            'lead name',
+            'lead_name',
+            'customer name',
+            'customer_name',
+            'client name',
+            'client_name',
+            'customer',
+            'client',
+            'person name',
+            'contact person',
+            'contact person name',
+            'full name',
+        ],
+
+        'mobile' => [
+            'mobile',
+            'mobile no',
+            'mobile number',
+            'mobile_no',
+            'mobile_number',
+            'phone',
+            'phone no',
+            'phone number',
+            'phone_no',
+            'phone_number',
+            'contact',
+            'contact no',
+            'contact number',
+            'contact_no',
+            'contact_number',
+            'primary mobile',
+            'primary phone',
+            'primary contact',
+            'telephone',
+            'tel',
+        ],
+
+        'alternate_mobile' => [
+            'alternate mobile',
+            'alternate mobile no',
+            'alternate mobile number',
+            'alternate_mobile',
+            'alternate_mobile_no',
+            'alternate_mobile_number',
+            'alternate phone',
+            'alternate phone no',
+            'alternate phone number',
+            'alt mobile',
+            'alt mobile no',
+            'alt phone',
+            'secondary mobile',
+            'secondary phone',
+            'other mobile',
+            'other phone',
+            'mobile 2',
+            'phone 2',
+        ],
+
+        'whatsapp_number' => [
+            'whatsapp',
+            'whatsapp no',
+            'whatsapp number',
+            'whatsapp_no',
+            'whatsapp_number',
+            'whats app',
+            'whats app no',
+            'whats app number',
+            'wa number',
+            'wa no',
+        ],
+
+        'email' => [
+            'email',
+            'email id',
+            'email_id',
+            'email address',
+            'email_address',
+            'mail',
+            'mail id',
+            'e mail',
+        ],
+
+        'company_name' => [
+            'company',
+            'company name',
+            'company_name',
+            'business',
+            'business name',
+            'business_name',
+            'firm',
+            'firm name',
+            'firm_name',
+            'shop',
+            'shop name',
+            'shop_name',
+            'organisation',
+            'organization',
+            'organisation name',
+            'organization name',
+            'store name',
+            'establishment name',
+        ],
+
+        'category' => [
+            'category',
+            'category name',
+            'category_name',
+            'lead category',
+            'lead_category',
+            'business category',
+            'business type',
+            'type',
+        ],
+
+        'lead_source' => [
+            'lead source',
+            'lead_source',
+            'source',
+            'source name',
+            'source_name',
+            'lead source name',
+            'lead_source_name',
+        ],
+
+        'lead_status' => [
+            'lead status',
+            'lead_status',
+            'status',
+            'status name',
+            'status_name',
+            'lead status name',
+            'lead_status_name',
+        ],
+
+        'assigned_to' => [
+            'assigned to',
+            'assigned_to',
+            'assigned employee',
+            'assigned employee email',
+            'assigned_employee',
+            'assigned_employee_email',
+            'employee',
+            'employee email',
+            'employee_email',
+            'assignee',
+            'assignee email',
+            'user',
+            'user email',
+        ],
+
+        'team' => [
+            'team',
+            'team name',
+            'team_name',
+            'assigned team',
+            'assigned_team',
+        ],
+
+        'priority' => [
+            'priority',
+            'lead priority',
+            'lead_priority',
+        ],
+
+        'temperature' => [
+            'temperature',
+            'lead temperature',
+            'lead_temperature',
+            'lead type',
+        ],
+
+        'preferred_language' => [
+            'preferred language',
+            'preferred_language',
+            'language',
+            'customer language',
+            'lead language',
+        ],
+
+        'address' => [
+            'address',
+            'full address',
+            'full_address',
+            'business address',
+            'office address',
+            'shop address',
+            'location address',
+        ],
+
+        'city' => [
+            'city',
+            'city name',
+            'city_name',
+            'town',
+            'location',
+            'place',
+        ],
+
+        'district' => [
+            'district',
+            'district name',
+            'district_name',
+            'dist',
+        ],
+
+        'state' => [
+            'state',
+            'state name',
+            'state_name',
+            'province',
+        ],
+
+        'pincode' => [
+            'pincode',
+            'pin code',
+            'pin_code',
+            'postal code',
+            'postal_code',
+            'zip',
+            'zip code',
+            'zipcode',
+        ],
+
+        'required_product' => [
+            'required product',
+            'required_product',
+            'product',
+            'product required',
+            'interested product',
+            'interest',
+            'requirement',
+        ],
+
+        'estimated_budget' => [
+            'estimated budget',
+            'estimated_budget',
+            'budget',
+            'lead budget',
+            'customer budget',
+        ],
+
+        'expected_deal_value' => [
+            'expected deal value',
+            'expected_deal_value',
+            'deal value',
+            'deal_value',
+            'expected value',
+            'value',
+        ],
+
+        'expected_closing_date' => [
+            'expected closing date',
+            'expected_closing_date',
+            'closing date',
+            'closing_date',
+            'expected close date',
+            'deal closing date',
+        ],
+
+        'next_follow_up_at' => [
+            'next follow up at',
+            'next_follow_up_at',
+            'next follow up',
+            'next_follow_up',
+            'next followup',
+            'next_followup',
+            'follow up date',
+            'followup date',
+            'follow up',
+            'followup',
+        ],
+    ];
+
+    /**
+     * Read an Excel value using flexible heading names.
+     */
+    private function field(
+        Collection $row,
+        string $field
+    ): mixed {
+        $aliases = self::HEADING_ALIASES[$field] ?? [$field];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Build normalized row only once for this call
+        |--------------------------------------------------------------------------
+        */
+
+        $normalizedRow = [];
+
+        foreach ($row as $heading => $value) {
+            $normalizedHeading =
+                $this->normalizeHeading(
+                    (string) $heading
+                );
+
+            if ($normalizedHeading !== '') {
+                $normalizedRow[$normalizedHeading] = $value;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Exact normalized alias match
+        |--------------------------------------------------------------------------
+        |
+        | "Mobile Number", "mobile_number", "MOBILE-NUMBER",
+        | "mobile.number" => all normalize to "mobilenumber"
+        |
+        */
+
+        foreach ($aliases as $alias) {
+            $key =
+                $this->normalizeHeading(
+                    $alias
+                );
+
+            if (
+                array_key_exists(
+                    $key,
+                    $normalizedRow
+                )
+            ) {
+                $value = $normalizedRow[$key];
+
+                if (
+                    $value !== null
+                    &&
+                    trim((string) $value) !== ''
+                ) {
+                    return $value;
+                }
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Safe relaxed match
+        |--------------------------------------------------------------------------
+        |
+        | Allows headings such as:
+        |   "Customer Mobile Number"
+        |   "Lead Contact Number"
+        |   "Business Company Name"
+        |
+        | Very short aliases are ignored here to avoid accidental matches.
+        |
+        */
+
+        foreach ($aliases as $alias) {
+            $aliasKey =
+                $this->normalizeHeading(
+                    $alias
+                );
+
+            if (strlen($aliasKey) < 5) {
+                continue;
+            }
+
+            foreach ($normalizedRow as $headingKey => $value) {
+                if (
+                    (
+                        str_contains(
+                            $headingKey,
+                            $aliasKey
+                        )
+                        ||
+                        str_contains(
+                            $aliasKey,
+                            $headingKey
+                        )
+                    )
+                    &&
+                    $value !== null
+                    &&
+                    trim((string) $value) !== ''
+                ) {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize Excel heading for comparison.
+     *
+     * Examples:
+     * Mobile Number  => mobilenumber
+     * mobile_number  => mobilenumber
+     * MOBILE-NO.     => mobileno
+     */
+    private function normalizeHeading(
+        string $heading
+    ): string {
+        $heading =
+            mb_strtolower(
+                trim($heading)
+            );
+
+        return preg_replace(
+            '/[^a-z0-9]+/u',
+            '',
+            $heading
+        ) ?? '';
     }
 
     /*
