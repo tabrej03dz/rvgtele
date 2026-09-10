@@ -315,7 +315,9 @@ public function callOnMobile(
             25,
             50,
             100,
-            200,
+            250,
+            500,
+            1000,
         ];
 
         $perPage =
@@ -1425,7 +1427,7 @@ public function callOnMobile(
             'per_page' => [
                 'nullable',
                 'integer',
-                Rule::in([25, 50, 100, 200]),
+                Rule::in([25, 50, 100, 250, 500, 1000]),
             ],
             'date_from' => ['nullable', 'date'],
             'date_to' => [
@@ -1484,7 +1486,7 @@ public function callOnMobile(
                 ->select(['id', 'company_id', 'assigned_to'])
                 ->orderBy('id')
                 ->chunkById(
-                    200,
+                    250,
                     function ($leads) use (
                         &$updatedCount,
                         &$skippedCount
@@ -1529,7 +1531,7 @@ public function callOnMobile(
             ])
             ->orderBy('id')
             ->chunkById(
-                200,
+                250,
                 function ($leads) use (
                     $newUserId,
                     $automaticStatusId,

@@ -159,7 +159,7 @@
                 @endforeach
                 <label>Per page</label>
                 <select name="per_page" onchange="this.form.submit()">
-                    @foreach([25,50,100,200] as $size)
+                    @foreach([25,50,100,250, 500, 1000] as $size)
                         <option value="{{ $size }}" @selected((int)$perPage === $size)>{{ $size }}</option>
                     @endforeach
                 </select>
