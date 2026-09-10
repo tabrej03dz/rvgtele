@@ -3,120 +3,52 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CallDisposition;
 use App\Models\CallLog;
 use App\Models\FollowUp;
 use App\Models\Lead;
+use App\Models\Order;
+use App\Models\Payment;
+use App\Models\Team;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
+    /**
+     * Mobile App Dashboard API
+     *
+     * Access rules exactly same as Web Dashboard:
+     *
+     * super_admin / admin
+     *      => poori company
+     *
+     * Team Leader
+     *      => apna + apni team ke employees
+     *
+     * Normal Employee
+     *      => sirf apni assigned leads
+     *
+     * Supported:
+     *
+     * period:
+     * today
+     * month
+     * all
+     *
+     * disposition_period:
+     * today
+     * month
+     * all
+     */
     public function index(Request $request): JsonResponse
     {
-        $authUser = $request->user();
+        $user = $request->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Permission
-        |--------------------------------------------------------------------------
-        */
-
-        $canViewAll =
-            $authUser->hasRole('Super Admin') ||
-            $authUser->hasRole('super-admin') ||
-            $authUser->hasRole('super_admin') ||
-            $authUser->hasRole('Admin') ||
-            $authUser->hasRole('admin') ||
-            $authUser->hasRole('Owner') ||
-            $authUser->hasRole('owner') ||
-            $authUser->can('dashboard.view-all');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validation
-        |--------------------------------------------------------------------------
-        */
-
-        $validated = $request->validate([
-            'employee_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('users', 'id'),
-            ],
-
-            'period' => [
-                'nullable',
-                Rule::in([
-                    'today',
-                    'yesterday',
-
-                    // Flutter old values
-                    'week',
-                    'month',
-                    'all',
-
-                    // New aliases
-                    'this_week',
-                    'this_month',
-                    'all_time',
-
-                    'custom',
-                ]),
-            ],
-
-            'from_date' => [
-                'nullable',
-                'date',
-            ],
-
-            'to_date' => [
-                'nullable',
-                'date',
-                'after_or_equal:from_date',
-            ],
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Company
-        |--------------------------------------------------------------------------
-        */
-
-        $companyId = (int) $authUser->company_id;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Employee Scope
-        |--------------------------------------------------------------------------
-        */
-
-        $selectedEmployeeId = null;
-
-        if ($canViewAll && !empty($validated['employee_id'])) {
-
-            $selectedEmployeeId = (int) $validated['employee_id'];
-
-            $employeeExists = User::query()
-                ->whereKey($selectedEmployeeId)
-                ->where('company_id', $companyId)
-                ->exists();
-
-            if (!$employeeExists) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Selected employee does not belong to your company.',
-                ], 422);
-            }
-
-        } elseif (!$canViewAll) {
-
-            // Normal employee sirf apna dashboard dekhega
-            $selectedEmployeeId = (int) $authUser->id;
-        }
+        $companyId = (int) $user->company_id;
+        $userId = (int) $user->id;
 
         /*
         |--------------------------------------------------------------------------
@@ -124,43 +56,196 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $requestedPeriod = $validated['period'] ?? 'today';
+        $period = $request->get('period', 'today');
 
-        // Old / new values normalize
-        $period = match ($requestedPeriod) {
-            'this_week'  => 'week',
-            'this_month' => 'month',
-            'all_time'   => 'all',
-            default      => $requestedPeriod,
+        if (!in_array($period, [
+            'today',
+            'month',
+            'all',
+        ], true)) {
+            $period = 'today';
+        }
+
+        $periodLabel = match ($period) {
+            'month' => 'This Month',
+            'all'   => 'All Time',
+            default => 'Today',
         };
 
         /*
         |--------------------------------------------------------------------------
-        | Date Range
+        | Disposition Period
         |--------------------------------------------------------------------------
         */
 
-        [$from, $to] = $this->resolvePeriod(
-            $period,
-            $validated['from_date'] ?? null,
-            $validated['to_date'] ?? null
+        $dispositionPeriod = $request->get(
+            'disposition_period',
+            $period
         );
 
-        if ($period === 'custom' && (!$from || !$to)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'from_date and to_date are required for custom date filter.',
-            ], 422);
+        if (!in_array($dispositionPeriod, [
+            'today',
+            'month',
+            'all',
+        ], true)) {
+            $dispositionPeriod = $period;
         }
+
+        $dispositionPeriodLabel = match ($dispositionPeriod) {
+            'month' => 'This Month',
+            'all'   => 'All Time',
+            default => 'Today',
+        };
 
         /*
         |--------------------------------------------------------------------------
-        | Actual Today
+        | Period Helper
         |--------------------------------------------------------------------------
         */
 
-        $todayStart = Carbon::today()->startOfDay();
-        $todayEnd   = Carbon::today()->endOfDay();
+        $applyPeriod = function (
+            Builder $query,
+            string $column = 'created_at'
+        ) use ($period): Builder {
+
+            if ($period === 'today') {
+                $query->whereBetween(
+                    $column,
+                    [
+                        now()->startOfDay(),
+                        now(),
+                    ]
+                );
+            }
+
+            if ($period === 'month') {
+                $query->whereBetween(
+                    $column,
+                    [
+                        now()->startOfMonth(),
+                        now(),
+                    ]
+                );
+            }
+
+            // all = koi date restriction nahi
+
+            return $query;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Disposition Period Helper
+        |--------------------------------------------------------------------------
+        */
+
+        $applyDispositionPeriod = function (
+            Builder $query,
+            string $column = 'created_at'
+        ) use ($dispositionPeriod): Builder {
+
+            if ($dispositionPeriod === 'today') {
+                $query->whereBetween(
+                    $column,
+                    [
+                        now()->startOfDay(),
+                        now(),
+                    ]
+                );
+            }
+
+            if ($dispositionPeriod === 'month') {
+                $query->whereBetween(
+                    $column,
+                    [
+                        now()->startOfMonth(),
+                        now(),
+                    ]
+                );
+            }
+
+            return $query;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Access
+        |--------------------------------------------------------------------------
+        |
+        | Ye bilkul Web Dashboard jaisa hai.
+        |
+        */
+
+        $hasFullAccess = $user->hasAnyRole([
+            'super_admin',
+            'admin',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Team Leader
+        |--------------------------------------------------------------------------
+        */
+
+        $leaderTeamIds = $hasFullAccess
+            ? []
+            : Team::query()
+                ->where('company_id', $companyId)
+                ->where('leader_id', $userId)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+        $isTeamLeader =
+            !$hasFullAccess &&
+            !empty($leaderTeamIds);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Visible User IDs
+        |--------------------------------------------------------------------------
+        |
+        | Employee:
+        | [own id]
+        |
+        | Team Leader:
+        | [own id + team users]
+        |
+        | Admin:
+        | is list ki zarurat nahi
+        |
+        */
+
+        $visibleUserIds = collect([$userId]);
+
+        if ($isTeamLeader) {
+            $visibleUserIds = $visibleUserIds->merge(
+                User::query()
+                    ->where('company_id', $companyId)
+                    ->whereIn('team_id', $leaderTeamIds)
+                    ->pluck('id')
+            );
+        }
+
+        $visibleUserIds = $visibleUserIds
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard Mode
+        |--------------------------------------------------------------------------
+        */
+
+        $dashboardMode = $hasFullAccess
+            ? 'admin'
+            : (
+                $isTeamLeader
+                    ? 'team_leader'
+                    : 'employee'
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -169,117 +254,82 @@ class DashboardController extends Controller
         */
 
         $leadQuery = Lead::query()
-            ->where('company_id', $companyId)
-            ->when(
-                $selectedEmployeeId,
-                fn (Builder $query) =>
-                    $query->where('assigned_to', $selectedEmployeeId)
-            );
+            ->where('company_id', $companyId);
 
         /*
-        |--------------------------------------------------------------------------
-        | Base Call Query
-        |--------------------------------------------------------------------------
-        */
+         * Admin ko saari company leads.
+         *
+         * Employee / Team Leader ko sirf visible users
+         * ki assigned leads.
+         */
 
-        $callQuery = CallLog::query()
-            ->whereHas('lead', function (Builder $query) use ($companyId) {
-                $query->where('company_id', $companyId);
-            })
-            ->when(
-                $selectedEmployeeId,
-                fn (Builder $query) =>
-                    $query->where('user_id', $selectedEmployeeId)
-            );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Base Follow-up Query
-        |--------------------------------------------------------------------------
-        */
-
-        $followUpQuery = FollowUp::query()
-            ->where('company_id', $companyId)
-            ->when(
-                $selectedEmployeeId,
-                fn (Builder $query) =>
-                    $query->where('assigned_to', $selectedEmployeeId)
-            );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Period Lead Query
-        |--------------------------------------------------------------------------
-        */
-
-        $periodLeadQuery = clone $leadQuery;
-
-        if ($from && $to) {
-            $periodLeadQuery->whereBetween(
-                'leads.created_at',
-                [$from, $to]
+        if (!$hasFullAccess) {
+            $leadQuery->whereIn(
+                'assigned_to',
+                $visibleUserIds
             );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Period Call Query
+        | Visible Lead IDs
         |--------------------------------------------------------------------------
+        |
+        | Calls, Followups, Orders, Payments sab isi visibility
+        | ke according filter honge.
+        |
         */
 
-        $periodCallQuery = clone $callQuery;
+        $visibleLeadIdsQuery = Lead::query()
+            ->select('id')
+            ->where('company_id', $companyId);
 
-        if ($from && $to) {
-            $this->applyCallDateRange(
-                $periodCallQuery,
-                $from,
-                $to
+        if (!$hasFullAccess) {
+            $visibleLeadIdsQuery->whereIn(
+                'assigned_to',
+                $visibleUserIds
             );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Period Follow-up Query
+        | TOTAL LEADS
         |--------------------------------------------------------------------------
+        |
+        | Web Dashboard me Total Leads ALWAYS all time hai.
+        |
         */
 
-        $periodFollowUpQuery = clone $followUpQuery;
-
-        if ($from && $to) {
-            $periodFollowUpQuery->whereBetween(
-                'scheduled_at',
-                [$from, $to]
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Total Leads
-        |--------------------------------------------------------------------------
-        */
-
-        $totalLeads = (clone $periodLeadQuery)->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | New Today
-        |--------------------------------------------------------------------------
-        */
-
-        $newToday = (clone $leadQuery)
-            ->whereBetween(
-                'leads.created_at',
-                [$todayStart, $todayEnd]
-            )
+        $totalLeads = (clone $leadQuery)
             ->count();
 
         /*
         |--------------------------------------------------------------------------
-        | Uncalled Leads
+        | NEW LEADS - Selected Period
         |--------------------------------------------------------------------------
         */
 
-        $uncalledLeads = (clone $periodLeadQuery)
+        $newLeadQuery = clone $leadQuery;
+
+        $applyPeriod(
+            $newLeadQuery,
+            'created_at'
+        );
+
+        $newLeads = $newLeadQuery->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | UNCALLED LEADS
+        |--------------------------------------------------------------------------
+        |
+        | App ke liye useful.
+        |
+        | Visible leads jinpar ek bhi call log nahi hai.
+        |
+        */
+
+        $uncalledLeads = (clone $leadQuery)
             ->whereNotExists(function ($query) {
 
                 $query->selectRaw('1')
@@ -293,483 +343,978 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Total Calls
+        | HOT LEADS
         |--------------------------------------------------------------------------
         */
 
-        $totalCalls = (clone $periodCallQuery)->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Calls Today
-        |--------------------------------------------------------------------------
-        */
-
-        $callsTodayQuery = clone $callQuery;
-
-        $this->applyCallDateRange(
-            $callsTodayQuery,
-            $todayStart,
-            $todayEnd
-        );
-
-        $callsToday = $callsTodayQuery->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Connected Calls
-        |--------------------------------------------------------------------------
-        */
-
-        $totalConnectedCalls = (clone $periodCallQuery)
-            ->where('duration_seconds', '>', 0)
+        $hotLeads = (clone $leadQuery)
+            ->where(
+                'temperature',
+                'hot'
+            )
             ->count();
 
         /*
         |--------------------------------------------------------------------------
-        | Connected Today
+        | TOTAL DEMO SENT
         |--------------------------------------------------------------------------
+        |
+        | All-time demo sent.
+        |
         */
 
-        $connectedTodayQuery = (clone $callQuery)
-            ->where('duration_seconds', '>', 0);
-
-        $this->applyCallDateRange(
-            $connectedTodayQuery,
-            $todayStart,
-            $todayEnd
-        );
-
-        $connectedCallsToday = $connectedTodayQuery->count();
+        $totalDemoSent = (clone $leadQuery)
+            ->where(
+                'demo_send',
+                true
+            )
+            ->count();
 
         /*
         |--------------------------------------------------------------------------
-        | Unique Connected
+        | DEMO SENT - Selected Period
         |--------------------------------------------------------------------------
         */
 
-        $uniqueConnectedNumbers = (clone $periodCallQuery)
-            ->where('duration_seconds', '>', 0)
+        $demoPeriodQuery = (clone $leadQuery)
+            ->where(
+                'demo_send',
+                true
+            )
+            ->whereNotNull(
+                'demo_sent_at'
+            );
+
+        $applyPeriod(
+            $demoPeriodQuery,
+            'demo_sent_at'
+        );
+
+        $demoSent = $demoPeriodQuery->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Base Call Query
+        |--------------------------------------------------------------------------
+        */
+
+        $callsBaseQuery = CallLog::query()
+            ->where(
+                'company_id',
+                $companyId
+            );
+
+        /*
+         * IMPORTANT:
+         *
+         * Web dashboard user_id ke according calls filter nahi karta.
+         *
+         * Visible lead IDs ke according calls filter karta hai.
+         */
+
+        if (!$hasFullAccess) {
+            $callsBaseQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL CALLS - Selected Period
+        |--------------------------------------------------------------------------
+        */
+
+        $callsPeriodQuery = clone $callsBaseQuery;
+
+        $applyPeriod(
+            $callsPeriodQuery,
+            'created_at'
+        );
+
+        $totalCalls = $callsPeriodQuery->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | CONNECTED CALLS - Selected Period
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        |
+        | duration_seconds se connected nahi maan rahe.
+        |
+        | Web Dashboard ki tarah:
+        |
+        | disposition.type = connected
+        |
+        */
+
+        $connectedCallsQuery = clone $callsBaseQuery;
+
+        $applyPeriod(
+            $connectedCallsQuery,
+            'created_at'
+        );
+
+        $connectedCallsQuery->whereHas(
+            'disposition',
+            function (Builder $query) {
+
+                $query->where(
+                    'type',
+                    'connected'
+                );
+            }
+        );
+
+        $connectedCalls = $connectedCallsQuery
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | UNIQUE CONNECTED LEADS
+        |--------------------------------------------------------------------------
+        |
+        | Same lead se 5 connected calls hue,
+        | tab bhi unique connected = 1.
+        |
+        */
+
+        $uniqueConnectedQuery = clone $callsBaseQuery;
+
+        $applyPeriod(
+            $uniqueConnectedQuery,
+            'created_at'
+        );
+
+        $uniqueConnectedQuery->whereHas(
+            'disposition',
+            function (Builder $query) {
+
+                $query->where(
+                    'type',
+                    'connected'
+                );
+            }
+        );
+
+        $uniqueConnected = $uniqueConnectedQuery
             ->whereNotNull('lead_id')
             ->distinct()
             ->count('lead_id');
 
         /*
         |--------------------------------------------------------------------------
-        | Today Demo Send
+        | Dynamic Disposition Counts
         |--------------------------------------------------------------------------
         */
 
-        $demoSentToday = (clone $leadQuery)
-            ->where('demo_send', true)
-            ->whereNotNull('demo_sent_at')
-            ->whereBetween(
-                'demo_sent_at',
-                [$todayStart, $todayEnd]
-            )
-            ->count();
+        $dispositionCountQuery = clone $callsBaseQuery;
+
+        $applyDispositionPeriod(
+            $dispositionCountQuery,
+            'created_at'
+        );
 
         /*
         |--------------------------------------------------------------------------
-        | Demo Send - Selected Period
+        | Total Calls for Disposition
         |--------------------------------------------------------------------------
         */
 
-        $demoQuery = (clone $leadQuery)
-            ->where('demo_send', true);
+        $dispositionTotalCallsQuery =
+            clone $callsBaseQuery;
 
-        if ($from && $to) {
-            $demoQuery
-                ->whereNotNull('demo_sent_at')
-                ->whereBetween(
-                    'demo_sent_at',
-                    [$from, $to]
+        $applyDispositionPeriod(
+            $dispositionTotalCallsQuery,
+            'created_at'
+        );
+
+        $dispositionTotalCalls =
+            $dispositionTotalCallsQuery->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Group Disposition Counts
+        |--------------------------------------------------------------------------
+        */
+
+        $dispositionCounts =
+            $dispositionCountQuery
+                ->whereNotNull(
+                    'call_disposition_id'
+                )
+                ->select(
+                    'call_disposition_id'
+                )
+                ->selectRaw(
+                    'COUNT(*) as total'
+                )
+                ->groupBy(
+                    'call_disposition_id'
+                )
+                ->pluck(
+                    'total',
+                    'call_disposition_id'
                 );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Master Dispositions
+        |--------------------------------------------------------------------------
+        |
+        | Call log se list nahi bana rahe.
+        |
+        | Master table ke sare dispositions API me jayenge,
+        | chahe count 0 hi kyu na ho.
+        |
+        */
+
+        $allDispositions =
+            CallDisposition::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->orderBy('id')
+                ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Disposition Stats
+        |--------------------------------------------------------------------------
+        */
+
+        $dispositionStats =
+            $allDispositions
+                ->map(function ($disposition) use (
+                    $dispositionCounts,
+                    $dispositionTotalCalls
+                ) {
+
+                    $total = (int) (
+                        $dispositionCounts[
+                            $disposition->id
+                        ] ?? 0
+                    );
+
+                    $percentage =
+                        $dispositionTotalCalls > 0
+                            ? round(
+                                (
+                                    $total /
+                                    $dispositionTotalCalls
+                                ) * 100,
+                                1
+                            )
+                            : 0;
+
+                    return [
+                        'id' =>
+                            (int) $disposition->id,
+
+                        'name' =>
+                            $disposition->name,
+
+                        'type' =>
+                            $disposition->type,
+
+                        'total' =>
+                            $total,
+
+                        'percentage' =>
+                            $percentage,
+
+                        'is_active' =>
+                            (bool) (
+                                $disposition->is_active
+                                ?? true
+                            ),
+
+                        'requires_follow_up' =>
+                            (bool) (
+                                $disposition->requires_follow_up
+                                ?? false
+                            ),
+
+                        'requires_remarks' =>
+                            (bool) (
+                                $disposition->requires_remarks
+                                ?? false
+                            ),
+
+                        'auto_remarks' =>
+                            $disposition->auto_remarks
+                            ?? null,
+
+                        'next_followup' =>
+                            $disposition->next_followup
+                            ?? null,
+                    ];
+                })
+                ->values();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calls Without Disposition
+        |--------------------------------------------------------------------------
+        */
+
+        $withoutDispositionQuery =
+            clone $callsBaseQuery;
+
+        $applyDispositionPeriod(
+            $withoutDispositionQuery,
+            'created_at'
+        );
+
+        $withoutDisposition =
+            $withoutDispositionQuery
+                ->whereNull(
+                    'call_disposition_id'
+                )
+                ->count();
+
+        $withoutDispositionPercentage =
+            $dispositionTotalCalls > 0
+                ? round(
+                    (
+                        $withoutDisposition /
+                        $dispositionTotalCalls
+                    ) * 100,
+                    1
+                )
+                : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOLLOW UPS
+        |--------------------------------------------------------------------------
+        */
+
+        $followUpsDueQuery =
+            FollowUp::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'status',
+                    'pending'
+                );
+
+        if (!$hasFullAccess) {
+            $followUpsDueQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
         }
 
-        $totalDemoSent = $demoQuery->count();
-
         /*
-        |--------------------------------------------------------------------------
-        | Total Follow-ups
-        |--------------------------------------------------------------------------
-        */
-
-        $totalFollowUps = (clone $periodFollowUpQuery)
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Pending Follow-ups
-        |--------------------------------------------------------------------------
-        */
-
-        $pendingFollowUps = (clone $periodFollowUpQuery)
-            ->where('status', 'pending')
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Follow-ups Today
-        |--------------------------------------------------------------------------
-        */
-
-        $followUpsToday = (clone $followUpQuery)
-            ->whereBetween(
-                'scheduled_at',
-                [$todayStart, $todayEnd]
-            )
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Overdue Follow-ups
-        |--------------------------------------------------------------------------
-        */
-
-        $overdueQuery = (clone $followUpQuery)
-            ->where('status', 'pending')
-            ->whereNotNull('scheduled_at')
-            ->where('scheduled_at', '<', now());
-
-        /*
-         * Period selected hai to usi period ke followups me
-         * overdue calculate hoga.
+         * Web dashboard exact same logic.
          */
-        if ($from && $to) {
-            $overdueQuery->whereBetween(
-                'scheduled_at',
-                [$from, $to]
+
+        if ($period === 'today') {
+
+            $followUpsDueQuery
+                ->whereBetween(
+                    'scheduled_at',
+                    [
+                        now()->startOfDay(),
+                        now()->endOfDay(),
+                    ]
+                );
+
+        } elseif ($period === 'month') {
+
+            $followUpsDueQuery
+                ->whereBetween(
+                    'scheduled_at',
+                    [
+                        now()->startOfMonth(),
+                        now()->endOfMonth(),
+                    ]
+                );
+        }
+
+        $followUpsDue =
+            $followUpsDueQuery->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL FOLLOWUPS
+        |--------------------------------------------------------------------------
+        |
+        | App screenshot ke Total Follow-ups card ke liye.
+        |
+        */
+
+        $totalFollowUpsQuery =
+            FollowUp::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                );
+
+        if (!$hasFullAccess) {
+            $totalFollowUpsQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
             );
         }
 
-        $overdueFollowUps = $overdueQuery->count();
+        $totalFollowUps =
+            $totalFollowUpsQuery->count();
 
         /*
         |--------------------------------------------------------------------------
-        | Converted Total / Selected Period
+        | OVERDUE FOLLOW UPS
         |--------------------------------------------------------------------------
         */
 
-        $convertedQuery = (clone $leadQuery)
-            ->whereHas('status', function (Builder $query) {
-                $query->whereRaw(
-                    'LOWER(name) = ?',
-                    ['converted']
+        $overdueQuery =
+            FollowUp::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                )
+                ->where(
+                    'status',
+                    'pending'
+                )
+                ->where(
+                    'scheduled_at',
+                    '<',
+                    now()
                 );
-            });
 
-        if ($from && $to) {
-            $convertedQuery->whereBetween(
-                'leads.updated_at',
-                [$from, $to]
+        if (!$hasFullAccess) {
+            $overdueQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
             );
         }
 
-        $converted = $convertedQuery->count();
+        if ($period !== 'all') {
+            $applyPeriod(
+                $overdueQuery,
+                'scheduled_at'
+            );
+        }
+
+        $overdue =
+            $overdueQuery->count();
 
         /*
         |--------------------------------------------------------------------------
-        | Converted Today
+        | SALES
         |--------------------------------------------------------------------------
         */
 
-        $convertedToday = (clone $leadQuery)
-            ->whereHas('status', function (Builder $query) {
-                $query->whereRaw(
-                    'LOWER(name) = ?',
-                    ['converted']
+        $salesQuery =
+            Order::query()
+                ->where(
+                    'company_id',
+                    $companyId
                 );
-            })
-            ->whereBetween(
-                'leads.updated_at',
-                [$todayStart, $todayEnd]
-            )
-            ->count();
+
+        if (!$hasFullAccess) {
+            $salesQuery->whereIn(
+                'lead_id',
+                clone $visibleLeadIdsQuery
+            );
+        }
+
+        $applyPeriod(
+            $salesQuery,
+            'created_at'
+        );
+
+        $sales = (float) $salesQuery
+            ->sum(
+                'total_amount'
+            );
 
         /*
         |--------------------------------------------------------------------------
-        | Employee
+        | PAYMENT RECEIVED
         |--------------------------------------------------------------------------
         */
 
-        $selectedEmployee = null;
+        $receivedQuery =
+            Payment::query()
+                ->where(
+                    'company_id',
+                    $companyId
+                );
 
-        if ($selectedEmployeeId) {
+        if (!$hasFullAccess) {
 
-            $employee = User::query()
-                ->where('company_id', $companyId)
-                ->find($selectedEmployeeId);
+            $receivedQuery->whereHas(
+                'order',
+                function (Builder $query) use (
+                    $visibleLeadIdsQuery
+                ) {
 
-            if ($employee) {
-                $selectedEmployee = [
-                    'id' => $employee->id,
-                    'name' => $employee->name,
-                    'employee_code' => $employee->employee_code,
-                ];
-            }
+                    $query->whereIn(
+                        'lead_id',
+                        clone $visibleLeadIdsQuery
+                    );
+                }
+            );
+        }
+
+        $applyPeriod(
+            $receivedQuery,
+            'created_at'
+        );
+
+        $received = (float) $receivedQuery
+            ->sum(
+                'amount'
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | ACTIVE EMPLOYEES
+        |--------------------------------------------------------------------------
+        */
+
+        if ($hasFullAccess) {
+
+            $activeUsers =
+                User::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->count();
+
+        } elseif ($isTeamLeader) {
+
+            $activeUsers =
+                User::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->whereIn(
+                        'id',
+                        $visibleUserIds
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->count();
+
+        } else {
+
+            /*
+             * Employee dashboard
+             */
+            $activeUsers =
+                $user->is_active
+                    ? 1
+                    : 0;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Period Label
+        | RECENT LEADS
         |--------------------------------------------------------------------------
         */
 
-        $periodLabel = match ($period) {
-            'today'     => 'Today',
-            'yesterday' => 'Yesterday',
-            'week'      => 'This Week',
-            'month'     => 'This Month',
-            'all'       => 'All Time',
+        $recentLeads =
+            (clone $leadQuery)
+                ->with([
+                    'assignedUser:id,name,employee_code',
+                    'status:id,name,color',
+                    'source:id,name',
+                ])
+                ->latest('id')
+                ->limit(8)
+                ->get()
+                ->map(function ($lead) {
 
-            'custom' => $from && $to
-                ? $from->format('d M Y') . ' - ' . $to->format('d M Y')
-                : 'Custom Date',
+                    return [
+                        'id' =>
+                            (int) $lead->id,
 
-            default => 'Today',
-        };
+                        'name' =>
+                            $lead->name,
+
+                        'mobile' =>
+                            $lead->mobile,
+
+                        'company_name' =>
+                            $lead->company_name,
+
+                        'city' =>
+                            $lead->city,
+
+                        'temperature' =>
+                            $lead->temperature,
+
+                        'demo_send' =>
+                            (bool) $lead->demo_send,
+
+                        'status' => $lead->status
+                            ? [
+                                'id' =>
+                                    (int) $lead->status->id,
+
+                                'name' =>
+                                    $lead->status->name,
+
+                                'color' =>
+                                    $lead->status->color,
+                            ]
+                            : null,
+
+                        'source' => $lead->source
+                            ? [
+                                'id' =>
+                                    (int) $lead->source->id,
+
+                                'name' =>
+                                    $lead->source->name,
+                            ]
+                            : null,
+
+                        'assigned_user' =>
+                            $lead->assignedUser
+                                ? [
+                                    'id' =>
+                                        (int) $lead->assignedUser->id,
+
+                                    'name' =>
+                                        $lead->assignedUser->name,
+
+                                    'employee_code' =>
+                                        $lead->assignedUser
+                                            ->employee_code,
+                                ]
+                                : null,
+
+                        'created_at' =>
+                            optional(
+                                $lead->created_at
+                            )->toDateTimeString(),
+                    ];
+                })
+                ->values();
 
         /*
         |--------------------------------------------------------------------------
-        | Response
+        | App Cards
+        |--------------------------------------------------------------------------
+        |
+        | Flutter loop laga kar bhi directly cards show kar sakta hai.
+        |
+        */
+
+        $cards = [
+
+            [
+                'key' => 'total_leads',
+                'label' => 'Total Leads',
+                'sub_label' => 'All Time',
+                'value' => $totalLeads,
+            ],
+
+            [
+                'key' => 'new_leads',
+                'label' => 'New Leads',
+                'sub_label' => $periodLabel,
+                'value' => $newLeads,
+            ],
+
+            [
+                'key' => 'uncalled_leads',
+                'label' => 'Uncalled Leads',
+                'sub_label' => 'Current',
+                'value' => $uncalledLeads,
+            ],
+
+            [
+                'key' => 'total_calls',
+                'label' => 'Total Calls',
+                'sub_label' => $periodLabel,
+                'value' => $totalCalls,
+            ],
+
+            [
+                'key' => 'connected_calls',
+                'label' => 'Connected Calls',
+                'sub_label' => $periodLabel,
+                'value' => $connectedCalls,
+            ],
+
+            [
+                'key' => 'unique_connected',
+                'label' => 'Unique Connected',
+                'sub_label' => $periodLabel,
+                'value' => $uniqueConnected,
+            ],
+
+            [
+                'key' => 'demo_sent',
+                'label' => 'Demo Sent',
+                'sub_label' => $periodLabel,
+                'value' => $demoSent,
+            ],
+
+            [
+                'key' => 'total_demo_sent',
+                'label' => 'Total Demo Sent',
+                'sub_label' => 'All Time',
+                'value' => $totalDemoSent,
+            ],
+
+            [
+                'key' => 'total_followups',
+                'label' => 'Total Follow-ups',
+                'sub_label' => 'All Time',
+                'value' => $totalFollowUps,
+            ],
+
+            [
+                'key' => 'pending_followups',
+                'label' => 'Pending Follow-ups',
+                'sub_label' => $periodLabel,
+                'value' => $followUpsDue,
+            ],
+
+            [
+                'key' => 'overdue_followups',
+                'label' => 'Overdue Follow-ups',
+                'sub_label' => $periodLabel,
+                'value' => $overdue,
+            ],
+
+            [
+                'key' => 'hot_leads',
+                'label' => 'Hot Leads',
+                'sub_label' => 'Current',
+                'value' => $hotLeads,
+            ],
+
+            [
+                'key' => 'active_employees',
+                'label' => 'Active Employees',
+                'sub_label' => 'Current',
+                'value' => $activeUsers,
+            ],
+
+            [
+                'key' => 'sales',
+                'label' => 'Sales Value',
+                'sub_label' => $periodLabel,
+                'value' => $sales,
+            ],
+
+            [
+                'key' => 'received',
+                'label' => 'Payment Received',
+                'sub_label' => $periodLabel,
+                'value' => $received,
+            ],
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | FINAL JSON RESPONSE
         |--------------------------------------------------------------------------
         */
 
         return response()->json([
+
             'success' => true,
 
-            'message' => 'Dashboard overview fetched successfully.',
+            'message' =>
+                'Dashboard fetched successfully.',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Access information
+            |--------------------------------------------------------------------------
+            */
+
+            'access' => [
+
+                'mode' =>
+                    $dashboardMode,
+
+                'has_full_access' =>
+                    $hasFullAccess,
+
+                'is_team_leader' =>
+                    $isTeamLeader,
+
+                'visible_user_ids' =>
+                    $visibleUserIds,
+
+                'company_id' =>
+                    $companyId,
+
+                'user_id' =>
+                    $userId,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Period
+            |--------------------------------------------------------------------------
+            */
 
             'filter' => [
-                'period' => $period,
-                'requested_period' => $requestedPeriod,
-                'label' => $periodLabel,
 
-                'from_date' => $from
-                    ? $from->format('Y-m-d')
-                    : null,
+                'period' =>
+                    $period,
 
-                'to_date' => $to
-                    ? $to->format('Y-m-d')
-                    : null,
-            ],
+                'period_label' =>
+                    $periodLabel,
 
-            'scope' => [
-                'type' => $selectedEmployeeId
-                    ? 'employee'
-                    : 'company',
+                'disposition_period' =>
+                    $dispositionPeriod,
 
-                'can_view_all' => $canViewAll,
-
-                'employee' => $selectedEmployee,
+                'disposition_period_label' =>
+                    $dispositionPeriodLabel,
             ],
 
             /*
             |--------------------------------------------------------------------------
-            | Screenshot Cards
+            | App direct cards
             |--------------------------------------------------------------------------
             */
 
-            'dashboard' => [
+            'cards' =>
+                $cards,
 
-                'total_leads' => [
-                    'label' => 'Total Leads',
-                    'value' => $totalLeads,
-                ],
+            /*
+            |--------------------------------------------------------------------------
+            | Raw Stats
+            |--------------------------------------------------------------------------
+            |
+            | Flutter individual keys se direct value show kar sakta hai.
+            |
+            */
 
-                'new_today' => [
-                    'label' => 'New Today',
-                    'value' => $newToday,
-                ],
+            'stats' => [
 
-                'uncalled_leads' => [
-                    'label' => 'Uncalled Leads',
-                    'value' => $uncalledLeads,
-                ],
+                /*
+                 * Leads
+                 */
 
-                'total_calls' => [
-                    'label' => 'Total Calls',
-                    'value' => $totalCalls,
-                ],
+                'total_leads' =>
+                    $totalLeads,
 
-                'calls_today' => [
-                    'label' => 'Calls Today',
-                    'value' => $callsToday,
-                ],
+                'new_leads' =>
+                    $newLeads,
 
-                'connected_calls' => [
-                    'label' => 'Connected Calls',
-                    'value' => $totalConnectedCalls,
-                ],
+                'uncalled_leads' =>
+                    $uncalledLeads,
 
-                'connected_today' => [
-                    'label' => 'Connected Today',
-                    'value' => $connectedCallsToday,
-                ],
+                'hot_leads' =>
+                    $hotLeads,
 
-                'unique_connected' => [
-                    'label' => 'Unique Connected',
-                    'value' => $uniqueConnectedNumbers,
-                ],
+                /*
+                 * Calls
+                 */
 
-                'today_demo_send' => [
-                    'label' => 'Today Demo Send',
-                    'value' => $demoSentToday,
-                ],
+                'total_calls' =>
+                    $totalCalls,
 
-                'total_demo_send' => [
-                    'label' => 'Total Demo Send',
-                    'value' => $totalDemoSent,
-                ],
+                'connected_calls' =>
+                    $connectedCalls,
 
-                'total_followups' => [
-                    'label' => 'Total Follow-ups',
-                    'value' => $totalFollowUps,
-                ],
+                'unique_connected' =>
+                    $uniqueConnected,
 
-                'pending_followups' => [
-                    'label' => 'Pending Follow-ups',
-                    'value' => $pendingFollowUps,
-                ],
+                /*
+                 * Demo
+                 */
 
-                'overdue_followups' => [
-                    'label' => 'Overdue Follow-ups',
-                    'value' => $overdueFollowUps,
-                ],
+                'demo_sent' =>
+                    $demoSent,
 
-                'converted_total' => [
-                    'label' => 'Converted (Total)',
-                    'value' => $converted,
-                ],
+                'total_demo_sent' =>
+                    $totalDemoSent,
+
+                /*
+                 * Followups
+                 */
+
+                'total_followups' =>
+                    $totalFollowUps,
+
+                'pending_followups' =>
+                    $followUpsDue,
+
+                'overdue_followups' =>
+                    $overdue,
+
+                /*
+                 * Employees
+                 */
+
+                'active_employees' =>
+                    $activeUsers,
+
+                /*
+                 * Sales
+                 */
+
+                'sales' =>
+                    $sales,
+
+                'payment_received' =>
+                    $received,
             ],
 
             /*
             |--------------------------------------------------------------------------
-            | Existing Flutter Compatible Metrics
+            | Disposition Statistics
             |--------------------------------------------------------------------------
             */
 
-            'metrics' => [
-                'total_leads' => $totalLeads,
-                'new_today' => $newToday,
-                'uncalled_leads' => $uncalledLeads,
+            'dispositions' => [
 
-                'total_calls' => $totalCalls,
-                'calls_today' => $callsToday,
+                'period' =>
+                    $dispositionPeriod,
 
-                'total_connected_calls' => $totalConnectedCalls,
-                'connected_calls_today' => $connectedCallsToday,
-                'unique_connected_numbers' => $uniqueConnectedNumbers,
+                'period_label' =>
+                    $dispositionPeriodLabel,
 
-                'demo_sent_today' => $demoSentToday,
-                'total_demo_sent' => $totalDemoSent,
+                'total_calls' =>
+                    $dispositionTotalCalls,
 
-                'total_followups' => $totalFollowUps,
-                'followups_today' => $followUpsToday,
-                'pending_followups' => $pendingFollowUps,
-                'overdue_followups' => $overdueFollowUps,
+                'without_disposition' => [
 
-                'converted' => $converted,
-                'converted_today' => $convertedToday,
+                    'total' =>
+                        $withoutDisposition,
+
+                    'percentage' =>
+                        $withoutDispositionPercentage,
+                ],
+
+                'items' =>
+                    $dispositionStats,
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Recent Leads
+            |--------------------------------------------------------------------------
+            */
+
+            'recent_leads' =>
+                $recentLeads,
         ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Resolve Period
-    |--------------------------------------------------------------------------
-    */
-
-    private function resolvePeriod(
-        string $period,
-        ?string $fromDate = null,
-        ?string $toDate = null
-    ): array {
-
-        return match ($period) {
-
-            'today' => [
-                Carbon::today()->startOfDay(),
-                Carbon::today()->endOfDay(),
-            ],
-
-            'yesterday' => [
-                Carbon::yesterday()->startOfDay(),
-                Carbon::yesterday()->endOfDay(),
-            ],
-
-            'week' => [
-                Carbon::now()->startOfWeek()->startOfDay(),
-                Carbon::now()->endOfDay(),
-            ],
-
-            'month' => [
-                Carbon::now()->startOfMonth()->startOfDay(),
-                Carbon::now()->endOfDay(),
-            ],
-
-            'custom' => [
-                $fromDate
-                    ? Carbon::parse($fromDate)->startOfDay()
-                    : null,
-
-                $toDate
-                    ? Carbon::parse($toDate)->endOfDay()
-                    : null,
-            ],
-
-            'all' => [
-                null,
-                null,
-            ],
-
-            default => [
-                Carbon::today()->startOfDay(),
-                Carbon::today()->endOfDay(),
-            ],
-        };
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Call Date Range
-    |--------------------------------------------------------------------------
-    |
-    | New call log:
-    | started_at use karega.
-    |
-    | Old record:
-    | started_at NULL hua to created_at use karega.
-    |
-    */
-
-    private function applyCallDateRange(
-        Builder $query,
-        Carbon $from,
-        Carbon $to
-    ): Builder {
-
-        return $query->where(
-            function (Builder $q) use ($from, $to) {
-
-                $q->whereBetween(
-                    'started_at',
-                    [$from, $to]
-                )
-                ->orWhere(
-                    function (Builder $fallback) use ($from, $to) {
-
-                        $fallback
-                            ->whereNull('started_at')
-                            ->whereBetween(
-                                'created_at',
-                                [$from, $to]
-                            );
-                    }
-                );
-            }
-        );
     }
 }
