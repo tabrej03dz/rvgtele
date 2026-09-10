@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DataController extends Controller
 {
@@ -1191,398 +1192,250 @@ class DataController extends Controller
     public function importStore(Request $request)
     {
         $validated = $request->validate([
-            'company_id' => [
-                'required',
-                'integer',
-                'exists:companies,id',
-            ],
-
-            'category_id' => [
-                'required',
-                'integer',
-                'exists:categories,id',
-            ],
-
-            'file' => [
-                'required',
-                'file',
-                'mimes:csv,txt',
-                'max:10240',
-            ],
+            'company_id' => ['required', 'integer', 'exists:companies,id'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:10240'],
         ]);
 
         $file = $request->file('file');
 
         if (!$file || !$file->isValid()) {
-            return back()
-                ->withInput()
-                ->with('error', 'Invalid import file.');
+            return back()->withInput()->with('error', 'Invalid import file.');
         }
-
-        $handle = fopen($file->getRealPath(), 'r');
-
-        if (!$handle) {
-            return back()
-                ->withInput()
-                ->with('error', 'Unable to open CSV file.');
-        }
-
-        $header = fgetcsv($handle);
-
-        if (!$header) {
-            fclose($handle);
-
-            return back()
-                ->withInput()
-                ->with('error', 'CSV file is empty.');
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Normalize CSV Header
-        |--------------------------------------------------------------------------
-        */
-
-        $header = array_map(function ($value) {
-
-            $value = (string) $value;
-
-            $value = preg_replace(
-                '/^\xEF\xBB\xBF/',
-                '',
-                $value
-            );
-
-            $value = str_replace(
-                "\xEF\xBB\xBF",
-                '',
-                $value
-            );
-
-            $value = trim($value);
-
-            $value = strtolower($value);
-
-            $value = str_replace(
-                [
-                    ' ',
-                    '-',
-                    '.',
-                    '/',
-                ],
-                '_',
-                $value
-            );
-
-            return $value;
-
-        }, $header);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Allowed CSV Fields
-        |--------------------------------------------------------------------------
-        */
-
-        $allowedFields = [
-
-            'name',
-
-            'company_name',
-
-            'mobile',
-
-            'alternate_mobile',
-
-            'whatsapp_number',
-
-            'email',
-
-            'category',
-
-            'lead_source',
-
-            'campaign',
-
-            'address',
-
-            'city',
-
-            'district',
-
-            'state',
-
-            'pincode',
-
-            'industry',
-
-            'required_product',
-
-            'preferred_language',
-
-            'estimated_budget',
-
-            'remarks',
-
-        ];
-
-
-        $inserted = 0;
-
-        $skipped = 0;
-
 
         DB::beginTransaction();
 
-
         try {
-
-            while (($row = fgetcsv($handle)) !== false) {
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Empty Row Check
-                |--------------------------------------------------------------------------
-                */
-
-                $hasValue = collect($row)
-                    ->contains(function ($value) {
-
-                        return trim(
-                            (string) $value
-                        ) !== '';
-
-                    });
-
-
-                if (!$hasValue) {
-
-                    continue;
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Column Count Fix
-                |--------------------------------------------------------------------------
-                */
-
-                if (count($row) < count($header)) {
-
-                    $row = array_pad(
-                        $row,
-                        count($header),
-                        null
-                    );
-
-                }
-
-
-                if (count($row) > count($header)) {
-
-                    $row = array_slice(
-                        $row,
-                        0,
-                        count($header)
-                    );
-
-                }
-
-
-                $csvData = array_combine(
-                    $header,
-                    $row
-                );
-
-
-                if (!$csvData) {
-
-                    $skipped++;
-
-                    continue;
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Prepare Data
-                |--------------------------------------------------------------------------
-                */
-
-                $data = [];
-
-
-                foreach ($allowedFields as $field) {
-
-
-                    if (!array_key_exists(
-                        $field,
-                        $csvData
-                    )) {
-
-                        continue;
-
-                    }
-
-
-                    $value = trim(
-                        (string) (
-                            $csvData[$field]
-                            ?? ''
-                        )
-                    );
-
-
-                    $data[$field] = $value !== ''
-                        ? $value
-                        : null;
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Selected Company
-                |--------------------------------------------------------------------------
-                */
-
-                $data['company_id'] =
-                    $validated['company_id'];
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Selected Category
-                |--------------------------------------------------------------------------
-                */
-
-                $data['category_id'] =
-                    $validated['category_id'];
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Clean Budget
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    isset(
-                        $data['estimated_budget']
-                    )
-                    &&
-                    $data['estimated_budget']
-                    !== null
-                ) {
-
-                    $budget = str_replace(
-                        [
-                            ',',
-                            '₹',
-                            ' ',
-                        ],
-                        '',
-                        $data['estimated_budget']
-                    );
-
-
-                    $data['estimated_budget'] =
-                        is_numeric($budget)
-                            ? $budget
-                            : null;
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Raw CSV
-                |--------------------------------------------------------------------------
-                */
-
-                $data['raw_data'] = $csvData;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Skip Invalid Row
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    empty($data['name'])
-                    &&
-                    empty($data['mobile'])
-                    &&
-                    empty($data['company_name'])
-                    &&
-                    empty($data['email'])
-                ) {
-
-                    $skipped++;
-
-                    continue;
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Create Data
-                |--------------------------------------------------------------------------
-                */
-
-                Data::create($data);
-
-
-                $inserted++;
-
+            $sheets = Excel::toArray([], $file);
+            $rows = $sheets[0] ?? [];
+
+            if (empty($rows)) {
+                DB::rollBack();
+                return back()->withInput()->with('error', 'Import file is empty.');
             }
 
+            $originalHeader = array_shift($rows);
 
-            fclose($handle);
+            if (!is_array($originalHeader) || empty($originalHeader)) {
+                DB::rollBack();
+                return back()->withInput()->with('error', 'Unable to read Excel headings.');
+            }
 
+            $header = array_map(
+                fn ($heading) => $this->normalizeDataImportHeading($heading),
+                $originalHeader
+            );
+
+            $inserted = 0;
+            $skipped = 0;
+
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $hasValue = collect($row)->contains(
+                    fn ($value) => trim((string) $value) !== ''
+                );
+
+                if (!$hasValue) {
+                    continue;
+                }
+
+                if (count($row) < count($header)) {
+                    $row = array_pad($row, count($header), null);
+                }
+
+                if (count($row) > count($header)) {
+                    $row = array_slice($row, 0, count($header));
+                }
+
+                $excelData = [];
+
+                foreach ($header as $index => $heading) {
+                    if ($heading === '') {
+                        continue;
+                    }
+
+                    $excelData[$heading] = $row[$index] ?? null;
+                }
+
+                $data = [
+                    'name' => $this->dataImportField($excelData, 'name'),
+                    'company_name' => $this->dataImportField($excelData, 'company_name'),
+                    'mobile' => $this->cleanDataImportPhone($this->dataImportField($excelData, 'mobile')),
+                    'alternate_mobile' => $this->cleanDataImportPhone($this->dataImportField($excelData, 'alternate_mobile')),
+                    'whatsapp_number' => $this->cleanDataImportPhone($this->dataImportField($excelData, 'whatsapp_number')),
+                    'email' => $this->dataImportField($excelData, 'email'),
+                    'category' => $this->dataImportField($excelData, 'category'),
+                    'lead_source' => $this->dataImportField($excelData, 'lead_source'),
+                    'campaign' => $this->dataImportField($excelData, 'campaign'),
+                    'address' => $this->dataImportField($excelData, 'address'),
+                    'city' => $this->dataImportField($excelData, 'city'),
+                    'district' => $this->dataImportField($excelData, 'district'),
+                    'state' => $this->dataImportField($excelData, 'state'),
+                    'pincode' => $this->dataImportField($excelData, 'pincode'),
+                    'industry' => $this->dataImportField($excelData, 'industry'),
+                    'required_product' => $this->dataImportField($excelData, 'required_product'),
+                    'preferred_language' => $this->dataImportField($excelData, 'preferred_language'),
+                    'estimated_budget' => $this->cleanDataImportNumber($this->dataImportField($excelData, 'estimated_budget')),
+                    'remarks' => $this->dataImportField($excelData, 'remarks'),
+                    'company_id' => (int) $validated['company_id'],
+                    'category_id' => (int) $validated['category_id'],
+                    'raw_data' => $excelData,
+                ];
+
+                if (
+                    empty($data['name']) &&
+                    empty($data['mobile']) &&
+                    empty($data['company_name']) &&
+                    empty($data['email'])
+                ) {
+                    $skipped++;
+                    continue;
+                }
+
+                Data::create($data);
+                $inserted++;
+            }
 
             DB::commit();
 
-
             return redirect()
                 ->route('data.index')
-                ->with(
-                    'success',
-                    "{$inserted} data records imported successfully. {$skipped} rows skipped."
-                );
-
+                ->with('success', "{$inserted} data records imported successfully. {$skipped} rows skipped.");
 
         } catch (\Throwable $e) {
-
-
-            if (is_resource($handle)) {
-
-                fclose($handle);
-
-            }
-
-
             DB::rollBack();
-
-
             report($e);
-
 
             return back()
                 ->withInput()
-                ->with(
-                    'error',
-                    'Import failed: '
-                    . $e->getMessage()
-                );
-
+                ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
+
+    private const DATA_IMPORT_HEADING_ALIASES = [
+        'name' => [
+            'name', 'lead name', 'customer name', 'client name', 'customer', 'client',
+            'person name', 'contact person', 'contact person name', 'full name',
+        ],
+        'company_name' => [
+            'company', 'company name', 'business', 'business name', 'firm', 'firm name',
+            'shop', 'shop name', 'organisation', 'organization', 'organisation name',
+            'organization name', 'store name', 'establishment name',
+        ],
+        'mobile' => [
+            'mobile', 'mobile no', 'mobile number', 'phone', 'phone no', 'phone number',
+            'contact', 'contact no', 'contact number', 'primary mobile', 'primary phone',
+            'primary contact', 'telephone', 'tel',
+        ],
+        'alternate_mobile' => [
+            'alternate mobile', 'alternate mobile no', 'alternate mobile number',
+            'alternate phone', 'alternate phone no', 'alternate phone number',
+            'alt mobile', 'alt mobile no', 'alt phone', 'secondary mobile',
+            'secondary phone', 'other mobile', 'other phone', 'mobile 2', 'phone 2',
+        ],
+        'whatsapp_number' => [
+            'whatsapp', 'whatsapp no', 'whatsapp number', 'whats app',
+            'whats app no', 'whats app number', 'wa number', 'wa no',
+        ],
+        'email' => ['email', 'email id', 'email address', 'mail', 'mail id', 'e mail'],
+        'category' => ['category', 'category name', 'lead category', 'business category', 'business type', 'type'],
+        'lead_source' => ['lead source', 'source', 'source name', 'lead source name'],
+        'campaign' => ['campaign', 'campaign name', 'lead campaign'],
+        'address' => ['address', 'full address', 'business address', 'office address', 'shop address', 'location address'],
+        'city' => ['city', 'city name', 'town', 'location', 'place'],
+        'district' => ['district', 'district name', 'dist'],
+        'state' => ['state', 'state name', 'province'],
+        'pincode' => ['pincode', 'pin code', 'postal code', 'zip', 'zip code', 'zipcode'],
+        'industry' => ['industry', 'industry name', 'business industry', 'sector'],
+        'required_product' => ['required product', 'product', 'product required', 'interested product', 'interest', 'requirement'],
+        'preferred_language' => ['preferred language', 'language', 'customer language', 'lead language'],
+        'estimated_budget' => ['estimated budget', 'budget', 'lead budget', 'customer budget'],
+        'remarks' => ['remarks', 'remark', 'notes', 'note', 'comments', 'comment', 'feedback', 'description'],
+    ];
+
+    private function dataImportField(array $row, string $field): ?string
+    {
+        $aliases = self::DATA_IMPORT_HEADING_ALIASES[$field] ?? [$field];
+
+        foreach ($aliases as $alias) {
+            $key = $this->normalizeDataImportHeading($alias);
+
+            if (!array_key_exists($key, $row)) {
+                continue;
+            }
+
+            $value = trim((string) ($row[$key] ?? ''));
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($aliases as $alias) {
+            $aliasKey = $this->normalizeDataImportHeading($alias);
+
+            if (strlen($aliasKey) < 5) {
+                continue;
+            }
+
+            foreach ($row as $heading => $value) {
+                $headingKey = $this->normalizeDataImportHeading($heading);
+
+                if (
+                    str_contains($headingKey, $aliasKey) ||
+                    str_contains($aliasKey, $headingKey)
+                ) {
+                    $value = trim((string) ($value ?? ''));
+
+                    if ($value !== '') {
+                        return $value;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeDataImportHeading(mixed $heading): string
+    {
+        $heading = (string) ($heading ?? '');
+        $heading = preg_replace('/^\xEF\xBB\xBF/', '', $heading);
+        $heading = mb_strtolower(trim($heading));
+
+        return preg_replace('/[^a-z0-9]+/u', '', $heading) ?? '';
+    }
+
+    private function cleanDataImportPhone(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if (is_numeric($value) && str_contains(strtolower($value), 'e')) {
+            $value = sprintf('%.0f', (float) $value);
+        }
+
+        $value = preg_replace('/[^0-9+]/', '', $value);
+
+        return $value ?: null;
+    }
+
+    private function cleanDataImportNumber(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $value = str_replace([',', '₹', 'Rs.', 'Rs', ' '], '', (string) $value);
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
 }

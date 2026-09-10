@@ -590,7 +590,7 @@
                         name="per_page"
                     >
 
-                        @foreach([25, 50, 100, 250, 500, 1000] as $size)
+                        @foreach([25, 50, 100, 250, 500, 1000, 2000] as $size)
 
                             <option
                                 value="{{ $size }}"

@@ -153,7 +153,11 @@ class RecycleBinController extends Controller
                     25,
                     50,
                     100,
-                    200,
+                    250,
+                    500,
+                    1000,
+                    2000,
+
                 ],
                 true
             )
