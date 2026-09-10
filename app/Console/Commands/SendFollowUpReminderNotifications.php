@@ -298,6 +298,7 @@ class SendFollowUpReminderNotifications extends Command
  * Follow-up किसी ने भी बनाया हो, notification हमेशा उस user को जाएगी
  * जिसके नाम lead assigned है।
  */
+
 private function sendReminder(
     FollowUp $followUp,
     FirebasePushService $firebase,
