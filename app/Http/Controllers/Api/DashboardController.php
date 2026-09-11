@@ -176,9 +176,20 @@ class DashboardController extends Controller
         |
         */
 
+        /*
+         * IMPORTANT:
+         * Ye role list Lead API ke full-company scope ke exactly same honi
+         * chahiye. Manager ko /api/leads me poori company ki leads milti hain,
+         * isliye dashboard me bhi manager par assigned_to filter nahi lagega.
+         *
+         * Project me role name underscore ya space dono format me ho sakta hai,
+         * isliye dono variants rakhe gaye hain.
+         */
         $hasFullAccess = $user->hasAnyRole([
             'super_admin',
+            'super admin',
             'admin',
+            'manager',
         ]);
 
         /*
@@ -232,6 +243,20 @@ class DashboardController extends Controller
             ->unique()
             ->values()
             ->all();
+
+        /*
+         * Full-access users ke liye response/debug information me company ke
+         * saare users dikhaye jayenge. Lead scope par iska koi extra filter nahi
+         * lagega, isliye assigned aur unassigned dono leads count hongi.
+         */
+        if ($hasFullAccess) {
+            $visibleUserIds = User::query()
+                ->where('company_id', $companyId)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -300,8 +325,12 @@ class DashboardController extends Controller
         |
         */
 
-        $totalLeads = (clone $leadQuery)
-            ->count();
+        /*
+         * Total Leads ALWAYS all-time hai. Yahan intentionally $applyPeriod()
+         * call nahi kiya gaya. Full-access users ke liye assigned_to IS NULL
+         * wali leads bhi automatically include hongi.
+         */
+        $totalLeads = (clone $leadQuery)->count();
 
         /*
         |--------------------------------------------------------------------------
