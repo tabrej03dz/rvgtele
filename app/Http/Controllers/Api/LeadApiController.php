@@ -469,6 +469,8 @@ public function callOnMobile(
 
 public function index(Request $request): JsonResponse
 {
+    $companyId = $this->companyId($request);
+
     /*
     |--------------------------------------------------------------------------
     | Validation
@@ -476,6 +478,43 @@ public function index(Request $request): JsonResponse
     */
 
     $validated = $request->validate([
+        /*
+        |--------------------------------------------------------------------------
+        | Exact Lead / Call Disposition Filters
+        |--------------------------------------------------------------------------
+        |
+        | lead_id=4607
+        | call_disposition_id=3
+        |
+        | Dono saath bhejne par wahi exact accessible lead return hogi jiske
+        | kisi call log me selected disposition save hai.
+        |
+        */
+
+        'lead_id' => [
+            'nullable',
+            'integer',
+            'min:1',
+            Rule::exists('leads', 'id')->where(
+                fn ($query) => $query
+                    ->where('company_id', $companyId)
+                    ->whereNull('deleted_at')
+            ),
+        ],
+
+        'call_disposition_id' => [
+            'nullable',
+            'integer',
+            'min:1',
+            Rule::exists('call_dispositions', 'id')->where(
+                fn ($query) => $query->where(
+                    fn ($scope) => $scope
+                        ->whereNull('company_id')
+                        ->orWhere('company_id', $companyId)
+                )
+            ),
+        ],
+
         'search' => [
             'nullable',
             'string',
@@ -686,6 +725,9 @@ public function index(Request $request): JsonResponse
     $baseRequest = clone $request;
 
     $removeKeys = [
+        'lead_id',
+        'call_disposition_id',
+
         'call_state',
         'call_disposition',
 
@@ -732,6 +774,58 @@ public function index(Request $request): JsonResponse
     $baseQuery = $this->filteredLeadQuery(
         $baseRequest
     );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Exact Lead ID Filter
+    |--------------------------------------------------------------------------
+    |
+    | Ye common base query par lagega, isliye new/dialed/connected tino
+    | sections aur unke counts sirf selected lead ke according banenge.
+    |
+    */
+
+    if (!empty($validated['lead_id'])) {
+        $baseQuery->whereKey(
+            (int) $validated['lead_id']
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Exact Call Disposition ID Filter
+    |--------------------------------------------------------------------------
+    |
+    | Selected disposition lead ke kisi bhi call log me hona chahiye.
+    | whereHas ki wajah se ek lead ke multiple matching call logs hone par bhi
+    | lead duplicate nahi hogi.
+    |
+    */
+
+    if (!empty($validated['call_disposition_id'])) {
+        $callDispositionId =
+            (int) $validated['call_disposition_id'];
+
+        $baseQuery->whereHas(
+            'calls',
+            function (Builder $callQuery) use (
+                $callDispositionId,
+                $companyId
+            ) {
+                $callQuery
+                    ->where(
+                        'call_logs.company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'call_logs.call_disposition_id',
+                        $callDispositionId
+                    );
+            }
+        );
+    }
 
 
     /*
@@ -2376,7 +2470,7 @@ public function communicationHistory(
 
 
 
-    
+
 }
 
 
