@@ -326,11 +326,60 @@ class DashboardController extends Controller
         */
 
         /*
-         * Total Leads ALWAYS all-time hai. Yahan intentionally $applyPeriod()
-         * call nahi kiya gaya. Full-access users ke liye assigned_to IS NULL
-         * wali leads bhi automatically include hongi.
+         * IMPORTANT:
+         * /api/leads API ka counts.total unique leads count nahi hai.
+         * Us API me total = new + dialed + connected hai.
+         * Connected leads dialed bucket me bhi ho sakti hain, phir bhi counts.total
+         * me dono buckets add hote hain. Dashboard card ko /api/leads ke saath
+         * exactly match karane ke liye yahan bhi wahi bucket formula use hoga.
          */
-        $totalLeads = (clone $leadQuery)->count();
+
+        $newBucketCount = (clone $leadQuery)
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('call_logs')
+                    ->whereColumn('call_logs.lead_id', 'leads.id');
+            })
+            ->count();
+
+        $dialedBucketCount = (clone $leadQuery)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('call_logs')
+                    ->whereColumn('call_logs.lead_id', 'leads.id');
+            })
+            ->count();
+
+        $connectedBucketCount = (clone $leadQuery)
+            ->whereExists(function ($query) use ($companyId) {
+                $query->selectRaw('1')
+                    ->from('call_logs')
+                    ->join(
+                        'call_dispositions',
+                        'call_dispositions.id',
+                        '=',
+                        'call_logs.call_disposition_id'
+                    )
+                    ->whereColumn('call_logs.lead_id', 'leads.id')
+                    ->where(function ($builder) use ($companyId) {
+                        $builder
+                            ->whereNull('call_dispositions.company_id')
+                            ->orWhere(
+                                'call_dispositions.company_id',
+                                $companyId
+                            );
+                    })
+                    ->whereIn('call_dispositions.type', [
+                        'connected',
+                        'demo',
+                    ]);
+            })
+            ->count();
+
+        $totalLeads =
+            $newBucketCount
+            + $dialedBucketCount
+            + $connectedBucketCount;
 
         /*
         |--------------------------------------------------------------------------
@@ -385,44 +434,6 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | TOTAL DEMO SENT
-        |--------------------------------------------------------------------------
-        |
-        | All-time demo sent.
-        |
-        */
-
-        $totalDemoSent = (clone $leadQuery)
-            ->where(
-                'demo_send',
-                true
-            )
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DEMO SENT - Selected Period
-        |--------------------------------------------------------------------------
-        */
-
-        $demoPeriodQuery = (clone $leadQuery)
-            ->where(
-                'demo_send',
-                true
-            )
-            ->whereNotNull(
-                'demo_sent_at'
-            );
-
-        $applyPeriod(
-            $demoPeriodQuery,
-            'demo_sent_at'
-        );
-
-        $demoSent = $demoPeriodQuery->count();
-
-        /*
-        |--------------------------------------------------------------------------
         | Base Call Query
         |--------------------------------------------------------------------------
         */
@@ -447,6 +458,37 @@ class DashboardController extends Controller
                 clone $visibleLeadIdsQuery
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DEMO SENT COUNTS
+        |--------------------------------------------------------------------------
+        |
+        | Demo leads.demo_send se nahi aata. CRM me Demo ek call disposition hai
+        | jiska type = demo hai. Isliye demo count call_logs ke disposition se
+        | calculate hoga aur calls ke same user/lead access scope ko follow karega.
+        |
+        */
+
+        $demoDispositionIds = CallDisposition::query()
+            ->where(function (Builder $builder) use ($companyId) {
+                $builder
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('type', 'demo')
+            ->pluck('id');
+
+        $totalDemoSent = (clone $callsBaseQuery)
+            ->whereIn('call_disposition_id', $demoDispositionIds)
+            ->count();
+
+        $demoPeriodQuery = (clone $callsBaseQuery)
+            ->whereIn('call_disposition_id', $demoDispositionIds);
+
+        $applyPeriod($demoPeriodQuery, 'created_at');
+
+        $demoSent = $demoPeriodQuery->count();
 
         /*
         |--------------------------------------------------------------------------
@@ -1277,6 +1319,24 @@ class DashboardController extends Controller
 
                 'total_leads' =>
                     $totalLeads,
+
+                /*
+                 * /api/leads counts verification
+                 */
+
+                'lead_buckets' => [
+                    'new' =>
+                        $newBucketCount,
+
+                    'dialed' =>
+                        $dialedBucketCount,
+
+                    'connected' =>
+                        $connectedBucketCount,
+
+                    'total' =>
+                        $totalLeads,
+                ],
 
                 'new_leads' =>
                     $newLeads,
