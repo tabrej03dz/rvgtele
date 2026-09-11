@@ -465,6 +465,26 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Accessible Connected Disposition IDs
+        |--------------------------------------------------------------------------
+        |
+        | CallDispositionApiController ki tarah global + current company dono.
+        | Relation par depend karne ke bajay call_logs.call_disposition_id ko
+        | master disposition IDs se directly match kiya jayega.
+        |
+        */
+
+        $connectedDispositionIds = CallDisposition::query()
+            ->where(function (Builder $builder) use ($companyId) {
+                $builder
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('type', 'connected')
+            ->pluck('id');
+
+        /*
+        |--------------------------------------------------------------------------
         | CONNECTED CALLS - Selected Period
         |--------------------------------------------------------------------------
         |
@@ -485,15 +505,9 @@ class DashboardController extends Controller
             'created_at'
         );
 
-        $connectedCallsQuery->whereHas(
-            'disposition',
-            function (Builder $query) {
-
-                $query->where(
-                    'type',
-                    'connected'
-                );
-            }
+        $connectedCallsQuery->whereIn(
+            'call_disposition_id',
+            $connectedDispositionIds
         );
 
         $connectedCalls = $connectedCallsQuery
@@ -516,15 +530,9 @@ class DashboardController extends Controller
             'created_at'
         );
 
-        $uniqueConnectedQuery->whereHas(
-            'disposition',
-            function (Builder $query) {
-
-                $query->where(
-                    'type',
-                    'connected'
-                );
-            }
+        $uniqueConnectedQuery->whereIn(
+            'call_disposition_id',
+            $connectedDispositionIds
         );
 
         $uniqueConnected = $uniqueConnectedQuery
@@ -601,10 +609,11 @@ class DashboardController extends Controller
 
         $allDispositions =
             CallDisposition::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
+                ->where(function (Builder $builder) use ($companyId) {
+                    $builder
+                        ->whereNull('company_id')
+                        ->orWhere('company_id', $companyId);
+                })
                 ->orderBy('id')
                 ->get();
 
@@ -642,6 +651,14 @@ class DashboardController extends Controller
                         'id' =>
                             (int) $disposition->id,
 
+                        'company_id' =>
+                            $disposition->company_id !== null
+                                ? (int) $disposition->company_id
+                                : null,
+
+                        'is_global' =>
+                            $disposition->company_id === null,
+
                         'name' =>
                             $disposition->name,
 
@@ -677,8 +694,26 @@ class DashboardController extends Controller
                             ?? null,
 
                         'next_followup' =>
-                            $disposition->next_followup
-                            ?? null,
+                            $disposition->next_followup !== null
+                                ? (int) $disposition->next_followup
+                                : null,
+
+                        'next_followup_minutes' =>
+                            $disposition->next_followup !== null
+                                ? (int) $disposition->next_followup
+                                : null,
+
+                        'next_followup_unit' =>
+                            $disposition->next_followup !== null
+                                ? 'minutes'
+                                : null,
+
+                        'suggested_follow_up_at' =>
+                            $disposition->next_followup !== null
+                                ? now()->copy()
+                                    ->addMinutes((int) $disposition->next_followup)
+                                    ->toIso8601String()
+                                : null,
                     ];
                 })
                 ->values();
