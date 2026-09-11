@@ -326,12 +326,8 @@ class DashboardController extends Controller
         */
 
         /*
-         * IMPORTANT:
-         * /api/leads API ka counts.total unique leads count nahi hai.
-         * Us API me total = new + dialed + connected hai.
-         * Connected leads dialed bucket me bhi ho sakti hain, phir bhi counts.total
-         * me dono buckets add hote hain. Dashboard card ko /api/leads ke saath
-         * exactly match karane ke liye yahan bhi wahi bucket formula use hoga.
+         * Total Leads hamesha unique, accessible, all-time leads ka count hai.
+         * Connected lead ko Dialed me dobara add karke total inflate nahi karna.
          */
 
         $newBucketCount = (clone $leadQuery)
@@ -342,7 +338,7 @@ class DashboardController extends Controller
             })
             ->count();
 
-        $dialedBucketCount = (clone $leadQuery)
+        $calledBucketCount = (clone $leadQuery)
             ->whereExists(function ($query) {
                 $query->selectRaw('1')
                     ->from('call_logs')
@@ -376,10 +372,12 @@ class DashboardController extends Controller
             })
             ->count();
 
-        $totalLeads =
-            $newBucketCount
-            + $dialedBucketCount
-            + $connectedBucketCount;
+        $dialedBucketCount = max(
+            0,
+            $calledBucketCount - $connectedBucketCount
+        );
+
+        $totalLeads = (clone $leadQuery)->count();
 
         /*
         |--------------------------------------------------------------------------
@@ -479,16 +477,86 @@ class DashboardController extends Controller
             ->where('type', 'demo')
             ->pluck('id');
 
-        $totalDemoSent = (clone $callsBaseQuery)
-            ->whereIn('call_disposition_id', $demoDispositionIds)
-            ->count();
+        /*
+         * Demo call rows nahi, unique leads count hongi.
+         * Sirf current assignment ki latest call ka disposition Demo hona chahiye.
+         */
+        $makeLatestDemoLeadQuery = function (
+            bool $withPeriod
+        ) use (
+            $leadQuery,
+            $demoDispositionIds,
+            $period
+        ): Builder {
+            $query = clone $leadQuery;
 
-        $demoPeriodQuery = (clone $callsBaseQuery)
-            ->whereIn('call_disposition_id', $demoDispositionIds);
+            $query->whereExists(function ($callQuery) use (
+                $demoDispositionIds,
+                $withPeriod,
+                $period
+            ) {
+                $callQuery
+                    ->selectRaw('1')
+                    ->from('call_logs as demo_calls')
+                    ->whereColumn(
+                        'demo_calls.lead_id',
+                        'leads.id'
+                    )
+                    ->whereIn(
+                        'demo_calls.call_disposition_id',
+                        $demoDispositionIds
+                    )
+                    ->whereRaw(
+                        "
+                        demo_calls.id = (
+                            SELECT MAX(latest_demo_scope.id)
+                            FROM call_logs AS latest_demo_scope
+                            WHERE latest_demo_scope.lead_id = leads.id
+                            AND (
+                                (
+                                    leads.assigned_to IS NOT NULL
+                                    AND latest_demo_scope.user_id = leads.assigned_to
+                                    AND latest_demo_scope.created_at >= COALESCE(
+                                        (
+                                            SELECT MAX(latest_assignment.assigned_at)
+                                            FROM lead_assignments AS latest_assignment
+                                            WHERE latest_assignment.lead_id = leads.id
+                                            AND latest_assignment.new_user_id = leads.assigned_to
+                                        ),
+                                        leads.created_at
+                                    )
+                                )
+                                OR leads.assigned_to IS NULL
+                            )
+                        )
+                        "
+                    );
 
-        $applyPeriod($demoPeriodQuery, 'created_at');
+                if ($withPeriod && $period === 'today') {
+                    $callQuery->whereBetween(
+                        'demo_calls.created_at',
+                        [now()->startOfDay(), now()]
+                    );
+                }
 
-        $demoSent = $demoPeriodQuery->count();
+                if ($withPeriod && $period === 'month') {
+                    $callQuery->whereBetween(
+                        'demo_calls.created_at',
+                        [now()->startOfMonth(), now()]
+                    );
+                }
+            });
+
+            return $query;
+        };
+
+        $totalDemoSent = $makeLatestDemoLeadQuery(false)
+            ->distinct()
+            ->count('leads.id');
+
+        $demoSent = $makeLatestDemoLeadQuery(true)
+            ->distinct()
+            ->count('leads.id');
 
         /*
         |--------------------------------------------------------------------------
