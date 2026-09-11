@@ -515,6 +515,12 @@ public function index(Request $request): JsonResponse
             ),
         ],
 
+        'call_disposition_type' => [
+            'nullable',
+            'string',
+            'max:100',
+        ],
+
         'search' => [
             'nullable',
             'string',
@@ -727,6 +733,7 @@ public function index(Request $request): JsonResponse
     $removeKeys = [
         'lead_id',
         'call_disposition_id',
+        'call_disposition_type',
 
         'call_state',
         'call_disposition',
@@ -789,41 +796,6 @@ public function index(Request $request): JsonResponse
     if (!empty($validated['lead_id'])) {
         $baseQuery->whereKey(
             (int) $validated['lead_id']
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Exact Call Disposition ID Filter
-    |--------------------------------------------------------------------------
-    |
-    | Selected disposition lead ke kisi bhi call log me hona chahiye.
-    | whereHas ki wajah se ek lead ke multiple matching call logs hone par bhi
-    | lead duplicate nahi hogi.
-    |
-    */
-
-    if (!empty($validated['call_disposition_id'])) {
-        $callDispositionId =
-            (int) $validated['call_disposition_id'];
-
-        $baseQuery->whereHas(
-            'calls',
-            function (Builder $callQuery) use (
-                $callDispositionId,
-                $companyId
-            ) {
-                $callQuery
-                    ->where(
-                        'call_logs.company_id',
-                        $companyId
-                    )
-                    ->where(
-                        'call_logs.call_disposition_id',
-                        $callDispositionId
-                    );
-            }
         );
     }
 
@@ -1076,6 +1048,101 @@ public function index(Request $request): JsonResponse
 
     /*
     |--------------------------------------------------------------------------
+    | Global Latest Call Disposition Filter
+    |--------------------------------------------------------------------------
+    |
+    | call_disposition_id aur call_disposition_type historical call par nahi,
+    | current assignment ki latest call par match honge.
+    |
+    */
+
+    $callDispositionId = !empty($validated['call_disposition_id'])
+        ? (int) $validated['call_disposition_id']
+        : null;
+
+    $callDispositionType = !empty($validated['call_disposition_type'])
+        ? strtolower(trim((string) $validated['call_disposition_type']))
+        : null;
+
+    if ($callDispositionId !== null || $callDispositionType !== null) {
+        $baseQuery->whereHas(
+            'calls',
+            function (Builder $calls) use (
+                $callDispositionId,
+                $callDispositionType,
+                $currentAssignmentCallScope,
+                $companyId
+            ) {
+                $currentAssignmentCallScope($calls);
+
+                $calls->where(
+                    'call_logs.company_id',
+                    $companyId
+                );
+
+                if ($callDispositionId !== null) {
+                    $calls->where(
+                        'call_logs.call_disposition_id',
+                        $callDispositionId
+                    );
+                }
+
+                if ($callDispositionType !== null) {
+                    $calls->whereHas(
+                        'disposition',
+                        function (Builder $disposition) use (
+                            $callDispositionType,
+                            $companyId
+                        ) {
+                            $disposition
+                                ->whereRaw(
+                                    'LOWER(call_dispositions.type) = ?',
+                                    [$callDispositionType]
+                                )
+                                ->where(function (Builder $scope) use ($companyId) {
+                                    $scope
+                                        ->whereNull('call_dispositions.company_id')
+                                        ->orWhere(
+                                            'call_dispositions.company_id',
+                                            $companyId
+                                        );
+                                });
+                        }
+                    );
+                }
+
+                $calls->whereRaw(
+                    "
+                    call_logs.id = (
+                        SELECT MAX(cl_latest.id)
+                        FROM call_logs AS cl_latest
+                        WHERE cl_latest.lead_id = call_logs.lead_id
+                        AND (
+                            (
+                                leads.assigned_to IS NOT NULL
+                                AND cl_latest.user_id = leads.assigned_to
+                                AND cl_latest.created_at >= COALESCE(
+                                    (
+                                        SELECT MAX(la_latest.assigned_at)
+                                        FROM lead_assignments AS la_latest
+                                        WHERE la_latest.lead_id = leads.id
+                                        AND la_latest.new_user_id = leads.assigned_to
+                                    ),
+                                    leads.created_at
+                                )
+                            )
+                            OR leads.assigned_to IS NULL
+                        )
+                    )
+                    "
+                );
+            }
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | NEW CALL
     |--------------------------------------------------------------------------
     |
@@ -1277,6 +1344,22 @@ public function index(Request $request): JsonResponse
                 );
             }
         }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Keep Dialed And Connected Sections Unique
+    |--------------------------------------------------------------------------
+    |
+    | Connected lead ko Dialed section se exclude kar rahe hain. Isse ek lead
+    | response me do sections me repeat nahi hogi aur counts.total unique rahega.
+    |
+    */
+
+    $dialedQuery->whereNotIn(
+        'leads.id',
+        (clone $connectedQuery)->select('leads.id')
     );
 
 
