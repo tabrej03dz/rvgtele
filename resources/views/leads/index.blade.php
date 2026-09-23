@@ -1943,7 +1943,7 @@
                                             </div>
                                         @endif
 
-                                        @if($sectionKey === 'dialed')
+                                        {{-- @if($sectionKey === 'dialed')
                                             <div class="call-state text-orange-600">
                                                 {{ $latestCall?->disposition?->name ?: 'Dialed' }}
                                             </div>
@@ -1951,6 +1951,27 @@
                                             <div class="call-state text-emerald-600">
                                                 {{ $durationText ? '☎ '.$durationText : 'Connected' }}
                                             </div>
+                                        @endif --}}
+
+
+                                        @if($sectionKey === 'dialed')
+
+                                            <div class="call-state text-orange-600">
+                                                {{ $latestCall?->disposition?->name ?: 'Dialed' }}
+                                            </div>
+
+                                        @elseif($sectionKey === 'connected')
+
+                                            {{-- Connected Status / Duration --}}
+                                            <div class="call-state text-emerald-600">
+                                                {{ $durationText ? '☎ '.$durationText : 'Connected' }}
+                                            </div>
+
+                                            {{-- Last Disposition --}}
+                                            <div class="mt-1 text-[9px] font-extrabold text-blue-600">
+                                                {{ $latestCall?->disposition?->name ?: 'No Disposition' }}
+                                            </div>
+
                                         @endif
                                     @endif
                                 </div>
