@@ -176,9 +176,20 @@ class DashboardController extends Controller
         |
         */
 
+        /*
+         * IMPORTANT:
+         * Ye role list Lead API ke full-company scope ke exactly same honi
+         * chahiye. Manager ko /api/leads me poori company ki leads milti hain,
+         * isliye dashboard me bhi manager par assigned_to filter nahi lagega.
+         *
+         * Project me role name underscore ya space dono format me ho sakta hai,
+         * isliye dono variants rakhe gaye hain.
+         */
         $hasFullAccess = $user->hasAnyRole([
             'super_admin',
+            'super admin',
             'admin',
+            'manager',
         ]);
 
         /*
@@ -232,6 +243,20 @@ class DashboardController extends Controller
             ->unique()
             ->values()
             ->all();
+
+        /*
+         * Full-access users ke liye response/debug information me company ke
+         * saare users dikhaye jayenge. Lead scope par iska koi extra filter nahi
+         * lagega, isliye assigned aur unassigned dono leads count hongi.
+         */
+        if ($hasFullAccess) {
+            $visibleUserIds = User::query()
+                ->where('company_id', $companyId)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -300,8 +325,59 @@ class DashboardController extends Controller
         |
         */
 
-        $totalLeads = (clone $leadQuery)
+        /*
+         * Total Leads hamesha unique, accessible, all-time leads ka count hai.
+         * Connected lead ko Dialed me dobara add karke total inflate nahi karna.
+         */
+
+        $newBucketCount = (clone $leadQuery)
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('call_logs')
+                    ->whereColumn('call_logs.lead_id', 'leads.id');
+            })
             ->count();
+
+        $calledBucketCount = (clone $leadQuery)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('call_logs')
+                    ->whereColumn('call_logs.lead_id', 'leads.id');
+            })
+            ->count();
+
+        $connectedBucketCount = (clone $leadQuery)
+            ->whereExists(function ($query) use ($companyId) {
+                $query->selectRaw('1')
+                    ->from('call_logs')
+                    ->join(
+                        'call_dispositions',
+                        'call_dispositions.id',
+                        '=',
+                        'call_logs.call_disposition_id'
+                    )
+                    ->whereColumn('call_logs.lead_id', 'leads.id')
+                    ->where(function ($builder) use ($companyId) {
+                        $builder
+                            ->whereNull('call_dispositions.company_id')
+                            ->orWhere(
+                                'call_dispositions.company_id',
+                                $companyId
+                            );
+                    })
+                    ->whereIn('call_dispositions.type', [
+                        'connected',
+                        'demo',
+                    ]);
+            })
+            ->count();
+
+        $dialedBucketCount = max(
+            0,
+            $calledBucketCount - $connectedBucketCount
+        );
+
+        $totalLeads = (clone $leadQuery)->count();
 
         /*
         |--------------------------------------------------------------------------
@@ -356,44 +432,6 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | TOTAL DEMO SENT
-        |--------------------------------------------------------------------------
-        |
-        | All-time demo sent.
-        |
-        */
-
-        $totalDemoSent = (clone $leadQuery)
-            ->where(
-                'demo_send',
-                true
-            )
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DEMO SENT - Selected Period
-        |--------------------------------------------------------------------------
-        */
-
-        $demoPeriodQuery = (clone $leadQuery)
-            ->where(
-                'demo_send',
-                true
-            )
-            ->whereNotNull(
-                'demo_sent_at'
-            );
-
-        $applyPeriod(
-            $demoPeriodQuery,
-            'demo_sent_at'
-        );
-
-        $demoSent = $demoPeriodQuery->count();
-
-        /*
-        |--------------------------------------------------------------------------
         | Base Call Query
         |--------------------------------------------------------------------------
         */
@@ -421,6 +459,107 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | DEMO SENT COUNTS
+        |--------------------------------------------------------------------------
+        |
+        | Demo leads.demo_send se nahi aata. CRM me Demo ek call disposition hai
+        | jiska type = demo hai. Isliye demo count call_logs ke disposition se
+        | calculate hoga aur calls ke same user/lead access scope ko follow karega.
+        |
+        */
+
+        $demoDispositionIds = CallDisposition::query()
+            ->where(function (Builder $builder) use ($companyId) {
+                $builder
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('type', 'demo')
+            ->pluck('id');
+
+        /*
+         * Demo call rows nahi, unique leads count hongi.
+         * Sirf current assignment ki latest call ka disposition Demo hona chahiye.
+         */
+        $makeLatestDemoLeadQuery = function (
+            bool $withPeriod
+        ) use (
+            $leadQuery,
+            $demoDispositionIds,
+            $period
+        ): Builder {
+            $query = clone $leadQuery;
+
+            $query->whereExists(function ($callQuery) use (
+                $demoDispositionIds,
+                $withPeriod,
+                $period
+            ) {
+                $callQuery
+                    ->selectRaw('1')
+                    ->from('call_logs as demo_calls')
+                    ->whereColumn(
+                        'demo_calls.lead_id',
+                        'leads.id'
+                    )
+                    ->whereIn(
+                        'demo_calls.call_disposition_id',
+                        $demoDispositionIds
+                    )
+                    ->whereRaw(
+                        "
+                        demo_calls.id = (
+                            SELECT MAX(latest_demo_scope.id)
+                            FROM call_logs AS latest_demo_scope
+                            WHERE latest_demo_scope.lead_id = leads.id
+                            AND (
+                                (
+                                    leads.assigned_to IS NOT NULL
+                                    AND latest_demo_scope.user_id = leads.assigned_to
+                                    AND latest_demo_scope.created_at >= COALESCE(
+                                        (
+                                            SELECT MAX(latest_assignment.assigned_at)
+                                            FROM lead_assignments AS latest_assignment
+                                            WHERE latest_assignment.lead_id = leads.id
+                                            AND latest_assignment.new_user_id = leads.assigned_to
+                                        ),
+                                        leads.created_at
+                                    )
+                                )
+                                OR leads.assigned_to IS NULL
+                            )
+                        )
+                        "
+                    );
+
+                if ($withPeriod && $period === 'today') {
+                    $callQuery->whereBetween(
+                        'demo_calls.created_at',
+                        [now()->startOfDay(), now()]
+                    );
+                }
+
+                if ($withPeriod && $period === 'month') {
+                    $callQuery->whereBetween(
+                        'demo_calls.created_at',
+                        [now()->startOfMonth(), now()]
+                    );
+                }
+            });
+
+            return $query;
+        };
+
+        $totalDemoSent = $makeLatestDemoLeadQuery(false)
+            ->distinct()
+            ->count('leads.id');
+
+        $demoSent = $makeLatestDemoLeadQuery(true)
+            ->distinct()
+            ->count('leads.id');
+
+        /*
+        |--------------------------------------------------------------------------
         | TOTAL CALLS - Selected Period
         |--------------------------------------------------------------------------
         */
@@ -433,6 +572,26 @@ class DashboardController extends Controller
         );
 
         $totalCalls = $callsPeriodQuery->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Accessible Connected Disposition IDs
+        |--------------------------------------------------------------------------
+        |
+        | CallDispositionApiController ki tarah global + current company dono.
+        | Relation par depend karne ke bajay call_logs.call_disposition_id ko
+        | master disposition IDs se directly match kiya jayega.
+        |
+        */
+
+        $connectedDispositionIds = CallDisposition::query()
+            ->where(function (Builder $builder) use ($companyId) {
+                $builder
+                    ->whereNull('company_id')
+                    ->orWhere('company_id', $companyId);
+            })
+            ->where('type', 'connected')
+            ->pluck('id');
 
         /*
         |--------------------------------------------------------------------------
@@ -456,15 +615,9 @@ class DashboardController extends Controller
             'created_at'
         );
 
-        $connectedCallsQuery->whereHas(
-            'disposition',
-            function (Builder $query) {
-
-                $query->where(
-                    'type',
-                    'connected'
-                );
-            }
+        $connectedCallsQuery->whereIn(
+            'call_disposition_id',
+            $connectedDispositionIds
         );
 
         $connectedCalls = $connectedCallsQuery
@@ -487,15 +640,9 @@ class DashboardController extends Controller
             'created_at'
         );
 
-        $uniqueConnectedQuery->whereHas(
-            'disposition',
-            function (Builder $query) {
-
-                $query->where(
-                    'type',
-                    'connected'
-                );
-            }
+        $uniqueConnectedQuery->whereIn(
+            'call_disposition_id',
+            $connectedDispositionIds
         );
 
         $uniqueConnected = $uniqueConnectedQuery
@@ -572,10 +719,11 @@ class DashboardController extends Controller
 
         $allDispositions =
             CallDisposition::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
+                ->where(function (Builder $builder) use ($companyId) {
+                    $builder
+                        ->whereNull('company_id')
+                        ->orWhere('company_id', $companyId);
+                })
                 ->orderBy('id')
                 ->get();
 
@@ -613,6 +761,14 @@ class DashboardController extends Controller
                         'id' =>
                             (int) $disposition->id,
 
+                        'company_id' =>
+                            $disposition->company_id !== null
+                                ? (int) $disposition->company_id
+                                : null,
+
+                        'is_global' =>
+                            $disposition->company_id === null,
+
                         'name' =>
                             $disposition->name,
 
@@ -648,8 +804,26 @@ class DashboardController extends Controller
                             ?? null,
 
                         'next_followup' =>
-                            $disposition->next_followup
-                            ?? null,
+                            $disposition->next_followup !== null
+                                ? (int) $disposition->next_followup
+                                : null,
+
+                        'next_followup_minutes' =>
+                            $disposition->next_followup !== null
+                                ? (int) $disposition->next_followup
+                                : null,
+
+                        'next_followup_unit' =>
+                            $disposition->next_followup !== null
+                                ? 'minutes'
+                                : null,
+
+                        'suggested_follow_up_at' =>
+                            $disposition->next_followup !== null
+                                ? now()->copy()
+                                    ->addMinutes((int) $disposition->next_followup)
+                                    ->toIso8601String()
+                                : null,
                     ];
                 })
                 ->values();
@@ -1213,6 +1387,24 @@ class DashboardController extends Controller
 
                 'total_leads' =>
                     $totalLeads,
+
+                /*
+                 * /api/leads counts verification
+                 */
+
+                'lead_buckets' => [
+                    'new' =>
+                        $newBucketCount,
+
+                    'dialed' =>
+                        $dialedBucketCount,
+
+                    'connected' =>
+                        $connectedBucketCount,
+
+                    'total' =>
+                        $totalLeads,
+                ],
 
                 'new_leads' =>
                     $newLeads,
