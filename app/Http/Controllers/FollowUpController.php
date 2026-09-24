@@ -74,18 +74,7 @@ class FollowUpController extends Controller
         $user = $request->user();
 
         $companyId = (int) $user->company_id;
-        $visibleUserIds = $this->visibleAssignedUserIds($user);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Base Follow-up Query
-        |--------------------------------------------------------------------------
-        |
-        | SECURITY:
-        | 1. Same company
-        | 2. Follow-up current user ya hierarchy me niche role ko assigned hona chahiye
-        |
-        */
+        $currentUserId = (int) $user->id;
 
         $query = FollowUp::query()
             ->with([
@@ -93,7 +82,7 @@ class FollowUpController extends Controller
                 'assignedUser',
             ])
             ->where('company_id', $companyId)
-            ->whereIn('assigned_to', $visibleUserIds);
+            ->where('assigned_to', $currentUserId);
 
         /*
         |--------------------------------------------------------------------------
@@ -170,7 +159,7 @@ class FollowUpController extends Controller
 
         $base = FollowUp::query()
             ->where('company_id', $companyId)
-            ->whereIn('assigned_to', $visibleUserIds);
+            ->where('assigned_to', $currentUserId);
 
         /*
         |--------------------------------------------------------------------------
@@ -289,7 +278,7 @@ class FollowUpController extends Controller
                 'assignedUser',
             ])
             ->where('company_id', $companyId)
-            ->whereIn('assigned_to', $visibleUserIds)
+            ->where('assigned_to', (int) $user->id)
             ->where('status', 'pending')
             ->whereNotNull('scheduled_at')
             ->where('scheduled_at', '<=', $oneMinuteLater)
@@ -547,7 +536,7 @@ class FollowUpController extends Controller
 
         $followUp = FollowUp::query()
             ->where('company_id', $companyId)
-            ->whereIn('assigned_to', $visibleUserIds)
+            ->where('assigned_to', (int) $user->id)
             ->where('status', 'pending')
             ->whereNotNull('scheduled_at')
             ->orderByRaw("
@@ -939,52 +928,18 @@ class FollowUpController extends Controller
 
         $user = $request->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Login Check
-        |--------------------------------------------------------------------------
-        */
+        abort_unless($user, 401);
 
         abort_unless(
-            $user,
-            401
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Company Check
-        |--------------------------------------------------------------------------
-        */
-
-        abort_unless(
-            (int) $followUp->company_id
-                ===
-            (int) $user->company_id,
+            (int) $followUp->company_id === (int) $user->company_id,
             403,
             'You are not allowed to access this follow-up.'
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Assigned User Check
-        |--------------------------------------------------------------------------
-        |
-        | THIS IS IMPORTANT
-        |
-        | User sirf apne ya hierarchy me niche allowed role ka follow-up access kar sakta hai.
-        |
-        */
-
-        $visibleUserIds = $this->visibleAssignedUserIds($user);
-
         abort_unless(
-            in_array(
-                (int) $followUp->assigned_to,
-                $visibleUserIds,
-                true
-            ),
+            (int) $followUp->assigned_to === (int) $user->id,
             403,
-            'You are not allowed to access this follow-up.'
+            'This follow-up is not assigned to you.'
         );
     }
 
@@ -999,112 +954,119 @@ class FollowUpController extends Controller
      * Logged-in user ko kaun-kaun se assigned users ke follow-ups
      * dekhne/action karne ki permission hai, un sab ke IDs return karta hai.
      */
+    // private function visibleAssignedUserIds(User $currentUser): array
+    // {
+    //     $currentUserId = (int) $currentUser->id;
+    //     $companyId = (int) $currentUser->company_id;
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Safety
+    //     |--------------------------------------------------------------------------
+    //     |
+    //     | Company missing ho to kisi dusre user ka data expose nahi karna.
+    //     |
+    //     */
+
+    //     if (!$companyId) {
+    //         return [$currentUserId];
+    //     }
+
+    //     $currentRank = $this->effectiveRoleRank($currentUser);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Unknown Role Safety
+    //     |--------------------------------------------------------------------------
+    //     |
+    //     | Agar user ka role ROLE_RANKS me configured nahi hai,
+    //     | to wo sirf apne follow-ups dekhega.
+    //     |
+    //     */
+
+    //     if ($currentRank === null) {
+    //         return [$currentUserId];
+    //     }
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Same Company Users
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     $companyUsers = User::query()
+    //         ->where('company_id', $companyId)
+    //         ->with('roles:id,name')
+    //         ->get([
+    //             'id',
+    //             'company_id',
+    //         ]);
+
+    //     $visibleIds = $companyUsers
+    //         ->filter(function (User $candidate) use (
+    //             $currentUserId,
+    //             $currentRank
+    //         ) {
+
+    //             /*
+    //             |--------------------------------------------------------------
+    //             | Always Own Follow-ups
+    //             |--------------------------------------------------------------
+    //             */
+
+    //             if ((int) $candidate->id === $currentUserId) {
+    //                 return true;
+    //             }
+
+    //             /*
+    //             |--------------------------------------------------------------
+    //             | Candidate Effective Rank
+    //             |--------------------------------------------------------------
+    //             */
+
+    //             $candidateRank = $this->effectiveRoleRank($candidate);
+
+    //             if ($candidateRank === null) {
+    //                 return false;
+    //             }
+
+    //             /*
+    //             |--------------------------------------------------------------
+    //             | Only Strictly Lower Roles
+    //             |--------------------------------------------------------------
+    //             |
+    //             | Same rank ko access nahi milega.
+    //             |
+    //             */
+
+    //             return $candidateRank > $currentRank;
+    //         })
+    //         ->pluck('id')
+    //         ->map(fn ($id) => (int) $id)
+    //         ->values()
+    //         ->all();
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Defensive Own-ID Guarantee
+    //     |--------------------------------------------------------------------------
+    //     */
+
+    //     if (!in_array($currentUserId, $visibleIds, true)) {
+    //         $visibleIds[] = $currentUserId;
+    //     }
+
+    //     return array_values(
+    //         array_unique($visibleIds)
+    //     );
+    // }
+
     private function visibleAssignedUserIds(User $currentUser): array
-    {
-        $currentUserId = (int) $currentUser->id;
-        $companyId = (int) $currentUser->company_id;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Safety
-        |--------------------------------------------------------------------------
-        |
-        | Company missing ho to kisi dusre user ka data expose nahi karna.
-        |
-        */
-
-        if (!$companyId) {
-            return [$currentUserId];
-        }
-
-        $currentRank = $this->effectiveRoleRank($currentUser);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Unknown Role Safety
-        |--------------------------------------------------------------------------
-        |
-        | Agar user ka role ROLE_RANKS me configured nahi hai,
-        | to wo sirf apne follow-ups dekhega.
-        |
-        */
-
-        if ($currentRank === null) {
-            return [$currentUserId];
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Same Company Users
-        |--------------------------------------------------------------------------
-        */
-
-        $companyUsers = User::query()
-            ->where('company_id', $companyId)
-            ->with('roles:id,name')
-            ->get([
-                'id',
-                'company_id',
-            ]);
-
-        $visibleIds = $companyUsers
-            ->filter(function (User $candidate) use (
-                $currentUserId,
-                $currentRank
-            ) {
-
-                /*
-                |--------------------------------------------------------------
-                | Always Own Follow-ups
-                |--------------------------------------------------------------
-                */
-
-                if ((int) $candidate->id === $currentUserId) {
-                    return true;
-                }
-
-                /*
-                |--------------------------------------------------------------
-                | Candidate Effective Rank
-                |--------------------------------------------------------------
-                */
-
-                $candidateRank = $this->effectiveRoleRank($candidate);
-
-                if ($candidateRank === null) {
-                    return false;
-                }
-
-                /*
-                |--------------------------------------------------------------
-                | Only Strictly Lower Roles
-                |--------------------------------------------------------------
-                |
-                | Same rank ko access nahi milega.
-                |
-                */
-
-                return $candidateRank > $currentRank;
-            })
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Defensive Own-ID Guarantee
-        |--------------------------------------------------------------------------
-        */
-
-        if (!in_array($currentUserId, $visibleIds, true)) {
-            $visibleIds[] = $currentUserId;
-        }
-
-        return array_values(
-            array_unique($visibleIds)
-        );
-    }
+{
+    return [
+        (int) $currentUser->id,
+    ];
+}
 
 
     /**
