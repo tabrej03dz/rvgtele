@@ -137,6 +137,16 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
         ->middleware('permission:dashboard.view')
         ->name('dashboard');
 
+        Route::middleware('auth')->group(function () {
+
+    Route::get(
+        '/dashboard/employee/{employee}',
+        [DashboardController::class, 'showEmployee']
+    )->name('dashboard.employee');
+
+});
+
+
     // Companies
     Route::get('/companies', [CompanyController::class, 'index'])->middleware('permission:companies.view')->name('companies.index');
     Route::get('/companies/create', [CompanyController::class, 'create'])->middleware('permission:companies.create')->name('companies.create');

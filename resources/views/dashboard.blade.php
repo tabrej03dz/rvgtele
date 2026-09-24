@@ -842,6 +842,514 @@
     </section>
 
 
+
+{{-- ================================================================ --}}
+{{-- Employee Performance --}}
+{{-- ================================================================ --}}
+
+@if($hasFullAccess)
+
+<section
+    class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+>
+
+    {{-- Header --}}
+
+    <div
+        class="border-b border-slate-200 px-5 py-5"
+    >
+
+        <div
+            class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+        >
+
+            <div>
+
+                <div class="flex items-center gap-3">
+
+                    <div
+                        class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600"
+                    >
+                        <svg
+                            class="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        </svg>
+                    </div>
+
+                    <div>
+
+                        <h2
+                            class="font-bold text-slate-900"
+                        >
+                            Employee Performance
+                        </h2>
+
+                        <p
+                            class="mt-0.5 text-sm text-slate-500"
+                        >
+                            Calls, demos, leads aur follow-ups ki employee-wise tracking.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            {{-- Quick Period Filter --}}
+
+            <form
+                method="GET"
+                action="{{ url()->current() }}"
+                class="flex flex-wrap items-center gap-2"
+            >
+
+                {{-- Preserve Main Dashboard Filter --}}
+
+                <input
+                    type="hidden"
+                    name="period"
+                    value="{{ $period }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="disposition_period"
+                    value="{{ $dispositionPeriod }}"
+                >
+
+
+                <div
+                    class="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+                >
+
+                    @foreach([
+                        'today' => 'Today',
+                        'month' => 'Month',
+                        'all' => 'All'
+                    ] as $key => $label)
+
+                        <button
+                            type="submit"
+                            name="employee_period"
+                            value="{{ $key }}"
+                            class="rounded-lg px-3 py-2 text-xs font-bold transition
+                            {{
+                                $employeePeriod === $key
+                                    ? 'bg-violet-600 text-white shadow-sm'
+                                    : 'text-slate-600 hover:bg-white'
+                            }}"
+                        >
+                            {{ $label }}
+                        </button>
+
+                    @endforeach
+
+                </div>
+
+            </form>
+
+        </div>
+
+
+        {{-- Custom Date Filter --}}
+
+        <form
+            method="GET"
+            action="{{ url()->current() }}"
+            class="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end"
+        >
+
+            <input
+                type="hidden"
+                name="period"
+                value="{{ $period }}"
+            >
+
+            <input
+                type="hidden"
+                name="disposition_period"
+                value="{{ $dispositionPeriod }}"
+            >
+
+            <input
+                type="hidden"
+                name="employee_period"
+                value="custom"
+            >
+
+
+            <div>
+
+                <label
+                    class="mb-1 block text-xs font-bold text-slate-600"
+                >
+                    From Date
+                </label>
+
+                <input
+                    type="date"
+                    name="employee_from"
+                    value="{{ $employeeFrom }}"
+                    required
+                    class="rounded-lg border-slate-300 text-sm focus:border-violet-500 focus:ring-violet-500"
+                >
+
+            </div>
+
+
+            <div>
+
+                <label
+                    class="mb-1 block text-xs font-bold text-slate-600"
+                >
+                    To Date
+                </label>
+
+                <input
+                    type="date"
+                    name="employee_to"
+                    value="{{ $employeeTo }}"
+                    required
+                    class="rounded-lg border-slate-300 text-sm focus:border-violet-500 focus:ring-violet-500"
+                >
+
+            </div>
+
+
+            <button
+                type="submit"
+                class="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700"
+            >
+                Apply Filter
+            </button>
+
+
+            <div
+                class="sm:ml-auto"
+            >
+
+                <div
+                    class="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700"
+                >
+                    Showing:
+                    {{ $employeePeriodLabel }}
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    {{-- Employee Table --}}
+
+    <div class="overflow-x-auto">
+
+        <table
+            class="w-full min-w-[1050px] text-sm"
+        >
+
+            <thead class="bg-slate-50">
+
+                <tr
+                    class="border-b border-slate-200 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500"
+                >
+
+                    <th class="px-5 py-3">
+                        Employee
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Leads
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Calls
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Connected
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Connect %
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Demo Sent
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Follow-ups
+                    </th>
+
+                    <th class="px-4 py-3 text-center">
+                        Pending
+                    </th>
+
+                    <th class="px-5 py-3 text-right">
+                        Action
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody
+                class="divide-y divide-slate-100"
+            >
+
+                @forelse(
+                    $employeePerformance
+                    as $row
+                )
+
+                    @php
+                        $employee = $row['user'];
+                    @endphp
+
+                    <tr
+                        class="transition hover:bg-violet-50/40"
+                    >
+
+                        {{-- Employee --}}
+
+                        <td class="px-5 py-4">
+
+                            <a
+                                href="{{ route('dashboard.employee', $employee) }}"
+                                class="font-bold text-slate-900 hover:text-violet-600"
+                            >
+                                {{ $employee->name }}
+                            </a>
+
+
+                            @if($employee->employee_code)
+
+                                <div
+                                    class="mt-0.5 text-xs text-slate-500"
+                                >
+                                    {{ $employee->employee_code }}
+                                </div>
+
+                            @endif
+
+                        </td>
+
+
+                        {{-- Leads --}}
+
+                        <td
+                            class="px-4 py-4 text-center font-bold text-slate-700"
+                        >
+                            {{ number_format(
+                                $row['total_leads']
+                            ) }}
+                        </td>
+
+
+                        {{-- Calls --}}
+
+                        <td
+                            class="px-4 py-4 text-center"
+                        >
+
+                            <span
+                                class="inline-flex min-w-[44px] justify-center rounded-lg bg-blue-50 px-2.5 py-1.5 font-black text-blue-700"
+                            >
+                                {{ number_format(
+                                    $row['calls']
+                                ) }}
+                            </span>
+
+                        </td>
+
+
+                        {{-- Connected --}}
+
+                        <td
+                            class="px-4 py-4 text-center"
+                        >
+
+                            <span
+                                class="font-bold text-emerald-600"
+                            >
+                                {{ number_format(
+                                    $row['connected']
+                                ) }}
+                            </span>
+
+                        </td>
+
+
+                        {{-- Percentage --}}
+
+                        <td
+                            class="px-4 py-4 text-center"
+                        >
+
+                            <div
+                                class="font-bold text-slate-800"
+                            >
+                                {{
+                                    number_format(
+                                        $row[
+                                            'connected_percentage'
+                                        ],
+                                        1
+                                    )
+                                }}%
+                            </div>
+
+                            <div
+                                class="mx-auto mt-1 h-1.5 w-16 overflow-hidden rounded-full bg-slate-100"
+                            >
+                                <div
+                                    class="h-full rounded-full bg-emerald-500"
+                                    style="width: {{
+                                        min(
+                                            100,
+                                            $row[
+                                                'connected_percentage'
+                                            ]
+                                        )
+                                    }}%"
+                                ></div>
+                            </div>
+
+                        </td>
+
+
+                        {{-- Demo --}}
+
+                        <td
+                            class="px-4 py-4 text-center"
+                        >
+
+                            <span
+                                class="inline-flex min-w-[40px] justify-center rounded-lg bg-violet-50 px-2 py-1.5 font-black text-violet-700"
+                            >
+                                {{ number_format(
+                                    $row['demos']
+                                ) }}
+                            </span>
+
+                        </td>
+
+
+                        {{-- Followups --}}
+
+                        <td
+                            class="px-4 py-4 text-center font-bold text-amber-600"
+                        >
+                            {{ number_format(
+                                $row['followups']
+                            ) }}
+                        </td>
+
+
+                        {{-- Pending --}}
+
+                        <td
+                            class="px-4 py-4 text-center"
+                        >
+
+                            @if(
+                                $row[
+                                    'pending_followups'
+                                ] > 0
+                            )
+
+                                <span
+                                    class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600"
+                                >
+                                    {{
+                                        number_format(
+                                            $row[
+                                                'pending_followups'
+                                            ]
+                                        )
+                                    }}
+                                </span>
+
+                            @else
+
+                                <span
+                                    class="text-emerald-600"
+                                >
+                                    ✓
+                                </span>
+
+                            @endif
+
+                        </td>
+
+
+                        {{-- Action --}}
+
+                        <td
+                            class="px-5 py-4 text-right"
+                        >
+
+                            <a
+                                href="{{ route(
+                                    'dashboard.employee',
+                                    $employee
+                                ) }}"
+                                class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-600 hover:text-white"
+                            >
+                                View Details
+
+                                <span>
+                                    →
+                                </span>
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                @empty
+
+                    <tr>
+
+                        <td
+                            colspan="9"
+                            class="px-5 py-14 text-center text-slate-500"
+                        >
+                            No employees found.
+                        </td>
+
+                    </tr>
+
+                @endforelse
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+@endif
+
+
+
+
+
+
     {{-- ================================================================ --}}
     {{-- Quick Links --}}
     {{-- ================================================================ --}}
