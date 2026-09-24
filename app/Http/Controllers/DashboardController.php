@@ -666,447 +666,581 @@ class DashboardController extends Controller
         }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard Snapshot Statistics
+    |--------------------------------------------------------------------------
+    |
+    | Screenshot-style dashboard ke liye "Today" aur "All Time" cards
+    | ek saath dikhane hain. Isliye ye values main period filter se
+    | independent rakhi gayi hain.
+    |
+    */
+
+    $todayStart = now()->startOfDay();
+    $todayEnd = now()->endOfDay();
+
+    // Today Leads
+    $todayNewLeads = (clone $leadQuery)
+        ->whereBetween('created_at', [$todayStart, $todayEnd])
+        ->count();
+
+    // Today Calls
+    $todayCalls = (clone $callsBaseQuery)
+        ->whereBetween('created_at', [$todayStart, $todayEnd])
+        ->count();
+
+    // Today Connected
+    $todayConnected = (clone $callsBaseQuery)
+        ->whereBetween('created_at', [$todayStart, $todayEnd])
+        ->whereHas('disposition', function (Builder $query) {
+            $query->where('type', 'connected');
+        })
+        ->count();
+
+    // Today Demo Sent
+    $todayDemos = (clone $leadQuery)
+        ->where('demo_send', true)
+        ->whereNotNull('demo_sent_at')
+        ->whereBetween('demo_sent_at', [$todayStart, $todayEnd])
+        ->count();
+
+    // Follow-up base query with same visibility rules as the dashboard
+    $snapshotFollowUpBase = FollowUp::query()
+        ->where('company_id', $companyId);
+
+    if (!$hasFullAccess) {
+        $snapshotFollowUpBase->whereIn(
+            'lead_id',
+            clone $visibleLeadIdsQuery
+        );
+    }
+
+    // Today Pending Follow-ups
+    $todayPendingFollowUps = (clone $snapshotFollowUpBase)
+        ->where('status', 'pending')
+        ->whereBetween('scheduled_at', [$todayStart, $todayEnd])
+        ->count();
+
+    // Today Overdue
+    $todayOverdue = (clone $snapshotFollowUpBase)
+        ->where('status', 'pending')
+        ->whereBetween('scheduled_at', [$todayStart, now()])
+        ->count();
+
+    // All Time Calls
+    $allCalls = (clone $callsBaseQuery)->count();
+
+    // All Time Connected
+    $allConnected = (clone $callsBaseQuery)
+        ->whereHas('disposition', function (Builder $query) {
+            $query->where('type', 'connected');
+        })
+        ->count();
+
+    // All Time Pending Follow-ups
+    $allPendingFollowUps = (clone $snapshotFollowUpBase)
+        ->where('status', 'pending')
+        ->count();
+
+    // All Time Overdue Follow-ups
+    $allOverdue = (clone $snapshotFollowUpBase)
+        ->where('status', 'pending')
+        ->where('scheduled_at', '<', now())
+        ->count();
+
+    // All Time Sales
+    $allSalesQuery = Order::query()
+        ->where('company_id', $companyId);
+
+    if (!$hasFullAccess) {
+        $allSalesQuery->whereIn(
+            'lead_id',
+            clone $visibleLeadIdsQuery
+        );
+    }
+
+    $allSales = (float) $allSalesQuery->sum('total_amount');
+
+    // All Time Payments Received
+    $allReceivedQuery = Payment::query()
+        ->where('company_id', $companyId);
+
+    if (!$hasFullAccess) {
+        $allReceivedQuery->whereHas(
+            'order',
+            function (Builder $query) use ($visibleLeadIdsQuery) {
+                $query->whereIn(
+                    'lead_id',
+                    clone $visibleLeadIdsQuery
+                );
+            }
+        );
+    }
+
+    $allReceived = (float) $allReceivedQuery->sum('amount');
 
 
-/*
-|--------------------------------------------------------------------------
-| Employee Performance
-|--------------------------------------------------------------------------
-|
-| Only Admin / Super Admin
-|
-*/
 
-$employeePerformance = collect();
-
-if ($hasFullAccess) {
 
     /*
     |--------------------------------------------------------------------------
-    | Employee Tracking Period
+    | Employee Performance
     |--------------------------------------------------------------------------
+    |
+    | Only Admin / Super Admin
+    |
     */
 
-    $employeePeriod = $request->get(
-        'employee_period',
-        'today'
-    );
+    $employeePerformance = collect();
 
-    if (!in_array(
-        $employeePeriod,
-        [
-            'today',
-            'month',
-            'all',
-            'custom',
-        ],
-        true
-    )) {
+    if ($hasFullAccess) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employee Tracking Period
+        |--------------------------------------------------------------------------
+        */
+
+        $employeePeriod = $request->get(
+            'employee_period',
+            'today'
+        );
+
+        if (!in_array(
+            $employeePeriod,
+            [
+                'today',
+                'month',
+                'all',
+                'custom',
+            ],
+            true
+        )) {
+            $employeePeriod = 'today';
+        }
+
+        $employeeFrom = $request->get('employee_from');
+        $employeeTo = $request->get('employee_to');
+
+        if ($employeePeriod === 'today') {
+
+            $employeeDateFrom = now()->startOfDay();
+            $employeeDateTo = now()->endOfDay();
+
+            $employeePeriodLabel = 'Today';
+
+        } elseif ($employeePeriod === 'month') {
+
+            $employeeDateFrom = now()->startOfMonth();
+            $employeeDateTo = now()->endOfDay();
+
+            $employeePeriodLabel = 'This Month';
+
+        } elseif (
+            $employeePeriod === 'custom'
+            && $employeeFrom
+            && $employeeTo
+        ) {
+
+            $employeeDateFrom = \Carbon\Carbon::parse(
+                $employeeFrom
+            )->startOfDay();
+
+            $employeeDateTo = \Carbon\Carbon::parse(
+                $employeeTo
+            )->endOfDay();
+
+            $employeePeriodLabel =
+                $employeeDateFrom->format('d M Y')
+                . ' - '
+                . $employeeDateTo->format('d M Y');
+
+        } else {
+
+            $employeePeriod = 'all';
+
+            $employeeDateFrom = null;
+            $employeeDateTo = null;
+
+            $employeePeriodLabel = 'All Time';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        */
+
+        $employees = User::query()
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'employee_code',
+                'team_id',
+                'is_active',
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Build Performance
+        |--------------------------------------------------------------------------
+        */
+
+        $employeePerformance = $employees
+            ->map(function ($employee) use (
+                $companyId,
+                $employeeDateFrom,
+                $employeeDateTo
+            ) {
+
+                /*
+                * Employee Leads
+                */
+
+                $leadIds = Lead::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'assigned_to',
+                        $employee->id
+                    )
+                    ->pluck('id');
+
+                $totalLeads = $leadIds->count();
+
+                /*
+                * Calls
+                */
+
+                $callsQuery = CallLog::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->whereIn(
+                        'lead_id',
+                        $leadIds
+                    );
+
+                if (
+                    $employeeDateFrom
+                    && $employeeDateTo
+                ) {
+
+                    $callsQuery->whereBetween(
+                        'created_at',
+                        [
+                            $employeeDateFrom,
+                            $employeeDateTo,
+                        ]
+                    );
+                }
+
+                $calls = (clone $callsQuery)
+                    ->count();
+
+                /*
+                * Connected Calls
+                */
+
+                $connected = (clone $callsQuery)
+                    ->whereHas(
+                        'disposition',
+                        function (Builder $query) {
+
+                            $query->where(
+                                'type',
+                                'connected'
+                            );
+                        }
+                    )
+                    ->count();
+
+                /*
+                * Demo Sent
+                */
+
+                $demoQuery = Lead::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->where(
+                        'assigned_to',
+                        $employee->id
+                    )
+                    ->where(
+                        'demo_send',
+                        true
+                    )
+                    ->whereNotNull(
+                        'demo_sent_at'
+                    );
+
+                if (
+                    $employeeDateFrom
+                    && $employeeDateTo
+                ) {
+
+                    $demoQuery->whereBetween(
+                        'demo_sent_at',
+                        [
+                            $employeeDateFrom,
+                            $employeeDateTo,
+                        ]
+                    );
+                }
+
+                $demos = $demoQuery->count();
+
+                /*
+                * Follow Ups
+                */
+
+                $followQuery = FollowUp::query()
+                    ->where(
+                        'company_id',
+                        $companyId
+                    )
+                    ->whereIn(
+                        'lead_id',
+                        $leadIds
+                    );
+
+                if (
+                    $employeeDateFrom
+                    && $employeeDateTo
+                ) {
+
+                    $followQuery->whereBetween(
+                        'scheduled_at',
+                        [
+                            $employeeDateFrom,
+                            $employeeDateTo,
+                        ]
+                    );
+                }
+
+                $followUps = (clone $followQuery)
+                    ->count();
+
+                $pendingFollowUps = (clone $followQuery)
+                    ->where(
+                        'status',
+                        'pending'
+                    )
+                    ->count();
+
+                /*
+                * Connected Percentage
+                */
+
+                $connectedPercentage = $calls > 0
+                    ? round(
+                        ($connected / $calls) * 100,
+                        1
+                    )
+                    : 0;
+
+                return [
+
+                    'user' => $employee,
+
+                    'total_leads' => $totalLeads,
+
+                    'calls' => $calls,
+
+                    'connected' => $connected,
+
+                    'connected_percentage' =>
+                        $connectedPercentage,
+
+                    'demos' => $demos,
+
+                    'followups' => $followUps,
+
+                    'pending_followups' =>
+                        $pendingFollowUps,
+                ];
+            });
+    } else {
+
         $employeePeriod = 'today';
-    }
-
-    $employeeFrom = $request->get('employee_from');
-    $employeeTo = $request->get('employee_to');
-
-    if ($employeePeriod === 'today') {
-
-        $employeeDateFrom = now()->startOfDay();
-        $employeeDateTo = now()->endOfDay();
 
         $employeePeriodLabel = 'Today';
 
-    } elseif ($employeePeriod === 'month') {
+        $employeeFrom = null;
 
-        $employeeDateFrom = now()->startOfMonth();
-        $employeeDateTo = now()->endOfDay();
-
-        $employeePeriodLabel = 'This Month';
-
-    } elseif (
-        $employeePeriod === 'custom'
-        && $employeeFrom
-        && $employeeTo
-    ) {
-
-        $employeeDateFrom = \Carbon\Carbon::parse(
-            $employeeFrom
-        )->startOfDay();
-
-        $employeeDateTo = \Carbon\Carbon::parse(
-            $employeeTo
-        )->endOfDay();
-
-        $employeePeriodLabel =
-            $employeeDateFrom->format('d M Y')
-            . ' - '
-            . $employeeDateTo->format('d M Y');
-
-    } else {
-
-        $employeePeriod = 'all';
-
-        $employeeDateFrom = null;
-        $employeeDateTo = null;
-
-        $employeePeriodLabel = 'All Time';
+        $employeeTo = null;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Users
-    |--------------------------------------------------------------------------
-    */
 
-    $employees = User::query()
-        ->where('company_id', $companyId)
-        ->where('is_active', true)
-        ->orderBy('name')
-        ->get([
-            'id',
-            'name',
-            'employee_code',
-            'team_id',
-            'is_active',
-        ]);
+
+
 
     /*
     |--------------------------------------------------------------------------
-    | Build Performance
+    | Recent Leads
     |--------------------------------------------------------------------------
     */
 
-    $employeePerformance = $employees
-        ->map(function ($employee) use (
-            $companyId,
-            $employeeDateFrom,
-            $employeeDateTo
-        ) {
+    $recentLeads = (clone $leadQuery)
+        ->with([
+            'assignedUser:id,name,employee_code',
+            'status:id,name,color',
+            'source:id,name',
+        ])
+        ->latest('id')
+        ->limit(8)
+        ->get();
 
-            /*
-             * Employee Leads
-             */
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard Mode
+    |--------------------------------------------------------------------------
+    */
 
-            $leadIds = Lead::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'assigned_to',
-                    $employee->id
-                )
-                ->pluck('id');
+    $dashboardMode = $hasFullAccess
+        ? 'admin'
+        : ($isTeamLeader ? 'team_leader' : 'employee');
 
-            $totalLeads = $leadIds->count();
+    /*
+    |--------------------------------------------------------------------------
+    | Return View
+    |--------------------------------------------------------------------------
+    */
 
-            /*
-             * Calls
-             */
+    return view('dashboard', [
 
-            $callsQuery = CallLog::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->whereIn(
-                    'lead_id',
-                    $leadIds
-                );
+        /*
+        * Leads
+        */
 
-            if (
-                $employeeDateFrom
-                && $employeeDateTo
-            ) {
+        'totalLeads' => $totalLeads,
 
-                $callsQuery->whereBetween(
-                    'created_at',
-                    [
-                        $employeeDateFrom,
-                        $employeeDateTo,
-                    ]
-                );
-            }
+        'newToday' => $newToday,
 
-            $calls = (clone $callsQuery)
-                ->count();
+        'hotLeads' => $hotLeads,
 
-            /*
-             * Connected Calls
-             */
+        /*
+        * Demo
+        */
 
-            $connected = (clone $callsQuery)
-                ->whereHas(
-                    'disposition',
-                    function (Builder $query) {
+        'todayLeadSend' => $todayLeadSend,
 
-                        $query->where(
-                            'type',
-                            'connected'
-                        );
-                    }
-                )
-                ->count();
+        'totalLeadSend' => $totalLeadSend,
 
-            /*
-             * Demo Sent
-             */
+        /*
+        * Calls
+        */
 
-            $demoQuery = Lead::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'assigned_to',
-                    $employee->id
-                )
-                ->where(
-                    'demo_send',
-                    true
-                )
-                ->whereNotNull(
-                    'demo_sent_at'
-                );
+        'callsToday' => $callsToday,
 
-            if (
-                $employeeDateFrom
-                && $employeeDateTo
-            ) {
+        'connectedToday' => $connectedToday,
 
-                $demoQuery->whereBetween(
-                    'demo_sent_at',
-                    [
-                        $employeeDateFrom,
-                        $employeeDateTo,
-                    ]
-                );
-            }
+        /*
+        * Dynamic Dispositions
+        */
 
-            $demos = $demoQuery->count();
+        'dispositionStats' => $dispositionStats,
 
-            /*
-             * Follow Ups
-             */
+        'withoutDisposition' => $withoutDisposition,
 
-            $followQuery = FollowUp::query()
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->whereIn(
-                    'lead_id',
-                    $leadIds
-                );
+        /*
+        * Follow Ups
+        */
 
-            if (
-                $employeeDateFrom
-                && $employeeDateTo
-            ) {
+        'followUpsDue' => $followUpsDue,
 
-                $followQuery->whereBetween(
-                    'scheduled_at',
-                    [
-                        $employeeDateFrom,
-                        $employeeDateTo,
-                    ]
-                );
-            }
+        'overdue' => $overdue,
 
-            $followUps = (clone $followQuery)
-                ->count();
+        /*
+        * Sales
+        */
 
-            $pendingFollowUps = (clone $followQuery)
-                ->where(
-                    'status',
-                    'pending'
-                )
-                ->count();
+        'sales' => $sales,
 
-            /*
-             * Connected Percentage
-             */
+        'received' => $received,
 
-            $connectedPercentage = $calls > 0
-                ? round(
-                    ($connected / $calls) * 100,
-                    1
-                )
-                : 0;
+        /*
+        * Employees
+        */
 
-            return [
+        'activeUsers' => $activeUsers,
 
-                'user' => $employee,
 
-                'total_leads' => $totalLeads,
+        /*
+         * Screenshot Dashboard Snapshot
+         */
 
-                'calls' => $calls,
+        'todayNewLeads' => $todayNewLeads,
+        'todayCalls' => $todayCalls,
+        'todayConnected' => $todayConnected,
+        'todayDemos' => $todayDemos,
+        'todayPendingFollowUps' => $todayPendingFollowUps,
+        'todayOverdue' => $todayOverdue,
 
-                'connected' => $connected,
+        'allCalls' => $allCalls,
+        'allConnected' => $allConnected,
+        'allPendingFollowUps' => $allPendingFollowUps,
+        'allOverdue' => $allOverdue,
+        'allSales' => $allSales,
+        'allReceived' => $allReceived,
 
-                'connected_percentage' =>
-                    $connectedPercentage,
 
-                'demos' => $demos,
+        'employeePerformance' => $employeePerformance,
 
-                'followups' => $followUps,
+        'employeePeriod' => $employeePeriod,
 
-                'pending_followups' =>
-                    $pendingFollowUps,
-            ];
-        });
-} else {
+        'employeePeriodLabel' => $employeePeriodLabel,
 
-    $employeePeriod = 'today';
+        'employeeFrom' => $employeeFrom,
 
-    $employeePeriodLabel = 'Today';
+        'employeeTo' => $employeeTo,
 
-    $employeeFrom = null;
+        /*
+            * Leads
+            */
 
-    $employeeTo = null;
+        'recentLeads' => $recentLeads,
+
+        /*
+            * Dashboard
+            */
+
+        'dashboardMode' => $dashboardMode,
+
+        'hasFullAccess' => $hasFullAccess,
+
+        'isTeamLeader' => $isTeamLeader,
+
+        'visibleUserIds' => $visibleUserIds,
+
+        /*
+            * Disposition Filter
+            */
+
+        'dispositionPeriod' => $dispositionPeriod,
+
+        'dispositionPeriodLabel' => $dispositionPeriodLabel,
+
+        'dispositionTotalCalls' => $dispositionTotalCalls,
+
+        /*
+            * Filter
+            */
+
+        'period' => $period,
+
+        'periodLabel' => $periodLabel,
+    ]);
 }
-
-
-
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Recent Leads
-        |--------------------------------------------------------------------------
-        */
-
-        $recentLeads = (clone $leadQuery)
-            ->with([
-                'assignedUser:id,name,employee_code',
-                'status:id,name,color',
-                'source:id,name',
-            ])
-            ->latest('id')
-            ->limit(8)
-            ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard Mode
-        |--------------------------------------------------------------------------
-        */
-
-        $dashboardMode = $hasFullAccess
-            ? 'admin'
-            : ($isTeamLeader ? 'team_leader' : 'employee');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Return View
-        |--------------------------------------------------------------------------
-        */
-
-        return view('dashboard', [
-
-            /*
-             * Leads
-             */
-
-            'totalLeads' => $totalLeads,
-
-            'newToday' => $newToday,
-
-            'hotLeads' => $hotLeads,
-
-            /*
-             * Demo
-             */
-
-            'todayLeadSend' => $todayLeadSend,
-
-            'totalLeadSend' => $totalLeadSend,
-
-            /*
-             * Calls
-             */
-
-            'callsToday' => $callsToday,
-
-            'connectedToday' => $connectedToday,
-
-            /*
-             * Dynamic Dispositions
-             */
-
-            'dispositionStats' => $dispositionStats,
-
-            'withoutDisposition' => $withoutDisposition,
-
-            /*
-             * Follow Ups
-             */
-
-            'followUpsDue' => $followUpsDue,
-
-            'overdue' => $overdue,
-
-            /*
-             * Sales
-             */
-
-            'sales' => $sales,
-
-            'received' => $received,
-
-            /*
-             * Employees
-             */
-
-            'activeUsers' => $activeUsers,
-
-
-            'employeePerformance' => $employeePerformance,
-
-'employeePeriod' => $employeePeriod,
-
-'employeePeriodLabel' => $employeePeriodLabel,
-
-'employeeFrom' => $employeeFrom,
-
-'employeeTo' => $employeeTo,
-
-            /*
-             * Leads
-             */
-
-            'recentLeads' => $recentLeads,
-
-            /*
-             * Dashboard
-             */
-
-            'dashboardMode' => $dashboardMode,
-
-            'hasFullAccess' => $hasFullAccess,
-
-            'isTeamLeader' => $isTeamLeader,
-
-            'visibleUserIds' => $visibleUserIds,
-
-            /*
-             * Disposition Filter
-             */
-
-            'dispositionPeriod' => $dispositionPeriod,
-
-            'dispositionPeriodLabel' => $dispositionPeriodLabel,
-
-            'dispositionTotalCalls' => $dispositionTotalCalls,
-
-            /*
-             * Filter
-             */
-
-            'period' => $period,
-
-            'periodLabel' => $periodLabel,
-        ]);
-    }
 
 
 

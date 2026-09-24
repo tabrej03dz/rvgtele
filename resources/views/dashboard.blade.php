@@ -5,429 +5,613 @@
 @section('content')
 
 @php
-    $stats = [
+    $crmCompletion = 30;
+    $crmRemaining = 100 - $crmCompletion;
 
+    $currentUser = auth()->user();
+    $currentRole = method_exists($currentUser, 'getRoleNames')
+        ? ($currentUser->getRoleNames()->first() ?? 'User')
+        : 'User';
+
+    $ordersUrl = \Illuminate\Support\Facades\Route::has('orders.index')
+        ? route('orders.index')
+        : '#overall-statistics';
+
+    $paymentsUrl = \Illuminate\Support\Facades\Route::has('payments.index')
+        ? route('payments.index')
+        : '#overall-statistics';
+
+    $employeesUrl = $hasFullAccess
+        ? '#employee-performance'
+        : route('leads.index');
+
+    $todayCards = [
         [
-            'label' => 'Total Leads',
-            'sub_label' => 'All Time',
-            'value' => number_format($totalLeads),
-            'accent' => 'text-blue-700',
-            'bg' => 'bg-blue-50',
+            'label' => 'Today Leads',
+            'value' => number_format($todayNewLeads),
+            'icon' => 'users',
             'url' => route('leads.index'),
+            'card' => 'border-violet-200 bg-gradient-to-br from-violet-50 to-violet-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-violet-600',
+            'arrow' => 'text-violet-600',
         ],
-
         [
-            'label' => 'New Leads',
-            'sub_label' => $periodLabel,
-            'value' => number_format($newToday),
-            'accent' => 'text-violet-700',
-            'bg' => 'bg-violet-50',
-            'url' => route('leads.index'),
-        ],
-
-        [
-            'label' => 'Total Calls',
-            'sub_label' => $periodLabel,
-            'value' => number_format($callsToday),
-            'accent' => 'text-sky-700',
-            'bg' => 'bg-sky-50',
+            'label' => 'Today Called',
+            'value' => number_format($todayCalls),
+            'icon' => 'phone',
             'url' => route('calls.index'),
+            'card' => 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-blue-600',
+            'arrow' => 'text-blue-600',
         ],
-
         [
-            'label' => 'Follow-ups',
-            'sub_label' => $periodLabel,
-            'value' => number_format($followUpsDue),
-            'accent' => 'text-amber-700',
-            'bg' => 'bg-amber-50',
-            'url' => route('followups.index'),
+            'label' => 'Today Connected',
+            'value' => number_format($todayConnected),
+            'icon' => 'connected',
+            'url' => route('calls.index'),
+            'card' => 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-emerald-600',
+            'arrow' => 'text-emerald-600',
         ],
-
         [
-            'label' => 'Overdue',
-            'sub_label' => $periodLabel,
-            'value' => number_format($overdue),
-            'accent' => 'text-rose-700',
-            'bg' => 'bg-rose-50',
-            'url' => route('followups.index'),
+            'label' => 'Today Demo',
+            'value' => number_format($todayDemos),
+            'icon' => 'demo',
+            'url' => route('leads.index'),
+            'card' => 'border-rose-200 bg-gradient-to-br from-rose-50 to-rose-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-rose-600',
+            'arrow' => 'text-rose-600',
         ],
-
+        [
+            'label' => 'Today Follow-ups',
+            'value' => number_format($todayPendingFollowUps),
+            'icon' => 'calendar',
+            'url' => route('followups.index'),
+            'card' => 'border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-amber-600',
+            'arrow' => 'text-amber-600',
+        ],
+        [
+            'label' => 'Today Overdue',
+            'value' => number_format($todayOverdue),
+            'icon' => 'alert',
+            'url' => route('followups.index'),
+            'card' => 'border-red-200 bg-gradient-to-br from-red-50 to-red-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-red-600',
+            'arrow' => 'text-red-600',
+        ],
         [
             'label' => 'Hot Leads',
-            'sub_label' => 'Current',
             'value' => number_format($hotLeads),
-            'accent' => 'text-orange-700',
-            'bg' => 'bg-orange-50',
+            'icon' => 'hot',
             'url' => route('leads.index'),
+            'card' => 'border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-orange-600',
+            'arrow' => 'text-orange-600',
         ],
-
         [
             'label' => 'Active Employees',
-            'sub_label' => 'Current',
             'value' => number_format($activeUsers),
-            'accent' => 'text-slate-700',
-            'bg' => 'bg-slate-100',
-            'url' => null,
+            'icon' => 'employee',
+            'url' => $employeesUrl,
+            'card' => 'border-cyan-200 bg-gradient-to-br from-cyan-50 to-cyan-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-cyan-600',
+            'arrow' => 'text-cyan-600',
         ],
-
-        [
-            'label' => 'Sales Value',
-            'sub_label' => $periodLabel,
-            'value' => '₹' . number_format($sales, 2),
-            'accent' => 'text-indigo-700',
-            'bg' => 'bg-indigo-50',
-            'url' => null,
-        ],
-
-        [
-            'label' => 'Payment Received',
-            'sub_label' => $periodLabel,
-            'value' => '₹' . number_format($received, 2),
-            'accent' => 'text-cyan-700',
-            'bg' => 'bg-cyan-50',
-            'url' => null,
-        ],
-
     ];
 
+    $overallCards = [
+        [
+            'label' => 'Total Leads',
+            'value' => number_format($totalLeads),
+            'icon' => 'users',
+            'url' => route('leads.index'),
+            'card' => 'border-violet-200 bg-gradient-to-br from-violet-50 to-violet-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-violet-600',
+            'arrow' => 'text-violet-600',
+        ],
+        [
+            'label' => 'Total Calls',
+            'value' => number_format($allCalls),
+            'icon' => 'phone',
+            'url' => route('calls.index'),
+            'card' => 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-blue-600',
+            'arrow' => 'text-blue-600',
+        ],
+        [
+            'label' => 'Total Connected',
+            'value' => number_format($allConnected),
+            'icon' => 'connected',
+            'url' => route('calls.index'),
+            'card' => 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-emerald-600',
+            'arrow' => 'text-emerald-600',
+        ],
+        [
+            'label' => 'Total Demo',
+            'value' => number_format($totalLeadSend),
+            'icon' => 'demo',
+            'url' => route('leads.index'),
+            'card' => 'border-rose-200 bg-gradient-to-br from-rose-50 to-rose-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-rose-600',
+            'arrow' => 'text-rose-600',
+        ],
+        [
+            'label' => 'Pending Follow-ups',
+            'value' => number_format($allPendingFollowUps),
+            'icon' => 'calendar',
+            'url' => route('followups.index'),
+            'card' => 'border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-amber-600',
+            'arrow' => 'text-amber-600',
+        ],
+        [
+            'label' => 'Total Overdue',
+            'value' => number_format($allOverdue),
+            'icon' => 'alert',
+            'url' => route('followups.index'),
+            'card' => 'border-red-200 bg-gradient-to-br from-red-50 to-red-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-red-600',
+            'arrow' => 'text-red-600',
+        ],
+        [
+            'label' => 'Sales Value',
+            'value' => '₹' . number_format($allSales, 2),
+            'icon' => 'sales',
+            'url' => $ordersUrl,
+            'card' => 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-indigo-600',
+            'arrow' => 'text-indigo-600',
+        ],
+        [
+            'label' => 'Payment Received',
+            'value' => '₹' . number_format($allReceived, 2),
+            'icon' => 'payment',
+            'url' => $paymentsUrl,
+            'card' => 'border-teal-200 bg-gradient-to-br from-teal-50 to-teal-100/70',
+            'icon_bg' => 'bg-white',
+            'icon_text' => 'text-teal-600',
+            'arrow' => 'text-teal-600',
+        ],
+    ];
 @endphp
 
+<style>
+    .rvg-dashboard-card {
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
 
-<div class="mx-auto max-w-7xl space-y-6">
+    .rvg-dashboard-card:hover {
+        box-shadow: 0 14px 34px rgba(15, 23, 42, 0.11);
+    }
+
+    .rvg-progress-shine {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .rvg-progress-shine::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 36%;
+        transform: translateX(-140%);
+        background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255,255,255,.45),
+            transparent
+        );
+        animation: rvg-progress-shine 3.8s linear infinite;
+    }
+
+    @keyframes rvg-progress-shine {
+        to {
+            transform: translateX(390%);
+        }
+    }
+
+    .rvg-kpi-card .rvg-kpi-icon svg {
+        width: 20px !important;
+        height: 20px !important;
+    }
+
+    .rvg-kpi-card .rvg-kpi-value {
+        font-size: 1.25rem !important;
+    }
+
+    .rvg-kpi-card .rvg-kpi-label {
+        font-size: .75rem !important;
+        line-height: 1rem;
+    }
+</style>
+
+<div class="mx-auto max-w-[1600px] space-y-4">
 
     {{-- ================================================================ --}}
-    {{-- Header --}}
+    {{-- CRM Completion Banner --}}
     {{-- ================================================================ --}}
 
-    <div
-        class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+    <a
+        href="#quick-links"
+        class="group relative block overflow-hidden rounded-[22px] border border-sky-800/40 bg-slate-950 shadow-[0_18px_50px_rgba(2,32,71,0.18)]"
+        style="background:
+            radial-gradient(circle at 72% 30%, rgba(255,193,92,.45), transparent 22%),
+            radial-gradient(circle at 92% 15%, rgba(80,176,255,.38), transparent 28%),
+            linear-gradient(110deg, #07345a 0%, #07588a 48%, #0b3154 100%);"
     >
+        <div class="absolute inset-0 opacity-20"
+             style="background-image:
+                linear-gradient(30deg, rgba(255,255,255,.08) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.08) 87.5%, rgba(255,255,255,.08)),
+                linear-gradient(150deg, rgba(255,255,255,.08) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.08) 87.5%, rgba(255,255,255,.08)); background-size: 46px 80px;">
+        </div>
 
-        <div>
+        <svg
+            class="absolute bottom-0 right-[12%] h-16 w-[300px] text-slate-950/30 sm:h-20"
+            viewBox="0 0 500 140"
+            fill="currentColor"
+            aria-hidden="true"
+        >
+            <path d="M0 140 95 63l51 38 62-70 72 67 44-36 93 78H0Z"/>
+        </svg>
 
+        <div class="relative grid gap-4 px-4 py-4 lg:grid-cols-[1.15fr_.85fr] lg:items-center lg:px-5 lg:py-4">
             <div class="flex items-center gap-3">
-
-                <div
-                    class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600"
-                >
-                    <svg
-                        class="h-5 w-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path d="M4 19V9"/>
-                        <path d="M10 19V5"/>
-                        <path d="M16 19v-7"/>
-                        <path d="M22 19V3"/>
-                    </svg>
+                <div class="hidden h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white/25 bg-white/10 shadow-xl backdrop-blur sm:flex">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-rose-500 text-xl shadow-inner">
+                        🎯
+                    </div>
                 </div>
 
                 <div>
+                    <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 text-base font-black leading-tight text-white sm:text-lg lg:text-xl">
+                        <span>Aapne CRM Panel ka</span>
+                        <span class="rounded-xl bg-gradient-to-b from-amber-300 to-amber-400 px-3 py-1 text-slate-950 shadow-lg">
+                            {{ $crmCompletion }}%
+                        </span>
+                        <span>complete kar liya hai — ab</span>
+                        <span class="rounded-xl bg-gradient-to-b from-emerald-400 to-teal-500 px-3 py-1 text-white shadow-lg">
+                            {{ $crmRemaining }}%
+                        </span>
+                        <span>aur complete karna baaki hai.</span>
+                    </div>
 
-                    <h1 class="text-2xl font-bold text-slate-900">
-                        Dashboard
-                    </h1>
+                    <div class="mt-2 text-xs font-semibold italic text-white/80 sm:text-sm">
+                        Thoda aur effort, aur badi success!
+                    </div>
+                </div>
+            </div>
 
-                    <p class="mt-0.5 text-sm text-slate-500">
-                        Leads, calls, demos aur follow-ups ka complete overview.
-                    </p>
-
+            <div class="relative">
+                <div class="mb-1.5 flex items-center justify-between text-[10px] font-bold text-white/80 sm:text-xs">
+                    <span>{{ $crmCompletion }}% Complete</span>
+                    <span>{{ $crmRemaining }}% Remaining</span>
                 </div>
 
-            </div>
-
-        </div>
-
-
-        <div class="flex flex-wrap items-center gap-2">
-
-            {{-- Period Filter --}}
-
-            <form
-                method="GET"
-                action="{{ url()->current() }}"
-                class="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
-            >
-
-                <button
-                    type="submit"
-                    name="period"
-                    value="today"
-                    class="rounded-lg px-4 py-2 text-sm font-semibold transition
-                    {{ $period === 'today'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                    }}"
-                >
-                    Today
-                </button>
-
-                <button
-                    type="submit"
-                    name="period"
-                    value="month"
-                    class="rounded-lg px-4 py-2 text-sm font-semibold transition
-                    {{ $period === 'month'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                    }}"
-                >
-                    Month
-                </button>
-
-                <button
-                    type="submit"
-                    name="period"
-                    value="all"
-                    class="rounded-lg px-4 py-2 text-sm font-semibold transition
-                    {{ $period === 'all'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                    }}"
-                >
-                    All
-                </button>
-
-            </form>
-
-
-            @can('leads.import')
-
-                <a
-                    href="{{ route('leads.import.create') }}"
-                    class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-
-                    <svg
-                        class="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path d="M12 3v12"/>
-                        <path d="m7 10 5 5 5-5"/>
-                        <path d="M5 21h14"/>
-                    </svg>
-
-                    Import Leads
-
-                </a>
-
-            @endcan
-
-
-            @can('leads.create')
-
-                <a
-                    href="{{ route('leads.create') }}"
-                    class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                >
-
-                    <svg
-                        class="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path d="M12 5v14"/>
-                        <path d="M5 12h14"/>
-                    </svg>
-
-                    Add Lead
-
-                </a>
-
-            @endcan
-
-        </div>
-
-    </div>
-
-
-    {{-- ================================================================ --}}
-    {{-- Period Information --}}
-    {{-- ================================================================ --}}
-
-    <div
-        class="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-    >
-
-        <div>
-
-            <div
-                class="text-xs font-bold uppercase tracking-wider text-blue-500"
-            >
-                Currently Showing
-            </div>
-
-            <div class="mt-0.5 text-base font-bold text-blue-900">
-                {{ $periodLabel }} Statistics
-            </div>
-
-        </div>
-
-
-        <div
-            class="inline-flex self-start rounded-lg border border-blue-100 bg-white px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm sm:self-auto"
-        >
-
-            @if($period === 'today')
-
-                {{ now()->format('d M Y') }}
-
-            @elseif($period === 'month')
-
-                {{ now()->format('F Y') }}
-
-            @else
-
-                All Records
-
-            @endif
-
-        </div>
-
-    </div>
-
-
-    {{-- ================================================================ --}}
-    {{-- Main KPI Cards --}}
-    {{-- ================================================================ --}}
-
-    <div
-        class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-    >
-
-        @foreach($stats as $stat)
-
-            @if(!empty($stat['url']))
-
-                <a
-                    href="{{ $stat['url'] }}"
-                    class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
-                >
-
-                    <div
-                        class="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full {{ $stat['bg'] }}"
-                    ></div>
-
-                    <div class="relative flex items-start justify-between gap-4">
-
-                        <div class="min-w-0">
-
-                            <div
-                                class="text-sm font-semibold text-slate-500"
-                            >
-                                {{ $stat['label'] }}
-                            </div>
-
-                            <div
-                                class="mt-2 text-2xl font-black tracking-tight {{ $stat['accent'] }}"
-                            >
-                                {{ $stat['value'] }}
-                            </div>
-
-                            <div
-                                class="mt-1 text-xs font-medium text-slate-400"
-                            >
-                                {{ $stat['sub_label'] }}
-                            </div>
-
-                        </div>
-
-
+                <div class="rounded-full border border-white/35 bg-slate-950/35 p-1.5 shadow-inner backdrop-blur">
+                    <div class="h-3 overflow-hidden rounded-full bg-white/15 sm:h-3.5">
                         <div
-                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ $stat['bg'] }}"
-                        >
-
-                            <svg
-                                class="h-5 w-5 {{ $stat['accent'] }}"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                            >
-                                <path d="M5 12h14"/>
-                                <path d="m13 6 6 6-6 6"/>
-                            </svg>
-
-                        </div>
-
-                    </div>
-
-
-                    <div
-                        class="relative mt-4 border-t border-slate-100 pt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 transition group-hover:text-blue-600"
-                    >
-                        View Details →
-                    </div>
-
-                </a>
-
-            @else
-
-                <div
-                    class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-
-                    <div
-                        class="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full {{ $stat['bg'] }}"
-                    ></div>
-
-                    <div class="relative flex items-start justify-between gap-4">
-
-                        <div class="min-w-0">
-
-                            <div class="text-sm font-semibold text-slate-500">
-                                {{ $stat['label'] }}
-                            </div>
-
-                            <div
-                                class="mt-2 text-2xl font-black tracking-tight {{ $stat['accent'] }}"
-                            >
-                                {{ $stat['value'] }}
-                            </div>
-
-                            <div
-                                class="mt-1 text-xs font-medium text-slate-400"
-                            >
-                                {{ $stat['sub_label'] }}
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="h-11 w-11 shrink-0 rounded-xl {{ $stat['bg'] }}"
+                            class="rvg-progress-shine h-full rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 shadow-[0_0_20px_rgba(251,191,36,.55)] transition-all duration-700"
+                            style="width: {{ $crmCompletion }}%"
                         ></div>
-
                     </div>
-
                 </div>
 
-            @endif
+                <div class="mt-2 flex items-center justify-end gap-1.5 text-xs font-black italic text-white">
+                    <span>You Can Do It!</span>
+                    <svg class="h-4 w-4 text-amber-300 transition group-hover:translate-x-1 group-hover:-translate-y-1"
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2 11 13"/>
+                        <path d="m22 2-7 20-4-9-9-4Z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </a>
 
-        @endforeach
+    {{-- ================================================================ --}}
+    {{-- Today Performance Cards --}}
+    {{-- ================================================================ --}}
 
-    </div>
+    <section id="today-performance" class="rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div class="mb-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 text-slate-900 shadow-sm">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M4 19V9M10 19V5M16 19v-7M22 19V3"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-base font-black text-slate-950 sm:text-lg">
+                        Today’s Performance Overview
+                    </h2>
+                    <p class="text-xs text-slate-500">
+                        Aaj ke calls, leads, demo aur follow-ups ka live data.
+                    </p>
+                </div>
+            </div>
 
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+                    {{ now()->format('d M Y') }}
+                </span>
+
+                @can('leads.import')
+                    <a href="{{ route('leads.import.create') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-50">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                        Import Leads
+                    </a>
+                @endcan
+
+                @can('leads.create')
+                    <a href="{{ route('leads.create') }}" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-blue-700">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        Add Lead
+                    </a>
+                @endcan
+
+                <span class="hidden text-[11px] font-black italic text-slate-600 lg:inline">
+                    Small Steps <span class="text-blue-600">Big Results</span> ✈
+                </span>
+            </div>
+        </div>
+
+        <div class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            @foreach($todayCards as $card)
+                <a
+                    href="{{ $card['url'] }}"
+                    class="rvg-dashboard-card rvg-kpi-card group relative min-h-[84px] overflow-hidden rounded-xl border p-3 transition duration-200 hover:-translate-y-0.5 {{ $card['card'] }}"
+                >
+                    <div class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/35"></div>
+
+                    <div class="relative flex items-center gap-3">
+                        <div class="rvg-kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(15,23,42,.10)] {{ $card['icon_bg'] }} {{ $card['icon_text'] }}">
+                            @switch($card['icon'])
+                                @case('users')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="8.5" cy="7" r="4"/>
+                                        <path d="M20 8v6M23 11h-6"/>
+                                    </svg>
+                                    @break
+                                @case('phone')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.09 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L9 10.68a16 16 0 0 0 4.32 4.32l1.23-1.23a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92Z"/>
+                                    </svg>
+                                    @break
+                                @case('connected')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2"/>
+                                        <path d="M15.05 14.95a16 16 0 0 1-6-6"/>
+                                        <path d="m14 4 2 2 4-4"/>
+                                        <path d="M7.1 3H4a2 2 0 0 0-2 2c0 9.4 7.6 17 17 17a2 2 0 0 0 2-2v-3.1"/>
+                                    </svg>
+                                    @break
+                                @case('demo')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="m3 3 18 9-18 9 4-9-4-9Z"/>
+                                        <path d="M7 12h14"/>
+                                    </svg>
+                                    @break
+                                @case('calendar')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <rect x="3" y="4" width="18" height="17" rx="2"/>
+                                        <path d="M16 2v4M8 2v4M3 10h18"/>
+                                        <circle cx="12" cy="15" r="2"/>
+                                    </svg>
+                                    @break
+                                @case('alert')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"/>
+                                        <path d="M12 9v4M12 17h.01"/>
+                                    </svg>
+                                    @break
+                                @case('hot')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M12 22c4 0 7-3 7-7 0-3-1.5-5.5-4.5-8.5.2 2-1 3.2-2.5 4.5.2-4-1.8-6.5-5-9 0 4-3 6.5-3 11 0 5 3.5 9 8 9Z"/>
+                                    </svg>
+                                    @break
+                                @case('employee')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M2 21v-2a6 6 0 0 1 6-6h2"/>
+                                        <path d="m16 17 2 2 4-5"/>
+                                    </svg>
+                                    @break
+                            @endswitch
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <div class="rvg-kpi-value text-xl font-black leading-none tracking-tight text-slate-950">
+                                {{ $card['value'] }}
+                            </div>
+                            <div class="rvg-kpi-label mt-1.5 text-xs font-bold text-slate-700">
+                                {{ $card['label'] }}
+                            </div>
+                        </div>
+
+                        <svg class="h-5 w-5 shrink-0 transition group-hover:translate-x-1 {{ $card['arrow'] }}"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="m9 18 6-6-6-6"/>
+                        </svg>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- ================================================================ --}}
+    {{-- Overall Statistics --}}
+    {{-- ================================================================ --}}
+
+    <section id="overall-statistics" class="rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-200 to-amber-400 text-slate-900 shadow-sm">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M4 19V9M10 19V5M16 19v-7M22 19V3"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-base font-black text-slate-950 sm:text-lg">
+                        Overall Statistics <span class="text-slate-400">(All Time)</span>
+                    </h2>
+                    <p class="text-xs text-slate-500">
+                        Total reports with complete data.
+                    </p>
+                </div>
+            </div>
+
+            <a
+                href="#quick-links"
+                class="inline-flex items-center gap-1.5 self-start rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-white hover:text-blue-600 sm:self-auto"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                    <path d="M16 3v4M8 3v4M3 11h18"/>
+                </svg>
+                All Time
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m9 18 6-6-6-6"/>
+                </svg>
+            </a>
+        </div>
+
+        <div class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            @foreach($overallCards as $card)
+                <a
+                    href="{{ $card['url'] }}"
+                    class="rvg-dashboard-card rvg-kpi-card group relative min-h-[84px] overflow-hidden rounded-xl border p-3 transition duration-200 hover:-translate-y-0.5 {{ $card['card'] }}"
+                >
+                    <div class="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/35"></div>
+
+                    <div class="relative flex items-center gap-3">
+                        <div class="rvg-kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(15,23,42,.10)] {{ $card['icon_bg'] }} {{ $card['icon_text'] }}">
+                            @switch($card['icon'])
+                                @case('users')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="8.5" cy="7" r="4"/>
+                                        <path d="M20 8v6M23 11h-6"/>
+                                    </svg>
+                                    @break
+                                @case('phone')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.09 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L9 10.68a16 16 0 0 0 4.32 4.32l1.23-1.23a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92Z"/>
+                                    </svg>
+                                    @break
+                                @case('connected')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2"/>
+                                        <path d="M15.05 14.95a16 16 0 0 1-6-6"/>
+                                        <path d="m14 4 2 2 4-4"/>
+                                        <path d="M7.1 3H4a2 2 0 0 0-2 2c0 9.4 7.6 17 17 17a2 2 0 0 0 2-2v-3.1"/>
+                                    </svg>
+                                    @break
+                                @case('demo')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="m3 3 18 9-18 9 4-9-4-9Z"/>
+                                        <path d="M7 12h14"/>
+                                    </svg>
+                                    @break
+                                @case('calendar')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <rect x="3" y="4" width="18" height="17" rx="2"/>
+                                        <path d="M16 2v4M8 2v4M3 10h18"/>
+                                        <circle cx="12" cy="15" r="2"/>
+                                    </svg>
+                                    @break
+                                @case('alert')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"/>
+                                        <path d="M12 9v4M12 17h.01"/>
+                                    </svg>
+                                    @break
+                                @case('sales')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/>
+                                    </svg>
+                                    @break
+                                @case('payment')
+                                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <rect x="2" y="5" width="20" height="14" rx="2"/>
+                                        <path d="M2 10h20M16 15h2"/>
+                                    </svg>
+                                    @break
+                            @endswitch
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <div class="rvg-kpi-value truncate text-xl font-black leading-none tracking-tight text-slate-950" title="{{ $card['value'] }}">
+                                {{ $card['value'] }}
+                            </div>
+                            <div class="rvg-kpi-label mt-1.5 text-xs font-bold text-slate-700">
+                                {{ $card['label'] }}
+                            </div>
+                        </div>
+
+                        <svg class="h-5 w-5 shrink-0 transition group-hover:translate-x-1 {{ $card['arrow'] }}"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="m9 18 6-6-6-6"/>
+                        </svg>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+
+        <a
+            href="#quick-links"
+            class="mt-3 flex flex-col gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 px-4 py-2.5 text-white transition hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div class="flex items-center gap-4">
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400 text-lg shadow-md">
+                    🏆
+                </div>
+                <div>
+                    <div class="text-sm font-black text-amber-300">
+                        Keep Going!
+                    </div>
+                    <div class="text-sm text-white/70">
+                        Track your performance and achieve your targets.
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-sm font-bold italic text-white/70">
+                Success is a Journey →
+            </div>
+        </a>
+    </section>
 
     {{-- ================================================================ --}}
     {{-- Dynamic Disposition Statistics --}}
     {{-- ================================================================ --}}
 
-    <section
+    <section id="call-dispositions"
         class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
     >
 
         {{-- Header --}}
 
         <div
-            class="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between"
+            class="flex flex-col gap-3 border-b border-slate-200 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
         >
 
             <div>
@@ -508,7 +692,7 @@
             @if($dispositionStats->isNotEmpty())
 
                 <div
-                    class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                 >
 
                     @foreach($dispositionStats as $disposition)
@@ -586,7 +770,7 @@
 
 
                         <div
-                            class="group relative overflow-hidden rounded-xl border {{ $style['border'] }} {{ $style['bg'] }} p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
+                            class="group relative overflow-hidden rounded-xl border {{ $style['border'] }} {{ $style['bg'] }} p-3 transition hover:-translate-y-0.5 hover:shadow-sm"
                         >
 
                             {{-- Top right active dot --}}
@@ -639,7 +823,7 @@
                             {{-- Count --}}
 
                             <div
-                                class="mt-4 text-3xl font-black tracking-tight {{ $style['number'] }}"
+                                class="mt-3 text-2xl font-black tracking-tight {{ $style['number'] }}"
                             >
                                 {{ number_format($disposition['total']) }}
                             </div>
@@ -672,7 +856,7 @@
 
                             {{-- Footer Badges --}}
 
-                            <div class="mt-4 flex flex-wrap gap-1.5">
+                            <div class="mt-3 flex flex-wrap gap-1.5">
 
                                 @if(!empty($disposition['type']))
 
@@ -849,14 +1033,14 @@
 
 @if($hasFullAccess)
 
-<section
+<section id="employee-performance"
     class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
 >
 
     {{-- Header --}}
 
     <div
-        class="border-b border-slate-200 px-5 py-5"
+        class="border-b border-slate-200 px-4 py-3.5"
     >
 
         <div
@@ -1354,13 +1538,13 @@
     {{-- Quick Links --}}
     {{-- ================================================================ --}}
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div id="quick-links" class="grid gap-4 md:grid-cols-3">
 
         @can('leads.view')
 
             <a
                 href="{{ route('leads.index') }}"
-                class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+                class="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md"
             >
 
                 <div class="flex items-start justify-between gap-3">
@@ -1406,7 +1590,7 @@
 
             <a
                 href="{{ route('followups.index') }}"
-                class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-amber-200 hover:shadow-md"
+                class="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-amber-200 hover:shadow-md"
             >
 
                 <div class="flex items-start justify-between gap-3">
@@ -1452,7 +1636,7 @@
 
             <a
                 href="{{ route('calls.index') }}"
-                class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
+                class="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
             >
 
                 <div class="flex items-start justify-between gap-3">
@@ -1501,7 +1685,7 @@
     {{-- Recent Leads --}}
     {{-- ================================================================ --}}
 
-    <section
+    <section id="recent-leads"
         class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
     >
 
