@@ -1853,7 +1853,7 @@
                                 $durationText = $duration;
                             }
 
-                            $displayName = $lead->company_name ?: $lead->name ?: 'Unnamed Lead';
+                            $displayName = $lead->name  ?: $lead->company_name  ?: 'Unnamed Lead';
                             $initials = collect(preg_split('/\s+/', trim($lead->name ?: $lead->company_name ?: 'Lead')))
                                 ->filter()->take(2)
                                 ->map(fn($word) => mb_strtoupper(mb_substr($word, 0, 1)))
