@@ -176,27 +176,62 @@ public function callOnMobile(
 
 
 
-//     public function index(Request $request): JsonResponse
+
+
+// public function index(Request $request): JsonResponse
 // {
+//     $companyId = $this->companyId($request);
+
 //     /*
 //     |--------------------------------------------------------------------------
-//     | Default Call Filter
+//     | Validation
 //     |--------------------------------------------------------------------------
-//     |
-//     | call_disposition नहीं भेजने पर केवल ऐसी leads आएंगी जिन पर अभी
-//     | तक कोई call log नहीं बना है।
-//     |
-//     | call_disposition=all भेजने पर सभी accessible leads आएंगी।
-//     |
 //     */
 
-//     if (!$request->has('call_disposition')) {
-//         $request->merge([
-//             'call_disposition' => 'no_call',
-//         ]);
-//     }
-
 //     $validated = $request->validate([
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Exact Lead / Call Disposition Filters
+//         |--------------------------------------------------------------------------
+//         |
+//         | lead_id=4607
+//         | call_disposition_id=3
+//         |
+//         | Dono saath bhejne par wahi exact accessible lead return hogi jiske
+//         | kisi call log me selected disposition save hai.
+//         |
+//         */
+
+//         'lead_id' => [
+//             'nullable',
+//             'integer',
+//             'min:1',
+//             Rule::exists('leads', 'id')->where(
+//                 fn ($query) => $query
+//                     ->where('company_id', $companyId)
+//                     ->whereNull('deleted_at')
+//             ),
+//         ],
+
+//         'call_disposition_id' => [
+//             'nullable',
+//             'integer',
+//             'min:1',
+//             Rule::exists('call_dispositions', 'id')->where(
+//                 fn ($query) => $query->where(
+//                     fn ($scope) => $scope
+//                         ->whereNull('company_id')
+//                         ->orWhere('company_id', $companyId)
+//                 )
+//             ),
+//         ],
+
+//         'call_disposition_type' => [
+//             'nullable',
+//             'string',
+//             'max:100',
+//         ],
+
 //         'search' => [
 //             'nullable',
 //             'string',
@@ -249,18 +284,6 @@ public function callOnMobile(
 //             ]),
 //         ],
 
-//         /*
-//          * Allowed values:
-//          * no_call
-//          * all
-//          * disposition ID जैसे 1, 2, 3
-//          */
-//         'call_disposition' => [
-//             'nullable',
-//             'string',
-//             'max:50',
-//         ],
-
 //         'label_id' => [
 //             'nullable',
 //             'integer',
@@ -297,6 +320,84 @@ public function callOnMobile(
 //             'after_or_equal:date_from',
 //         ],
 
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Separate section filters
+//         |--------------------------------------------------------------------------
+//         */
+
+//         'new_category' => [
+//             'nullable',
+//             'string',
+//             'max:255',
+//         ],
+
+//         'dialed_category' => [
+//             'nullable',
+//             'string',
+//             'max:255',
+//         ],
+
+//         'connected_category' => [
+//             'nullable',
+//             'string',
+//             'max:255',
+//         ],
+
+//         'new_disposition' => [
+//             'nullable',
+//             'string',
+//             'max:50',
+//         ],
+
+//         'dialed_disposition' => [
+//             'nullable',
+//             'string',
+//             'max:50',
+//         ],
+
+//         'connected_disposition' => [
+//             'nullable',
+//             'string',
+//             'max:50',
+//         ],
+
+//         'new_assigned_to' => [
+//             'nullable',
+//             'string',
+//         ],
+
+//         'dialed_assigned_to' => [
+//             'nullable',
+//             'string',
+//         ],
+
+//         'connected_assigned_to' => [
+//             'nullable',
+//             'string',
+//         ],
+
+//         'new_team_id' => [
+//             'nullable',
+//             'integer',
+//         ],
+
+//         'dialed_team_id' => [
+//             'nullable',
+//             'integer',
+//         ],
+
+//         'connected_team_id' => [
+//             'nullable',
+//             'integer',
+//         ],
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Pagination
+//         |--------------------------------------------------------------------------
+//         */
+
 //         'per_page' => [
 //             'nullable',
 //             'integer',
@@ -308,159 +409,1089 @@ public function callOnMobile(
 //                 200,
 //             ]),
 //         ],
+
+//         'new_page' => [
+//             'nullable',
+//             'integer',
+//             'min:1',
+//         ],
+
+//         'dialed_page' => [
+//             'nullable',
+//             'integer',
+//             'min:1',
+//         ],
+
+//         'connected_page' => [
+//             'nullable',
+//             'integer',
+//             'min:1',
+//         ],
 //     ]);
 
-//     $callDisposition = (string) (
-//         $validated['call_disposition']
-//         ?? 'no_call'
-//     );
 
 //     /*
 //     |--------------------------------------------------------------------------
-//     | Filter Request
+//     | Base Request
 //     |--------------------------------------------------------------------------
 //     |
-//     | filteredLeadQuery() के अंदर मौजूद call disposition filter हटाकर
-//     | नीचे नया complete filter लगाया जाएगा।
+//     | Section-specific filters filteredLeadQuery() ko nahi bhejne.
 //     |
 //     */
 
-//     $filterRequest = clone $request;
+//     $baseRequest = clone $request;
 
-//     $filterRequest->query->remove(
-//         'call_disposition'
-//     );
+//     $removeKeys = [
+//         'lead_id',
+//         'call_disposition_id',
+//         'call_disposition_type',
 
-//     $filterRequest->request->remove(
-//         'call_disposition'
-//     );
+//         'call_state',
+//         'call_disposition',
 
-//     /*
-//     |--------------------------------------------------------------------------
-//     | Base Lead Query
-//     |--------------------------------------------------------------------------
-//     */
+//         'new_category',
+//         'dialed_category',
+//         'connected_category',
 
-//     $query = $this->filteredLeadQuery(
-//         $filterRequest
-//     )
-//         ->with([
-//             'assignedUser:id,name,email,employee_code,team_id',
-//             'source:id,name',
-//             'status:id,name,color',
-//             'team:id,name',
-//             'stage:id,name,color',
-//             'labels:id,company_id,name,color',
-//         ])
-//         ->addSelect([
-//             'latest_note_body' => Note::query()
-//                 ->select('body')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
+//         'new_disposition',
+//         'dialed_disposition',
+//         'connected_disposition',
 
-//             'latest_note_created_at' => Note::query()
-//                 ->select('created_at')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
+//         'new_assigned_to',
+//         'dialed_assigned_to',
+//         'connected_assigned_to',
 
-//             'latest_note_user_name' => Note::query()
-//                 ->leftJoin(
-//                     'users',
-//                     'users.id',
-//                     '=',
-//                     'notes.user_id'
-//                 )
-//                 ->select('users.name')
-//                 ->whereColumn(
-//                     'notes.lead_id',
-//                     'leads.id'
-//                 )
-//                 ->latest('notes.id')
-//                 ->limit(1),
-//         ]);
+//         'new_team_id',
+//         'dialed_team_id',
+//         'connected_team_id',
+
+//         'new_page',
+//         'dialed_page',
+//         'connected_page',
+
+//         'page',
+//         'per_page',
+//     ];
+
+//     foreach ($removeKeys as $key) {
+//         $baseRequest->query->remove($key);
+//         $baseRequest->request->remove($key);
+//     }
+
 
 //     /*
 //     |--------------------------------------------------------------------------
-//     | Call Filter
+//     | Base Accessible Query
+//     |--------------------------------------------------------------------------
+//     |
+//     | Existing Admin / Super Admin / Team Leader / Employee permission
+//     | filteredLeadQuery() se hi chalega.
+//     |
+//     */
+
+//     $baseQuery = $this->filteredLeadQuery(
+//         $baseRequest
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Exact Lead ID Filter
+//     |--------------------------------------------------------------------------
+//     |
+//     | Ye common base query par lagega, isliye new/dialed/connected tino
+//     | sections aur unke counts sirf selected lead ke according banenge.
+//     |
+//     */
+
+//     if (!empty($validated['lead_id'])) {
+//         $baseQuery->whereKey(
+//             (int) $validated['lead_id']
+//         );
+//     }
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Relations
 //     |--------------------------------------------------------------------------
 //     */
 
-//     if ($callDisposition === 'no_call') {
-//         /*
-//          * जिन leads पर एक भी call log नहीं है।
-//          */
-//         $query->whereDoesntHave('calls');
-//     } elseif ($callDisposition === 'all') {
-//         /*
-//          * सभी accessible leads.
-//          * कोई call filter नहीं लगेगा।
-//          */
-//     } elseif (ctype_digit($callDisposition)) {
-//         /*
-//          * केवल वही leads जिनकी latest call का disposition
-//          * selected disposition है।
-//          */
+//     $relations = [
+//         'assignedUser:id,name,email,employee_code,team_id',
 
-//         $dispositionId = (int) $callDisposition;
+//         'source:id,name',
 
-//         $query->whereHas(
-//             'calls',
-//             function (
-//                 Builder $callQuery
-//             ) use ($dispositionId) {
-//                 $callQuery
-//                     ->where(
-//                         'call_disposition_id',
-//                         $dispositionId
+//         'status:id,name,color',
+
+//         'team:id,name',
+
+//         'stage:id,name,color',
+
+//         'labels:id,company_id,name,color',
+
+//         'latestCall' => function ($query) {
+//             $query->with([
+//                 'disposition',
+//                 'user:id,name',
+//             ]);
+//         },
+
+//         'latestNote.user:id,name',
+
+//         'latestFollowUp' => function ($query) {
+//             $query->with([
+//                 'assignedUser:id,name',
+//             ]);
+//         },
+//     ];
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Prepare Lead Query
+//     |--------------------------------------------------------------------------
+//     |
+//     | Teenon sections me same relation + latest note + latest current call data.
+//     |
+//     */
+
+//     $prepareQuery = function (Builder $query) use ($relations) {
+
+//         return $query
+//             ->with($relations)
+
+//             /*
+//              * Existing/global call count.
+//              */
+//             ->withCount('calls')
+
+//             ->addSelect([
+
+//                 /*
+//                 |--------------------------------------------------------------------------
+//                 | Latest Call ID Of Current Assignment
+//                 |--------------------------------------------------------------------------
+//                 */
+
+//                 'latest_call_id' => CallLog::query()
+//                     ->select('id')
+//                     ->whereColumn(
+//                         'call_logs.lead_id',
+//                         'leads.id'
 //                     )
-//                     ->whereRaw(
-//                         'call_logs.id = (
-//                             SELECT MAX(cl2.id)
-//                             FROM call_logs AS cl2
-//                             WHERE cl2.lead_id = call_logs.lead_id
-//                         )'
+//                     ->where(
+//                         function (Builder $callScope) {
+
+//                             $callScope
+
+//                                 /*
+//                                  * Assigned Lead:
+//                                  * Current employee ki latest assignment ke
+//                                  * baad ki calls.
+//                                  */
+//                                 ->where(
+//                                     function (Builder $assigned) {
+
+//                                         $assigned
+//                                             ->whereNotNull(
+//                                                 'leads.assigned_to'
+//                                             )
+//                                             ->whereColumn(
+//                                                 'call_logs.user_id',
+//                                                 'leads.assigned_to'
+//                                             )
+//                                             ->whereRaw(
+//                                                 "
+//                                                 call_logs.created_at >=
+//                                                 COALESCE(
+//                                                     (
+//                                                         SELECT MAX(
+//                                                             la.assigned_at
+//                                                         )
+//                                                         FROM lead_assignments AS la
+
+//                                                         WHERE la.lead_id =
+//                                                             leads.id
+
+//                                                         AND la.new_user_id =
+//                                                             leads.assigned_to
+//                                                     ),
+//                                                     leads.created_at
+//                                                 )
+//                                                 "
+//                                             );
+//                                     }
+//                                 )
+
+//                                 /*
+//                                  * Unassigned lead:
+//                                  * Global call behavior.
+//                                  */
+//                                 ->orWhere(
+//                                     function (Builder $unassigned) {
+
+//                                         $unassigned
+//                                             ->whereNull(
+//                                                 'leads.assigned_to'
+//                                             );
+//                                     }
+//                                 );
+//                         }
+//                     )
+//                     ->latest('call_logs.id')
+//                     ->limit(1),
+
+
+//                 /*
+//                 |--------------------------------------------------------------------------
+//                 | Latest Note
+//                 |--------------------------------------------------------------------------
+//                 */
+
+//                 'latest_note_body' => Note::query()
+//                     ->select('body')
+//                     ->whereColumn(
+//                         'notes.lead_id',
+//                         'leads.id'
+//                     )
+//                     ->latest('notes.id')
+//                     ->limit(1),
+
+
+//                 'latest_note_created_at' => Note::query()
+//                     ->select('created_at')
+//                     ->whereColumn(
+//                         'notes.lead_id',
+//                         'leads.id'
+//                     )
+//                     ->latest('notes.id')
+//                     ->limit(1),
+
+
+//                 'latest_note_user_name' => Note::query()
+//                     ->leftJoin(
+//                         'users',
+//                         'users.id',
+//                         '=',
+//                         'notes.user_id'
+//                     )
+//                     ->select(
+//                         'users.name'
+//                     )
+//                     ->whereColumn(
+//                         'notes.lead_id',
+//                         'leads.id'
+//                     )
+//                     ->latest('notes.id')
+//                     ->limit(1),
+//             ]);
+//     };
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Current Assignment Call Scope
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $currentAssignmentCallScope = function (
+//         Builder $callQuery
+//     ) {
+
+//         $callQuery->where(
+//             function (Builder $scope) {
+
+//                 /*
+//                  * Assigned lead.
+//                  */
+//                 $scope
+//                     ->where(
+//                         function (Builder $assigned) {
+
+//                             $assigned
+//                                 ->whereNotNull(
+//                                     'leads.assigned_to'
+//                                 )
+//                                 ->whereColumn(
+//                                     'call_logs.user_id',
+//                                     'leads.assigned_to'
+//                                 )
+//                                 ->whereRaw(
+//                                     "
+//                                     call_logs.created_at >=
+//                                     COALESCE(
+//                                         (
+//                                             SELECT MAX(
+//                                                 la.assigned_at
+//                                             )
+//                                             FROM lead_assignments AS la
+
+//                                             WHERE la.lead_id =
+//                                                 leads.id
+
+//                                             AND la.new_user_id =
+//                                                 leads.assigned_to
+//                                         ),
+//                                         leads.created_at
+//                                     )
+//                                     "
+//                                 );
+//                         }
+//                     )
+
+//                     /*
+//                      * Unassigned lead.
+//                      */
+//                     ->orWhere(
+//                         function (Builder $unassigned) {
+
+//                             $unassigned
+//                                 ->whereNull(
+//                                     'leads.assigned_to'
+//                                 );
+//                         }
 //                     );
 //             }
 //         );
-//     } else {
-//         /*
-//          * गलत call_disposition value पर empty result.
-//          */
-//         $query->whereRaw('1 = 0');
-//     }
+//     };
 
-//     $perPage = (int) (
-//         $validated['per_page'] ?? 25
-//     );
-
-//     $leads = $query
-//         ->latest('leads.id')
-//         ->paginate($perPage);
 
 //     /*
-//      * Response में applied filter भी मिलेगा।
-//      */
-//     $leads->setCollection(
-//         $leads->getCollection()->map(
-//             function ($lead) use ($callDisposition) {
-//                 $lead->applied_call_filter =
-//                     $callDisposition;
+//     |--------------------------------------------------------------------------
+//     | Global Latest Call Disposition Filter
+//     |--------------------------------------------------------------------------
+//     |
+//     | call_disposition_id aur call_disposition_type historical call par nahi,
+//     | current assignment ki latest call par match honge.
+//     |
+//     */
 
-//                 return $lead;
+//     $callDispositionId = !empty($validated['call_disposition_id'])
+//         ? (int) $validated['call_disposition_id']
+//         : null;
+
+//     $callDispositionType = !empty($validated['call_disposition_type'])
+//         ? strtolower(trim((string) $validated['call_disposition_type']))
+//         : null;
+
+//     if ($callDispositionId !== null || $callDispositionType !== null) {
+//         $baseQuery->whereHas(
+//             'calls',
+//             function (Builder $calls) use (
+//                 $callDispositionId,
+//                 $callDispositionType,
+//                 $currentAssignmentCallScope,
+//                 $companyId
+//             ) {
+//                 $currentAssignmentCallScope($calls);
+
+//                 $calls->where(
+//                     'call_logs.company_id',
+//                     $companyId
+//                 );
+
+//                 if ($callDispositionId !== null) {
+//                     $calls->where(
+//                         'call_logs.call_disposition_id',
+//                         $callDispositionId
+//                     );
+//                 }
+
+//                 if ($callDispositionType !== null) {
+//                     $calls->whereHas(
+//                         'disposition',
+//                         function (Builder $disposition) use (
+//                             $callDispositionType,
+//                             $companyId
+//                         ) {
+//                             $disposition
+//                                 ->whereRaw(
+//                                     'LOWER(call_dispositions.type) = ?',
+//                                     [$callDispositionType]
+//                                 )
+//                                 ->where(function (Builder $scope) use ($companyId) {
+//                                     $scope
+//                                         ->whereNull('call_dispositions.company_id')
+//                                         ->orWhere(
+//                                             'call_dispositions.company_id',
+//                                             $companyId
+//                                         );
+//                                 });
+//                         }
+//                     );
+//                 }
+
+//                 $calls->whereRaw(
+//                     "
+//                     call_logs.id = (
+//                         SELECT MAX(cl_latest.id)
+//                         FROM call_logs AS cl_latest
+//                         WHERE cl_latest.lead_id = call_logs.lead_id
+//                         AND (
+//                             (
+//                                 leads.assigned_to IS NOT NULL
+//                                 AND cl_latest.user_id = leads.assigned_to
+//                                 AND cl_latest.created_at >= COALESCE(
+//                                     (
+//                                         SELECT MAX(la_latest.assigned_at)
+//                                         FROM lead_assignments AS la_latest
+//                                         WHERE la_latest.lead_id = leads.id
+//                                         AND la_latest.new_user_id = leads.assigned_to
+//                                     ),
+//                                     leads.created_at
+//                                 )
+//                             )
+//                             OR leads.assigned_to IS NULL
+//                         )
+//                     )
+//                     "
+//                 );
 //             }
-//         )
+//         );
+//     }
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | NEW CALL
+//     |--------------------------------------------------------------------------
+//     |
+//     | Current assignment ke baad ek bhi call nahi.
+//     |
+//     */
+
+//     $newQuery = clone $baseQuery;
+
+//     $newQuery->whereDoesntHave(
+//         'calls',
+//         $currentAssignmentCallScope
 //     );
 
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | DIALED CALL
+//     |--------------------------------------------------------------------------
+//     |
+//     | Current assignment ke baad kam se kam ek call hui.
+//     | Disposition kuch bhi ho sakta hai.
+//     |
+//     */
+
+//     $dialedQuery = clone $baseQuery;
+
+//     $dialedQuery->whereHas(
+//         'calls',
+//         $currentAssignmentCallScope
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | CONNECTED CALL
+//     |--------------------------------------------------------------------------
+//     |
+//     | Current assignment par call honi chahiye
+//     |
+//     | AND
+//     |
+//     | remarks / remark / auto_remarks / note hona chahiye.
+//     |
+//     */
+
+//     $connectedQuery = clone $baseQuery;
+
+//     /*
+//      * Current assignment ki call compulsory.
+//      */
+//     $connectedQuery->whereHas(
+//         'calls',
+//         $currentAssignmentCallScope
+//     );
+
+//     $connectedQuery->where(
+//         function (Builder $connected) use (
+//             $currentAssignmentCallScope
+//         ) {
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | Note Exists
+//             |--------------------------------------------------------------------------
+//             */
+
+//             $connected->whereHas('notes');
+
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | remarks
+//             |--------------------------------------------------------------------------
+//             */
+
+//             if (
+//                 Schema::hasColumn(
+//                     'call_logs',
+//                     'remarks'
+//                 )
+//             ) {
+
+//                 $connected->orWhereHas(
+//                     'calls',
+//                     function (
+//                         Builder $calls
+//                     ) use (
+//                         $currentAssignmentCallScope
+//                     ) {
+
+//                         $currentAssignmentCallScope(
+//                             $calls
+//                         );
+
+//                         $calls
+//                             ->whereNotNull(
+//                                 'remarks'
+//                             )
+//                             ->whereRaw(
+//                                 "
+//                                 TRIM(
+//                                     COALESCE(
+//                                         remarks,
+//                                         ''
+//                                     )
+//                                 ) <> ''
+//                                 "
+//                             );
+//                     }
+//                 );
+//             }
+
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | remark
+//             |--------------------------------------------------------------------------
+//             */
+
+//             if (
+//                 Schema::hasColumn(
+//                     'call_logs',
+//                     'remark'
+//                 )
+//             ) {
+
+//                 $connected->orWhereHas(
+//                     'calls',
+//                     function (
+//                         Builder $calls
+//                     ) use (
+//                         $currentAssignmentCallScope
+//                     ) {
+
+//                         $currentAssignmentCallScope(
+//                             $calls
+//                         );
+
+//                         $calls
+//                             ->whereNotNull(
+//                                 'remark'
+//                             )
+//                             ->whereRaw(
+//                                 "
+//                                 TRIM(
+//                                     COALESCE(
+//                                         remark,
+//                                         ''
+//                                     )
+//                                 ) <> ''
+//                                 "
+//                             );
+//                     }
+//                 );
+//             }
+
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | auto_remarks
+//             |--------------------------------------------------------------------------
+//             */
+
+//             if (
+//                 Schema::hasColumn(
+//                     'call_logs',
+//                     'auto_remarks'
+//                 )
+//             ) {
+
+//                 $connected->orWhereHas(
+//                     'calls',
+//                     function (
+//                         Builder $calls
+//                     ) use (
+//                         $currentAssignmentCallScope
+//                     ) {
+
+//                         $currentAssignmentCallScope(
+//                             $calls
+//                         );
+
+//                         $calls
+//                             ->whereNotNull(
+//                                 'auto_remarks'
+//                             )
+//                             ->whereRaw(
+//                                 "
+//                                 TRIM(
+//                                     COALESCE(
+//                                         auto_remarks,
+//                                         ''
+//                                     )
+//                                 ) <> ''
+//                                 "
+//                             );
+//                     }
+//                 );
+//             }
+//         }
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Keep Dialed And Connected Sections Unique
+//     |--------------------------------------------------------------------------
+//     |
+//     | Connected lead ko Dialed section se exclude kar rahe hain. Isse ek lead
+//     | response me do sections me repeat nahi hogi aur counts.total unique rahega.
+//     |
+//     */
+
+//     $dialedQuery->whereNotIn(
+//         'leads.id',
+//         (clone $connectedQuery)->select('leads.id')
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Section Specific Filters
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $applySectionFilters = function (
+//         Builder $query,
+//         string $section
+//     ) use (
+//         $request,
+//         $currentAssignmentCallScope
+//     ) {
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Category
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $category = $request->input(
+//             "{$section}_category"
+//         );
+
+//         if (
+//             $category !== null &&
+//             $category !== ''
+//         ) {
+
+//             $query->where(
+//                 'leads.category',
+//                 $category
+//             );
+//         }
+
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Employee
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $assignedTo = $request->input(
+//             "{$section}_assigned_to"
+//         );
+
+//         if (
+//             $assignedTo !== null &&
+//             $assignedTo !== ''
+//         ) {
+
+//             if ($assignedTo === 'unassigned') {
+
+//                 $query->whereNull(
+//                     'leads.assigned_to'
+//                 );
+
+//             } elseif (
+//                 ctype_digit(
+//                     (string) $assignedTo
+//                 )
+//             ) {
+
+//                 $query->where(
+//                     'leads.assigned_to',
+//                     (int) $assignedTo
+//                 );
+//             }
+//         }
+
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Team
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $teamId = $request->input(
+//             "{$section}_team_id"
+//         );
+
+//         if ($teamId) {
+
+//             $query->where(
+//                 'leads.team_id',
+//                 (int) $teamId
+//             );
+//         }
+
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Disposition
+//         |--------------------------------------------------------------------------
+//         |
+//         | New section me normally disposition nahi hoga.
+//         |
+//         | Dialed/Connected me current assignment ki latest call ka
+//         | disposition match hoga.
+//         |
+//         */
+
+//         $disposition = $request->input(
+//             "{$section}_disposition"
+//         );
+
+//         if (
+//             $disposition !== null &&
+//             $disposition !== '' &&
+//             $disposition !== 'all'
+//         ) {
+
+//             if ($disposition === 'no_call') {
+
+//                 $query->whereDoesntHave(
+//                     'calls',
+//                     $currentAssignmentCallScope
+//                 );
+
+//             } elseif (
+//                 ctype_digit(
+//                     (string) $disposition
+//                 )
+//             ) {
+
+//                 $dispositionId =
+//                     (int) $disposition;
+
+//                 $query->whereHas(
+//                     'calls',
+//                     function (
+//                         Builder $calls
+//                     ) use (
+//                         $dispositionId,
+//                         $currentAssignmentCallScope
+//                     ) {
+
+//                         /*
+//                          * Current assignment calls only.
+//                          */
+//                         $currentAssignmentCallScope(
+//                             $calls
+//                         );
+
+//                         /*
+//                          * Selected disposition.
+//                          */
+//                         $calls->where(
+//                             'call_disposition_id',
+//                             $dispositionId
+//                         );
+
+//                         /*
+//                          * Current assignment ki latest call hi
+//                          * selected disposition honi chahiye.
+//                          */
+//                         $calls->whereRaw(
+//                             "
+//                             call_logs.id = (
+//                                 SELECT MAX(cl2.id)
+
+//                                 FROM call_logs AS cl2
+
+//                                 WHERE cl2.lead_id =
+//                                     call_logs.lead_id
+
+//                                 AND (
+//                                     (
+//                                         leads.assigned_to IS NOT NULL
+
+//                                         AND cl2.user_id =
+//                                             leads.assigned_to
+
+//                                         AND cl2.created_at >=
+//                                             COALESCE(
+//                                                 (
+//                                                     SELECT MAX(
+//                                                         la.assigned_at
+//                                                     )
+//                                                     FROM lead_assignments AS la
+
+//                                                     WHERE la.lead_id =
+//                                                         leads.id
+
+//                                                     AND la.new_user_id =
+//                                                         leads.assigned_to
+//                                                 ),
+//                                                 leads.created_at
+//                                             )
+//                                     )
+
+//                                     OR
+
+//                                     leads.assigned_to IS NULL
+//                                 )
+//                             )
+//                             "
+//                         );
+//                     }
+//                 );
+
+//             } else {
+
+//                 /*
+//                  * Invalid disposition.
+//                  */
+//                 $query->whereRaw(
+//                     '1 = 0'
+//                 );
+//             }
+//         }
+//     };
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Apply Section Filters
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $applySectionFilters(
+//         $newQuery,
+//         'new'
+//     );
+
+//     $applySectionFilters(
+//         $dialedQuery,
+//         'dialed'
+//     );
+
+//     $applySectionFilters(
+//         $connectedQuery,
+//         'connected'
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Counts
+//     |--------------------------------------------------------------------------
+//     |
+//     | Ye filtered counts hain.
+//     |
+//     */
+
+//     $newCount =
+//         (clone $newQuery)->count();
+
+//     $dialedCount =
+//         (clone $dialedQuery)->count();
+
+//     $connectedCount =
+//         (clone $connectedQuery)->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Pagination
+//     |--------------------------------------------------------------------------
+//     |
+//     | Har section ki separate pagination.
+//     |
+//     */
+
+//     $perPage = (int) (
+//         $validated['per_page']
+//         ?? 25
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | New Leads
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $newLeads =
+//         $prepareQuery(
+//             clone $newQuery
+//         )
+//             ->orderByDesc(
+//                 'leads.id'
+//             )
+//             ->paginate(
+//                 $perPage,
+//                 ['*'],
+//                 'new_page'
+//             );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Dialed Leads
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $dialedLeads =
+//         $prepareQuery(
+//             clone $dialedQuery
+//         )
+//             ->orderByDesc(
+//                 'latest_call_id'
+//             )
+//             ->orderByDesc(
+//                 'leads.id'
+//             )
+//             ->paginate(
+//                 $perPage,
+//                 ['*'],
+//                 'dialed_page'
+//             );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Connected Leads
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $connectedLeads =
+//         $prepareQuery(
+//             clone $connectedQuery
+//         )
+//             ->orderByDesc(
+//                 'latest_call_id'
+//             )
+//             ->orderByDesc(
+//                 'leads.id'
+//             )
+//             ->paginate(
+//                 $perPage,
+//                 ['*'],
+//                 'connected_page'
+//             );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Final API Response
+//     |--------------------------------------------------------------------------
+//     |
+//     | Ek hi API me teen separate sections.
+//     |
+//     */
+
+//     $data = [
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Summary
+//         |--------------------------------------------------------------------------
+//         */
+
+//         'counts' => [
+//             'new' =>
+//                 $newCount,
+
+//             'dialed' =>
+//                 $dialedCount,
+
+//             'connected' =>
+//                 $connectedCount,
+
+//             'total' =>
+//                 $newCount +
+//                 $dialedCount +
+//                 $connectedCount,
+//         ],
+
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | NEW
+//         |--------------------------------------------------------------------------
+//         */
+
+//         'new' => [
+//             'count' =>
+//                 $newCount,
+
+//             'leads' =>
+//                 $newLeads,
+//         ],
+
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | DIALED
+//         |--------------------------------------------------------------------------
+//         */
+
+//         'dialed' => [
+//             'count' =>
+//                 $dialedCount,
+
+//             'leads' =>
+//                 $dialedLeads,
+//         ],
+
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | CONNECTED
+//         |--------------------------------------------------------------------------
+//         */
+
+//         'connected' => [
+//             'count' =>
+//                 $connectedCount,
+
+//             'leads' =>
+//                 $connectedLeads,
+//         ],
+//     ];
+
+
 //     return $this->success(
-//         $leads,
+//         $data,
 //         'Leads fetched successfully.'
 //     );
 // }
@@ -1185,166 +2216,52 @@ public function index(Request $request): JsonResponse
     |
     | AND
     |
-    | remarks / remark / auto_remarks / note hona chahiye.
+    | Sirf actual call remarks / legacy remark hona chahiye.
     |
     */
 
     $connectedQuery = clone $baseQuery;
 
-    /*
-     * Current assignment ki call compulsory.
-     */
     $connectedQuery->whereHas(
         'calls',
-        $currentAssignmentCallScope
-    );
-
-    $connectedQuery->where(
-        function (Builder $connected) use (
+        function (Builder $calls) use (
             $currentAssignmentCallScope
         ) {
 
             /*
-            |--------------------------------------------------------------------------
-            | Note Exists
-            |--------------------------------------------------------------------------
+            * Sirf current assignment ki call.
             */
-
-            $connected->whereHas('notes');
-
+            $currentAssignmentCallScope($calls);
 
             /*
-            |--------------------------------------------------------------------------
-            | remarks
-            |--------------------------------------------------------------------------
+            * Web ki tarah:
+            * actual remarks hone par hi Connected.
             */
+            if (Schema::hasColumn('call_logs', 'remarks')) {
 
-            if (
-                Schema::hasColumn(
-                    'call_logs',
-                    'remarks'
-                )
-            ) {
+                $calls
+                    ->whereNotNull('remarks')
+                    ->whereRaw(
+                        "TRIM(COALESCE(call_logs.remarks, '')) <> ''"
+                    );
 
-                $connected->orWhereHas(
-                    'calls',
-                    function (
-                        Builder $calls
-                    ) use (
-                        $currentAssignmentCallScope
-                    ) {
+            } elseif (Schema::hasColumn('call_logs', 'remark')) {
 
-                        $currentAssignmentCallScope(
-                            $calls
-                        );
+                // Legacy fallback
+                $calls
+                    ->whereNotNull('remark')
+                    ->whereRaw(
+                        "TRIM(COALESCE(call_logs.remark, '')) <> ''"
+                    );
 
-                        $calls
-                            ->whereNotNull(
-                                'remarks'
-                            )
-                            ->whereRaw(
-                                "
-                                TRIM(
-                                    COALESCE(
-                                        remarks,
-                                        ''
-                                    )
-                                ) <> ''
-                                "
-                            );
-                    }
-                );
-            }
+            } else {
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | remark
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                Schema::hasColumn(
-                    'call_logs',
-                    'remark'
-                )
-            ) {
-
-                $connected->orWhereHas(
-                    'calls',
-                    function (
-                        Builder $calls
-                    ) use (
-                        $currentAssignmentCallScope
-                    ) {
-
-                        $currentAssignmentCallScope(
-                            $calls
-                        );
-
-                        $calls
-                            ->whereNotNull(
-                                'remark'
-                            )
-                            ->whereRaw(
-                                "
-                                TRIM(
-                                    COALESCE(
-                                        remark,
-                                        ''
-                                    )
-                                ) <> ''
-                                "
-                            );
-                    }
-                );
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | auto_remarks
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                Schema::hasColumn(
-                    'call_logs',
-                    'auto_remarks'
-                )
-            ) {
-
-                $connected->orWhereHas(
-                    'calls',
-                    function (
-                        Builder $calls
-                    ) use (
-                        $currentAssignmentCallScope
-                    ) {
-
-                        $currentAssignmentCallScope(
-                            $calls
-                        );
-
-                        $calls
-                            ->whereNotNull(
-                                'auto_remarks'
-                            )
-                            ->whereRaw(
-                                "
-                                TRIM(
-                                    COALESCE(
-                                        auto_remarks,
-                                        ''
-                                    )
-                                ) <> ''
-                                "
-                            );
-                    }
-                );
+                $calls->whereRaw('1 = 0');
             }
         }
     );
+
+
 
 
     /*
@@ -1357,10 +2274,10 @@ public function index(Request $request): JsonResponse
     |
     */
 
-    $dialedQuery->whereNotIn(
-        'leads.id',
-        (clone $connectedQuery)->select('leads.id')
-    );
+    // $dialedQuery->whereNotIn(
+    //     'leads.id',
+    //     (clone $connectedQuery)->select('leads.id')
+    // );
 
 
     /*
@@ -1617,6 +2534,11 @@ public function index(Request $request): JsonResponse
     $connectedCount =
         (clone $connectedQuery)->count();
 
+    // New + Dialed + Connected ko add nahi karna,
+    // kyunki Connected lead Dialed me bhi ho sakti hai.
+    $totalCount =
+        (clone $baseQuery)->count();
+
 
     /*
     |--------------------------------------------------------------------------
@@ -1629,7 +2551,7 @@ public function index(Request $request): JsonResponse
 
     $perPage = (int) (
         $validated['per_page']
-        ?? 25
+        ?? 10
     );
 
 
@@ -1727,9 +2649,7 @@ public function index(Request $request): JsonResponse
                 $connectedCount,
 
             'total' =>
-                $newCount +
-                $dialedCount +
-                $connectedCount,
+                $totalCount,
         ],
 
 
@@ -1784,6 +2704,11 @@ public function index(Request $request): JsonResponse
         'Leads fetched successfully.'
     );
 }
+
+
+
+
+
 
     public function options(Request $request): JsonResponse
     {
