@@ -666,6 +666,205 @@ class DashboardController extends Controller
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Logged-in User Work Completion Score
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Ye score sirf currently logged-in user ke CURRENTLY assigned leads
+        | aur us user ke khud ke work par based hai.
+        |
+        | Formula:
+        | - Called lead coverage      = 40%
+        | - Demo lead coverage        = 30%
+        | - Follow-up completion      = 30%
+        | - Overdue penalty           = max 20 points
+        |
+        | Overdue penalty proportional hai:
+        | overdue follow-ups / actionable follow-ups * 20
+        |
+        | Cancelled follow-ups completion denominator me include nahi honge.
+        |
+        */
+
+        $myAssignedLeadIds = Lead::query()
+            ->where('company_id', $companyId)
+            ->where('assigned_to', $userId)
+            ->pluck('id');
+
+        $myAssignedLeads = $myAssignedLeadIds->count();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Unique Assigned Leads Called By Logged-in User
+        |--------------------------------------------------------------------------
+        |
+        | Ek lead par kitni bhi calls ho, progress me lead ek hi baar count hogi.
+        |
+        */
+
+        $myCalledLeads = $myAssignedLeads > 0
+            ? CallLog::query()
+                ->where('company_id', $companyId)
+                ->where('user_id', $userId)
+                ->whereIn('lead_id', $myAssignedLeadIds)
+                ->distinct()
+                ->count('lead_id')
+            : 0;
+
+        $myCallPercentage = $myAssignedLeads > 0
+            ? round(($myCalledLeads / $myAssignedLeads) * 100, 1)
+            : 0.0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Unique Assigned Leads With "Demo" Disposition
+        |--------------------------------------------------------------------------
+        |
+        | Demo lead column ke demo_send flag se nahi,
+        | actual call disposition name = Demo se count hoga.
+        |
+        */
+
+        $myDemoLeads = $myAssignedLeads > 0
+            ? CallLog::query()
+                ->where('company_id', $companyId)
+                ->where('user_id', $userId)
+                ->whereIn('lead_id', $myAssignedLeadIds)
+                ->whereHas('disposition', function (Builder $query) {
+                    $query->whereRaw(
+                        "LOWER(TRIM(name)) = ?",
+                        ['demo']
+                    );
+                })
+                ->distinct()
+                ->count('lead_id')
+            : 0;
+
+        $myDemoPercentage = $myAssignedLeads > 0
+            ? round(($myDemoLeads / $myAssignedLeads) * 100, 1)
+            : 0.0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Logged-in User Follow-up Performance
+        |--------------------------------------------------------------------------
+        |
+        | Sirf wahi follow-ups jo directly logged-in user ko assigned hain.
+        | Cancelled follow-ups ko completion target me include nahi karenge.
+        |
+        */
+
+        $myFollowUpBase = FollowUp::query()
+            ->where('company_id', $companyId)
+            ->where('assigned_to', $userId)
+            ->whereIn('status', [
+                'pending',
+                'completed',
+            ]);
+
+        $myFollowUps = (clone $myFollowUpBase)
+            ->count();
+
+        $myCompletedFollowUps = (clone $myFollowUpBase)
+            ->where('status', 'completed')
+            ->count();
+
+        $myOverdueFollowUps = (clone $myFollowUpBase)
+            ->where('status', 'pending')
+            ->whereNotNull('scheduled_at')
+            ->where('scheduled_at', '<', now())
+            ->count();
+
+        $myFollowUpPercentage = $myFollowUps > 0
+            ? round(
+                ($myCompletedFollowUps / $myFollowUps) * 100,
+                1
+            )
+            : 0.0;
+
+        $myOverduePercentage = $myFollowUps > 0
+            ? round(
+                ($myOverdueFollowUps / $myFollowUps) * 100,
+                1
+            )
+            : 0.0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Final CRM Work Completion
+        |--------------------------------------------------------------------------
+        |
+        | Calls     = 40 points
+        | Demo      = 30 points
+        | Follow-up = 30 points
+        |
+        | Agar user ke paas ek bhi follow-up target nahi hai to available
+        | weights ko normalize kar diya jayega, taaki bina follow-up ke
+        | maximum score 70 par atak na jaye.
+        |
+        */
+
+        $callPoints =
+            ($myCallPercentage / 100) * 40;
+
+        $demoPoints =
+            ($myDemoPercentage / 100) * 30;
+
+        $followUpPoints = $myFollowUps > 0
+            ? ($myFollowUpPercentage / 100) * 30
+            : 0;
+
+        $availableWeight =
+            40
+            + 30
+            + ($myFollowUps > 0 ? 30 : 0);
+
+        $rawCompletionPoints =
+            $callPoints
+            + $demoPoints
+            + $followUpPoints;
+
+        $baseCompletionPercentage = $availableWeight > 0
+            ? ($rawCompletionPoints / $availableWeight) * 100
+            : 0;
+
+        /*
+        | Maximum 20 points penalty.
+        | Example:
+        | 10 actionable follow-ups me 2 overdue = 20% overdue
+        | Penalty = 20% of 20 = 4 points.
+        */
+
+        $myOverduePenalty = $myFollowUps > 0
+            ? round(
+                min(
+                    20,
+                    ($myOverdueFollowUps / $myFollowUps) * 20
+                ),
+                1
+            )
+            : 0.0;
+
+        $crmCompletion = (int) round(
+            max(
+                0,
+                min(
+                    100,
+                    $baseCompletionPercentage - $myOverduePenalty
+                )
+            )
+        );
+
+        $crmRemaining =
+            max(0, 100 - $crmCompletion);
+
+
     /*
     |--------------------------------------------------------------------------
     | Dashboard Snapshot Statistics
@@ -780,6 +979,89 @@ class DashboardController extends Controller
 
     $allReceived = (float) $allReceivedQuery->sum('amount');
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | 30-Day Dashboard Activity Trend
+    |--------------------------------------------------------------------------
+    |
+    | Overall Statistics ke niche line graph ke liye real day-wise data.
+    | Same dashboard visibility rules use ho rahe hain.
+    |
+    */
+
+    $trendStart = now()->copy()->subDays(29)->startOfDay();
+    $trendEnd = now()->copy()->endOfDay();
+
+    $trendCallCounts = (clone $callsBaseQuery)
+        ->whereBetween('created_at', [$trendStart, $trendEnd])
+        ->selectRaw('DATE(created_at) as trend_date, COUNT(*) as total')
+        ->groupByRaw('DATE(created_at)')
+        ->pluck('total', 'trend_date');
+
+    $trendConnectedCounts = (clone $callsBaseQuery)
+        ->whereBetween('created_at', [$trendStart, $trendEnd])
+        ->whereHas('disposition', function (Builder $query) {
+            $query->where('type', 'connected');
+        })
+        ->selectRaw('DATE(created_at) as trend_date, COUNT(*) as total')
+        ->groupByRaw('DATE(created_at)')
+        ->pluck('total', 'trend_date');
+
+    $trendDemoCounts = (clone $leadQuery)
+        ->where('demo_send', true)
+        ->whereNotNull('demo_sent_at')
+        ->whereBetween('demo_sent_at', [$trendStart, $trendEnd])
+        ->selectRaw('DATE(demo_sent_at) as trend_date, COUNT(*) as total')
+        ->groupByRaw('DATE(demo_sent_at)')
+        ->pluck('total', 'trend_date');
+
+    $trendFollowUpCounts = (clone $snapshotFollowUpBase)
+        ->whereNotNull('scheduled_at')
+        ->whereBetween('scheduled_at', [$trendStart, $trendEnd])
+        ->selectRaw('DATE(scheduled_at) as trend_date, COUNT(*) as total')
+        ->groupByRaw('DATE(scheduled_at)')
+        ->pluck('total', 'trend_date');
+
+    $trendLabels = [];
+    $trendCalls = [];
+    $trendConnected = [];
+    $trendDemos = [];
+    $trendFollowUps = [];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build Exact 30-Day Trend Array
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | Carbon mutable/immutable configuration dono me safe rahe.
+    | while + addDay() use karne par immutable Carbon me cursor mutate nahi hota,
+    | jis wajah se infinite loop aur memory exhausted error aa sakta hai.
+    |
+    */
+
+    for ($dayOffset = 0; $dayOffset < 30; $dayOffset++) {
+        $trendDate = $trendStart
+            ->copy()
+            ->addDays($dayOffset);
+
+        $trendKey = $trendDate->format('Y-m-d');
+
+        $trendLabels[] = $trendDate->format('d M');
+        $trendCalls[] = (int) ($trendCallCounts[$trendKey] ?? 0);
+        $trendConnected[] = (int) ($trendConnectedCounts[$trendKey] ?? 0);
+        $trendDemos[] = (int) ($trendDemoCounts[$trendKey] ?? 0);
+        $trendFollowUps[] = (int) ($trendFollowUpCounts[$trendKey] ?? 0);
+    }
+
+    $performanceTrend = [
+        'labels' => $trendLabels,
+        'calls' => $trendCalls,
+        'connected' => $trendConnected,
+        'demos' => $trendDemos,
+        'followups' => $trendFollowUps,
+    ];
 
 
 
@@ -1173,6 +1455,34 @@ class DashboardController extends Controller
         */
 
         'activeUsers' => $activeUsers,
+
+        /*
+         * Logged-in User Work Completion
+         */
+
+        'crmCompletion' => $crmCompletion,
+        'crmRemaining' => $crmRemaining,
+
+        'myAssignedLeads' => $myAssignedLeads,
+        'myCalledLeads' => $myCalledLeads,
+        'myCallPercentage' => $myCallPercentage,
+
+        'myDemoLeads' => $myDemoLeads,
+        'myDemoPercentage' => $myDemoPercentage,
+
+        'myFollowUps' => $myFollowUps,
+        'myCompletedFollowUps' => $myCompletedFollowUps,
+        'myFollowUpPercentage' => $myFollowUpPercentage,
+
+        'myOverdueFollowUps' => $myOverdueFollowUps,
+        'myOverduePercentage' => $myOverduePercentage,
+        'myOverduePenalty' => $myOverduePenalty,
+
+        /*
+         * Advanced 30-Day Trend Graph
+         */
+
+        'performanceTrend' => $performanceTrend,
 
 
         /*
