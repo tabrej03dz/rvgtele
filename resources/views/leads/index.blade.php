@@ -2928,35 +2928,108 @@
                 }
             },
 
+            // dispositionChanged(event) {
+            //     const option = event.target.options[event.target.selectedIndex];
+
+            //     if (!option || !option.value) {
+            //         this.callForm.remarks = '';
+            //         this.callForm.followupAt = '';
+            //         this.callForm.showRemarks = false;
+            //         this.callForm.remarksRequired = false;
+            //         this.callForm.showFollowup = false;
+            //         this.callForm.followupRequired = false;
+            //         return;
+            //     }
+
+            //     const requiresRemarks = option.dataset.requiresRemarks === '1';
+            //     const requiresFollowUp = option.dataset.requiresFollowUp === '1';
+            //     const autoRemarks = String(option.dataset.autoRemarks || '').trim();
+            //     const nextMinutes = Number(option.dataset.nextFollowup || 0);
+            //     const hasAutoFollowup = Number.isFinite(nextMinutes) && nextMinutes > 0;
+
+            //     this.callForm.remarks = autoRemarks;
+            //     this.callForm.remarksRequired = requiresRemarks;
+            //     this.callForm.showRemarks = requiresRemarks || autoRemarks !== '';
+
+            //     this.callForm.followupAt = hasAutoFollowup
+            //         ? this.datetimeLocalAfterMinutes(nextMinutes)
+            //         : '';
+
+            //     this.callForm.followupRequired = requiresFollowUp || hasAutoFollowup;
+            //     this.callForm.showFollowup = requiresFollowUp || hasAutoFollowup;
+            // },
+
             dispositionChanged(event) {
                 const option = event.target.options[event.target.selectedIndex];
 
                 if (!option || !option.value) {
                     this.callForm.remarks = '';
                     this.callForm.followupAt = '';
+
+                    // Disposition select nahi hai to remark hide rahega
                     this.callForm.showRemarks = false;
                     this.callForm.remarksRequired = false;
+
                     this.callForm.showFollowup = false;
                     this.callForm.followupRequired = false;
+
                     return;
                 }
 
-                const requiresRemarks = option.dataset.requiresRemarks === '1';
-                const requiresFollowUp = option.dataset.requiresFollowUp === '1';
-                const autoRemarks = String(option.dataset.autoRemarks || '').trim();
-                const nextMinutes = Number(option.dataset.nextFollowup || 0);
-                const hasAutoFollowup = Number.isFinite(nextMinutes) && nextMinutes > 0;
+                const requiresRemarks =
+                    option.dataset.requiresRemarks === '1';
+
+                const requiresFollowUp =
+                    option.dataset.requiresFollowUp === '1';
+
+                const autoRemarks =
+                    String(option.dataset.autoRemarks || '').trim();
+
+                const nextMinutes =
+                    Number(option.dataset.nextFollowup || 0);
+
+                const hasAutoFollowup =
+                    Number.isFinite(nextMinutes) &&
+                    nextMinutes > 0;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Remarks
+                |--------------------------------------------------------------------------
+                |
+                | Koi bhi disposition select hote hi Remarks field dikhega.
+                | Required ka existing dynamic logic same rahega.
+                |
+                */
 
                 this.callForm.remarks = autoRemarks;
-                this.callForm.remarksRequired = requiresRemarks;
-                this.callForm.showRemarks = requiresRemarks || autoRemarks !== '';
 
-                this.callForm.followupAt = hasAutoFollowup
-                    ? this.datetimeLocalAfterMinutes(nextMinutes)
-                    : '';
+                this.callForm.remarksRequired =
+                    requiresRemarks;
 
-                this.callForm.followupRequired = requiresFollowUp || hasAutoFollowup;
-                this.callForm.showFollowup = requiresFollowUp || hasAutoFollowup;
+                this.callForm.showRemarks = true;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Follow-up
+                |--------------------------------------------------------------------------
+                |
+                | Existing logic same.
+                |
+                */
+
+                this.callForm.followupAt =
+                    hasAutoFollowup
+                        ? this.datetimeLocalAfterMinutes(nextMinutes)
+                        : '';
+
+                this.callForm.followupRequired =
+                    requiresFollowUp || hasAutoFollowup;
+
+                this.callForm.showFollowup =
+                    requiresFollowUp || hasAutoFollowup;
             },
 
             async sendCall(leadId) {

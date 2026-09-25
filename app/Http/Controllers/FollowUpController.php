@@ -75,6 +75,7 @@ class FollowUpController extends Controller
 
         $companyId = (int) $user->company_id;
         $currentUserId = (int) $user->id;
+        $visibleUserIds = $this->visibleAssignedUserIds($user);
 
         $query = FollowUp::query()
             ->with([
@@ -82,7 +83,7 @@ class FollowUpController extends Controller
                 'assignedUser',
             ])
             ->where('company_id', $companyId)
-            ->where('assigned_to', $currentUserId);
+            ->whereIn('assigned_to', $visibleUserIds);
 
         /*
         |--------------------------------------------------------------------------
@@ -159,7 +160,7 @@ class FollowUpController extends Controller
 
         $base = FollowUp::query()
             ->where('company_id', $companyId)
-            ->where('assigned_to', $currentUserId);
+            ->whereIn('assigned_to', $visibleUserIds);
 
         /*
         |--------------------------------------------------------------------------
@@ -930,8 +931,15 @@ class FollowUpController extends Controller
 
         abort_unless($user, 401);
 
+        $visibleUserIds =
+            $this->visibleAssignedUserIds($user);
+
         abort_unless(
-            (int) $followUp->company_id === (int) $user->company_id,
+            in_array(
+                (int) $followUp->assigned_to,
+                $visibleUserIds,
+                true
+            ),
             403,
             'You are not allowed to access this follow-up.'
         );
@@ -1061,11 +1069,131 @@ class FollowUpController extends Controller
     //     );
     // }
 
-    private function visibleAssignedUserIds(User $currentUser): array
+//     private function visibleAssignedUserIds(User $currentUser): array
+// {
+//     return [
+//         (int) $currentUser->id,
+//     ];
+// }
+
+private function visibleAssignedUserIds(User $currentUser): array
 {
-    return [
-        (int) $currentUser->id,
-    ];
+    $currentUserId = (int) $currentUser->id;
+    $companyId = (int) $currentUser->company_id;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Safety
+    |--------------------------------------------------------------------------
+    */
+
+    if (!$companyId) {
+        return [$currentUserId];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current User Highest Role Rank
+    |--------------------------------------------------------------------------
+    */
+
+    $currentRank = $this->effectiveRoleRank($currentUser);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Unknown Role
+    |--------------------------------------------------------------------------
+    |
+    | Role hierarchy me configured nahi hai to sirf apna follow-up dikhega.
+    |
+    */
+
+    if ($currentRank === null) {
+        return [$currentUserId];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Same Company Users
+    |--------------------------------------------------------------------------
+    */
+
+    $companyUsers = User::query()
+        ->where('company_id', $companyId)
+        ->with('roles:id,name')
+        ->get([
+            'id',
+            'company_id',
+        ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Own + Strictly Lower Role Users
+    |--------------------------------------------------------------------------
+    */
+
+    $visibleIds = $companyUsers
+        ->filter(function (User $candidate) use (
+            $currentUserId,
+            $currentRank
+        ) {
+
+            /*
+            |--------------------------------------------------------------
+            | Apna Follow-up Hamesha Visible
+            |--------------------------------------------------------------
+            */
+
+            if ((int) $candidate->id === $currentUserId) {
+                return true;
+            }
+
+            /*
+            |--------------------------------------------------------------
+            | Candidate Role Rank
+            |--------------------------------------------------------------
+            */
+
+            $candidateRank =
+                $this->effectiveRoleRank($candidate);
+
+            if ($candidateRank === null) {
+                return false;
+            }
+
+            /*
+            |--------------------------------------------------------------
+            | Sirf Lower Role
+            |--------------------------------------------------------------
+            |
+            | Higher number = lower authority.
+            |
+            | Same role wale users ek dusre ke follow-up nahi dekhenge.
+            |
+            */
+
+            return $candidateRank > $currentRank;
+        })
+        ->pluck('id')
+        ->map(
+            fn ($id) => (int) $id
+        )
+        ->values()
+        ->all();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Own ID Safety
+    |--------------------------------------------------------------------------
+    */
+
+    if (!in_array($currentUserId, $visibleIds, true)) {
+        $visibleIds[] = $currentUserId;
+    }
+
+    return array_values(
+        array_unique($visibleIds)
+    );
 }
 
 
