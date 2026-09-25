@@ -20,11 +20,23 @@
 
         <div>
 
-            <h1 class="text-2xl font-extrabold text-slate-900">
+            <h1
+                class="
+                    text-2xl
+                    font-extrabold
+                    text-slate-900
+                "
+            >
                 Demo Images
             </h1>
 
-            <p class="mt-1 text-xs text-slate-500">
+            <p
+                class="
+                    mt-1
+                    text-xs
+                    text-slate-500
+                "
+            >
                 Search and download city wise customer demo images
             </p>
 
@@ -52,12 +64,14 @@
                 hover:bg-slate-50
             "
         >
+
             <i
                 data-lucide="arrow-left"
                 class="h-4 w-4"
             ></i>
 
             Demo Cities
+
         </a>
 
     </div>
@@ -126,7 +140,12 @@
 
 
             {{-- NUMBER OF IMAGES --}}
-            <div class="w-full md:w-48">
+            <div
+                class="
+                    w-full
+                    md:w-48
+                "
+            >
 
                 <label
                     class="
@@ -153,9 +172,11 @@
                         rounded-lg
                         border
                         border-slate-200
+                        bg-white
                         px-4
                         text-sm
                         outline-none
+                        transition
                         focus:border-amber-400
                     "
                 >
@@ -163,7 +184,7 @@
             </div>
 
 
-            {{-- GET IMAGES --}}
+            {{-- SEARCH BUTTON --}}
             <button
                 type="submit"
                 id="searchButton"
@@ -181,6 +202,8 @@
                     text-white
                     transition
                     hover:bg-slate-800
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
                 "
             >
 
@@ -189,7 +212,9 @@
                     class="h-4 w-4"
                 ></i>
 
-                <span id="searchButtonText">
+                <span
+                    id="searchButtonText"
+                >
                     Get Images
                 </span>
 
@@ -200,7 +225,7 @@
     </div>
 
 
-    {{-- RESULT INFO --}}
+    {{-- RESULT INFORMATION --}}
     <div
         id="resultInfo"
         class="
@@ -210,6 +235,7 @@
             border-slate-200
             bg-white
             p-4
+            shadow-sm
         "
     >
 
@@ -224,12 +250,24 @@
             "
         >
 
-            <div class="flex items-center gap-8">
+            <div
+                class="
+                    flex
+                    flex-wrap
+                    items-center
+                    gap-8
+                "
+            >
 
                 {{-- CITY --}}
                 <div>
 
-                    <div class="text-xs text-slate-500">
+                    <div
+                        class="
+                            text-xs
+                            text-slate-500
+                        "
+                    >
                         City
                     </div>
 
@@ -246,10 +284,15 @@
                 </div>
 
 
-                {{-- COUNT --}}
+                {{-- IMAGES --}}
                 <div>
 
-                    <div class="text-xs text-slate-500">
+                    <div
+                        class="
+                            text-xs
+                            text-slate-500
+                        "
+                    >
                         Images Found
                     </div>
 
@@ -270,7 +313,7 @@
             </div>
 
 
-            {{-- BULK DOWNLOAD --}}
+            {{-- DOWNLOAD ALL --}}
             <button
                 type="button"
                 id="bulkDownloadButton"
@@ -290,6 +333,8 @@
                     text-white
                     transition
                     hover:bg-slate-800
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
                 "
             >
 
@@ -298,7 +343,9 @@
                     class="h-4 w-4"
                 ></i>
 
-                <span class="bulk-download-text">
+                <span
+                    class="bulk-download-text"
+                >
                     Download All
                 </span>
 
@@ -327,11 +374,16 @@
                 flex
                 items-center
                 justify-between
-                gap-3
+                gap-4
             "
         >
 
-            <div>
+            <div
+                class="
+                    min-w-0
+                    flex-1
+                "
+            >
 
                 <div
                     class="
@@ -347,7 +399,6 @@
                     id="downloadCurrentFile"
                     class="
                         mt-1
-                        max-w-[600px]
                         truncate
                         text-[10px]
                         font-semibold
@@ -375,7 +426,7 @@
         </div>
 
 
-        {{-- BAR --}}
+        {{-- PROGRESS BAR --}}
         <div
             class="
                 mt-3
@@ -401,27 +452,60 @@
         </div>
 
 
+        {{-- COUNTS --}}
         <div
             class="
                 mt-2
                 flex
+                flex-wrap
                 items-center
                 justify-between
+                gap-3
                 text-[10px]
                 font-bold
             "
         >
 
-            <span class="text-emerald-700">
+            <span
+                class="
+                    text-emerald-700
+                "
+            >
                 Downloaded:
-                <span id="downloadedCount">
+
+                <span
+                    id="downloadedCount"
+                >
                     0
                 </span>
             </span>
 
-            <span class="text-red-600">
+
+            <span
+                class="
+                    text-amber-700
+                "
+            >
+                Retrying:
+
+                <span
+                    id="retryCount"
+                >
+                    0
+                </span>
+            </span>
+
+
+            <span
+                class="
+                    text-red-600
+                "
+            >
                 Failed:
-                <span id="failedCount">
+
+                <span
+                    id="failedCount"
+                >
                     0
                 </span>
             </span>
@@ -557,7 +641,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Global Data
+    | Global Variables
     |--------------------------------------------------------------------------
     */
 
@@ -577,80 +661,102 @@
             'demoImageForm'
         );
 
+
     const grid =
         document.getElementById(
             'imageGrid'
         );
+
 
     const loadingBox =
         document.getElementById(
             'loadingBox'
         );
 
+
     const errorBox =
         document.getElementById(
             'errorBox'
         );
+
 
     const emptyBox =
         document.getElementById(
             'emptyBox'
         );
 
+
     const resultInfo =
         document.getElementById(
             'resultInfo'
         );
+
 
     const resultCity =
         document.getElementById(
             'resultCity'
         );
 
+
     const resultCount =
         document.getElementById(
             'resultCount'
         );
+
 
     const searchButton =
         document.getElementById(
             'searchButton'
         );
 
+
     const searchButtonText =
         document.getElementById(
             'searchButtonText'
         );
+
 
     const bulkDownloadButton =
         document.getElementById(
             'bulkDownloadButton'
         );
 
+
     const downloadProgressBox =
         document.getElementById(
             'downloadProgressBox'
         );
+
 
     const downloadProgressText =
         document.getElementById(
             'downloadProgressText'
         );
 
+
     const downloadProgressBar =
         document.getElementById(
             'downloadProgressBar'
         );
+
 
     const downloadCurrentFile =
         document.getElementById(
             'downloadCurrentFile'
         );
 
+
     const downloadedCount =
         document.getElementById(
             'downloadedCount'
         );
+
+
+    const retryCount =
+        document.getElementById(
+            'retryCount'
+        );
+
 
     const failedCount =
         document.getElementById(
@@ -660,7 +766,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Search Images
+    | Search Demo Images
     |--------------------------------------------------------------------------
     */
 
@@ -670,7 +776,10 @@
 
             event.preventDefault();
 
-            if (bulkDownloadRunning) {
+
+            if (
+                bulkDownloadRunning
+            ) {
                 return;
             }
 
@@ -681,95 +790,143 @@
             |--------------------------------------------------------------------------
             */
 
-            currentDemoImages = [];
-
-            grid.innerHTML = '';
-
-            errorBox.classList.add(
-                'hidden'
-            );
-
-            emptyBox.classList.add(
-                'hidden'
-            );
-
-            resultInfo.classList.add(
-                'hidden'
-            );
-
-            bulkDownloadButton.classList.add(
-                'hidden'
-            );
-
-            downloadProgressBox.classList.add(
-                'hidden'
-            );
-
-            loadingBox.classList.remove(
-                'hidden'
-            );
+            currentDemoImages =
+                [];
 
 
-            searchButton.disabled = true;
+            grid.innerHTML =
+                '';
+
+
+            errorBox
+                .classList
+                .add(
+                    'hidden'
+                );
+
+
+            emptyBox
+                .classList
+                .add(
+                    'hidden'
+                );
+
+
+            resultInfo
+                .classList
+                .add(
+                    'hidden'
+                );
+
+
+            bulkDownloadButton
+                .classList
+                .add(
+                    'hidden'
+                );
+
+
+            downloadProgressBox
+                .classList
+                .add(
+                    'hidden'
+                );
+
+
+            loadingBox
+                .classList
+                .remove(
+                    'hidden'
+                );
+
+
+            searchButton.disabled =
+                true;
+
 
             searchButtonText.textContent =
                 'Loading...';
 
 
+            /*
+            |--------------------------------------------------------------------------
+            | Values
+            |--------------------------------------------------------------------------
+            */
+
             const city =
-                document.getElementById(
-                    'city'
-                )
+                document
+                    .getElementById(
+                        'city'
+                    )
                     .value
                     .trim();
 
 
             const numberOfImages =
-                document.getElementById(
-                    'number_of_images'
-                ).value;
+                document
+                    .getElementById(
+                        'number_of_images'
+                    )
+                    .value;
 
 
             try {
 
                 /*
                 |--------------------------------------------------------------------------
-                | Call API
+                | API Call
                 |--------------------------------------------------------------------------
                 */
 
-                const response = await fetch(
-                    "{{ route('api.demo-images') }}",
-                    {
-                        method: 'POST',
+                const response =
+                    await fetch(
+                        "{{ route('api.demo-images') }}",
+                        {
+                            method:
+                                'POST',
 
-                        headers: {
+                            headers: {
 
-                            'Accept':
-                                'application/json',
+                                'Accept':
+                                    'application/json',
 
-                            'Content-Type':
-                                'application/json',
-                        },
+                                'Content-Type':
+                                    'application/json',
+                            },
 
-                        body: JSON.stringify({
+                            body:
+                                JSON.stringify({
 
-                            city: city,
+                                    city:
+                                        city,
 
-                            number_of_images:
-                                numberOfImages
-                                ? Number(
-                                    numberOfImages
-                                )
-                                : null,
-                        }),
-                    }
-                );
+                                    number_of_images:
+                                        numberOfImages
+                                            ? Number(
+                                                numberOfImages
+                                            )
+                                            : null,
+                                }),
+                        }
+                    );
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | JSON
+                |--------------------------------------------------------------------------
+                */
 
                 const data =
                     await response.json();
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | Check Error
+                |--------------------------------------------------------------------------
+                */
 
                 if (
                     !response.ok
@@ -795,25 +952,33 @@
                     Array.isArray(
                         data.data
                     )
-                        ? data.data
-                        : [];
+                        ?
+                        data.data
+                        :
+                        [];
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Result Header
+                | Header Information
                 |--------------------------------------------------------------------------
                 */
 
                 resultCity.textContent =
-                    data.city ?? city;
+                    data.city
+                    ??
+                    city;
+
 
                 resultCount.textContent =
                     currentDemoImages.length;
 
-                resultInfo.classList.remove(
-                    'hidden'
-                );
+
+                resultInfo
+                    .classList
+                    .remove(
+                        'hidden'
+                    );
 
 
                 /*
@@ -824,12 +989,15 @@
 
                 if (
                     currentDemoImages.length
-                    === 0
+                    ===
+                    0
                 ) {
 
-                    emptyBox.classList.remove(
-                        'hidden'
-                    );
+                    emptyBox
+                        .classList
+                        .remove(
+                            'hidden'
+                        );
 
                     return;
                 }
@@ -837,13 +1005,15 @@
 
                 /*
                 |--------------------------------------------------------------------------
-                | Show Bulk Download
+                | Download All Button
                 |--------------------------------------------------------------------------
                 */
 
-                bulkDownloadButton.classList.remove(
-                    'hidden'
-                );
+                bulkDownloadButton
+                    .classList
+                    .remove(
+                        'hidden'
+                    );
 
 
                 /*
@@ -852,40 +1022,54 @@
                 |--------------------------------------------------------------------------
                 */
 
-                currentDemoImages.forEach(
-                    function (
-                        item,
-                        index
-                    ) {
-
-                        renderDemoImage(
+                currentDemoImages
+                    .forEach(
+                        function (
                             item,
-                            index,
-                            city
-                        );
-                    }
-                );
+                            index
+                        ) {
+
+                            renderDemoImage(
+                                item,
+                                index,
+                                city
+                            );
+                        }
+                    );
 
 
             } catch (error) {
+
+                console.error(
+                    error
+                );
+
 
                 errorBox.textContent =
                     error.message
                     ||
                     'Something went wrong.';
 
-                errorBox.classList.remove(
-                    'hidden'
-                );
+
+                errorBox
+                    .classList
+                    .remove(
+                        'hidden'
+                    );
+
 
             } finally {
 
-                loadingBox.classList.add(
-                    'hidden'
-                );
+                loadingBox
+                    .classList
+                    .add(
+                        'hidden'
+                    );
+
 
                 searchButton.disabled =
                     false;
+
 
                 searchButtonText.textContent =
                     'Get Images';
@@ -899,7 +1083,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Render Single Image Card
+    | Render Single Image
     |--------------------------------------------------------------------------
     */
 
@@ -914,13 +1098,28 @@
                 'div'
             );
 
+
         card.className =
             'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm';
 
 
-        const imageUrl =
-            item.media ?? '';
+        /*
+        |--------------------------------------------------------------------------
+        | Image URL
+        |--------------------------------------------------------------------------
+        */
 
+        const imageUrl =
+            item.media
+            ??
+            '';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Download Filename
+        |--------------------------------------------------------------------------
+        */
 
         const fileName =
             makeDemoFileName(
@@ -929,12 +1128,24 @@
             );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Laravel Proxy Download URL
+        |--------------------------------------------------------------------------
+        */
+
         const downloadUrl =
             buildDownloadUrl(
                 imageUrl,
                 fileName
             );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Card
+        |--------------------------------------------------------------------------
+        */
 
         card.innerHTML = `
 
@@ -994,7 +1205,11 @@
             </div>
 
 
-            <div class="p-3">
+            <div
+                class="
+                    p-3
+                "
+            >
 
                 <div
                     class="
@@ -1039,7 +1254,9 @@
                     <span>
                         ${
                             escapeHtml(
-                                item.date || ''
+                                item.date
+                                ||
+                                ''
                             )
                         }
                     </span>
@@ -1047,7 +1264,9 @@
                     <span>
                         ${
                             escapeHtml(
-                                item.city || city
+                                item.city
+                                ||
+                                city
                             )
                         }
                     </span>
@@ -1064,6 +1283,7 @@
                     "
                 >
 
+                    {{-- VIEW --}}
                     <a
                         href="${escapeHtml(imageUrl)}"
                         target="_blank"
@@ -1089,6 +1309,7 @@
                     </a>
 
 
+                    {{-- DOWNLOAD --}}
                     <a
                         href="${escapeHtml(downloadUrl)}"
                         class="
@@ -1123,25 +1344,289 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Bulk Download All Demo Images
+    | Fetch Download With Browser Retry
     |--------------------------------------------------------------------------
     |
-    | Exactly one by one:
+    | Laravel backend khud 5 attempts karega.
     |
-    | 1/10
-    | 2/10
-    | 3/10
+    | Uske baad bhi request fail hui to browser dobara request karega.
     |
+    */
+
+    async function fetchDownloadWithRetry(
+        url,
+        maxAttempts = 3
+    ) {
+
+        let lastError =
+            null;
+
+
+        for (
+            let attempt = 1;
+            attempt <= maxAttempts;
+            attempt++
+        ) {
+
+            try {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Request
+                |--------------------------------------------------------------------------
+                */
+
+                const response =
+                    await fetch(
+                        url,
+                        {
+                            method:
+                                'GET',
+
+                            credentials:
+                                'same-origin',
+
+                            headers: {
+
+                                'Accept':
+                                    'application/octet-stream,image/*,*/*',
+
+                                'X-Requested-With':
+                                    'XMLHttpRequest',
+                            },
+
+                            cache:
+                                'no-store',
+                        }
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Success
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    response.ok
+                ) {
+
+                    const contentType =
+                        (
+                            response
+                                .headers
+                                .get(
+                                    'content-type'
+                                )
+                            ||
+                            ''
+                        )
+                        .toLowerCase();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Prevent HTML Login/Error Page From Saving As Image
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        contentType.includes(
+                            'text/html'
+                        )
+                        ||
+                        contentType.includes(
+                            'application/json'
+                        )
+                    ) {
+
+                        const text =
+                            await response.text();
+
+
+                        throw new Error(
+                            'Server returned invalid download response.'
+                            +
+                            (
+                                text
+                                    ?
+                                    ' '
+                                    +
+                                    text.substring(
+                                        0,
+                                        150
+                                    )
+                                    :
+                                    ''
+                            )
+                        );
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Blob
+                    |--------------------------------------------------------------------------
+                    */
+
+                    const blob =
+                        await response.blob();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Empty Blob Protection
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        !blob
+                        ||
+                        blob.size <= 0
+                    ) {
+
+                        throw new Error(
+                            'Downloaded image is empty.'
+                        );
+                    }
+
+
+                    return blob;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Read Server Error
+                |--------------------------------------------------------------------------
+                */
+
+                let serverMessage =
+                    '';
+
+
+                try {
+
+                    const errorData =
+                        await response
+                            .clone()
+                            .json();
+
+
+                    serverMessage =
+                        errorData.message
+                        ||
+                        errorData.error
+                        ||
+                        '';
+
+                } catch (jsonError) {
+
+                    try {
+
+                        serverMessage =
+                            await response
+                                .clone()
+                                .text();
+
+                    } catch (textError) {
+
+                        serverMessage =
+                            '';
+                    }
+                }
+
+
+                throw new Error(
+                    serverMessage
+                    ||
+                    (
+                        'HTTP '
+                        +
+                        response.status
+                    )
+                );
+
+
+            } catch (error) {
+
+                lastError =
+                    error;
+
+
+                console.warn(
+                    `Download attempt ${attempt}/${maxAttempts} failed`,
+                    url,
+                    error
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Wait Before Retry
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    attempt
+                    <
+                    maxAttempts
+                ) {
+
+                    await sleep(
+                        1000
+                        *
+                        attempt
+                    );
+                }
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Completely Failed
+        |--------------------------------------------------------------------------
+        */
+
+        throw (
+            lastError
+            ||
+            new Error(
+                'Download failed.'
+            )
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Download All Demo Images
+    |--------------------------------------------------------------------------
     */
 
     async function downloadAllDemoImages(
         button
     ) {
 
-        if (bulkDownloadRunning) {
+        /*
+        |--------------------------------------------------------------------------
+        | Already Running
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            bulkDownloadRunning
+        ) {
             return;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Images Check
+        |--------------------------------------------------------------------------
+        */
 
         if (
             !Array.isArray(
@@ -1149,7 +1634,8 @@
             )
             ||
             currentDemoImages.length
-            === 0
+            ===
+            0
         ) {
 
             alert(
@@ -1162,7 +1648,7 @@
 
         /*
         |--------------------------------------------------------------------------
-        | Chrome / Edge Folder Picker
+        | Chrome / Edge Folder API
         |--------------------------------------------------------------------------
         */
 
@@ -1188,31 +1674,44 @@
 
         let directoryHandle;
 
+
         try {
 
             directoryHandle =
-                await window.showDirectoryPicker({
-                    mode: 'readwrite'
-                });
+                await window
+                    .showDirectoryPicker({
+                        mode:
+                            'readwrite'
+                    });
+
 
         } catch (error) {
 
+            /*
+            | User Cancelled
+            */
             if (
                 error
                 &&
-                error.name ===
-                    'AbortError'
+                error.name
+                ===
+                'AbortError'
             ) {
+
                 return;
             }
 
+
             console.error(
+                'Folder picker error:',
                 error
             );
+
 
             alert(
                 'Unable to select download folder.'
             );
+
 
             return;
         }
@@ -1240,14 +1739,25 @@
 
         const originalText =
             textElement
-                ? textElement.textContent
-                : 'Download All';
+                ?
+                textElement.textContent
+                :
+                'Download All';
 
 
-        button.disabled = true;
+        /*
+        |--------------------------------------------------------------------------
+        | Disable Buttons
+        |--------------------------------------------------------------------------
+        */
+
+        button.disabled =
+            true;
+
 
         button.style.opacity =
             '0.65';
+
 
         button.style.cursor =
             'not-allowed';
@@ -1259,7 +1769,7 @@
 
         /*
         |--------------------------------------------------------------------------
-        | Progress Reset
+        | Reset Progress
         |--------------------------------------------------------------------------
         */
 
@@ -1269,25 +1779,41 @@
                 'hidden'
             );
 
-        downloadProgressBar.style.width =
+
+        downloadProgressBar
+            .style
+            .width =
             '0%';
 
-        downloadProgressText.textContent =
+
+        downloadProgressText
+            .textContent =
             `0 / ${total}`;
 
-        downloadedCount.textContent =
+
+        downloadedCount
+            .textContent =
             '0';
 
-        failedCount.textContent =
+
+        retryCount
+            .textContent =
             '0';
 
-        downloadCurrentFile.textContent =
+
+        failedCount
+            .textContent =
+            '0';
+
+
+        downloadCurrentFile
+            .textContent =
             'Preparing download...';
 
 
         /*
         |--------------------------------------------------------------------------
-        | Used File Names
+        | Counters
         |--------------------------------------------------------------------------
         */
 
@@ -1298,17 +1824,28 @@
         let downloaded =
             0;
 
+
         let failed =
             0;
 
 
         /*
         |--------------------------------------------------------------------------
-        | Download One By One
+        | First Pass Failed Images
         |--------------------------------------------------------------------------
         */
 
+        const failedImages =
+            [];
+
+
         try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | FIRST PASS
+            |--------------------------------------------------------------------------
+            */
 
             for (
                 let index = 0;
@@ -1316,13 +1853,29 @@
                 index++
             ) {
 
+                /*
+                |--------------------------------------------------------------------------
+                | Image
+                |--------------------------------------------------------------------------
+                */
+
                 const item =
-                    currentDemoImages[index];
+                    currentDemoImages[
+                        index
+                    ];
 
 
                 const imageUrl =
-                    item.media ?? '';
+                    item.media
+                    ??
+                    '';
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | Filename
+                |--------------------------------------------------------------------------
+                */
 
                 let fileName =
                     makeDemoFileName(
@@ -1340,30 +1893,40 @@
 
                 /*
                 |--------------------------------------------------------------------------
-                | UI Progress
+                | Progress UI
                 |--------------------------------------------------------------------------
                 */
 
-                if (textElement) {
+                if (
+                    textElement
+                ) {
 
                     textElement.textContent =
                         `Downloading ${index + 1}/${total}`;
                 }
 
 
-                downloadProgressText.textContent =
+                downloadProgressText
+                    .textContent =
                     `${index + 1} / ${total}`;
 
 
-                downloadCurrentFile.textContent =
+                downloadCurrentFile
+                    .textContent =
                     fileName;
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | Download
+                |--------------------------------------------------------------------------
+                */
 
                 try {
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Build Same-Origin Laravel Download URL
+                    | Laravel Proxy URL
                     |--------------------------------------------------------------------------
                     */
 
@@ -1376,51 +1939,20 @@
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Fetch Image
-                    |--------------------------------------------------------------------------
-                    */
-
-                    const response =
-                        await fetch(
-                            downloadUrl,
-                            {
-                                method: 'GET',
-
-                                credentials:
-                                    'same-origin',
-
-                                headers: {
-
-                                    'X-Requested-With':
-                                        'XMLHttpRequest'
-                                }
-                            }
-                        );
-
-
-                    if (!response.ok) {
-
-                        throw new Error(
-                            'Download failed: '
-                            +
-                            response.status
-                        );
-                    }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Blob
+                    | Fetch With Retry
                     |--------------------------------------------------------------------------
                     */
 
                     const blob =
-                        await response.blob();
+                        await fetchDownloadWithRetry(
+                            downloadUrl,
+                            3
+                        );
 
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Create File In Selected Folder
+                    | Create File
                     |--------------------------------------------------------------------------
                     */
 
@@ -1429,14 +1961,15 @@
                             .getFileHandle(
                                 fileName,
                                 {
-                                    create: true
+                                    create:
+                                        true
                                 }
                             );
 
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Write Image
+                    | Write File
                     |--------------------------------------------------------------------------
                     */
 
@@ -1453,89 +1986,372 @@
                     await writable.close();
 
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Success
+                    |--------------------------------------------------------------------------
+                    */
+
                     downloaded++;
 
 
-                    downloadedCount.textContent =
+                    downloadedCount
+                        .textContent =
                         downloaded;
 
 
                 } catch (fileError) {
 
-                    failed++;
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Keep For Second Pass
+                    |--------------------------------------------------------------------------
+                    */
 
-
-                    failedCount.textContent =
-                        failed;
-
-
-                    console.error(
-                        'Demo image download failed:',
+                    console.warn(
+                        'First pass failed. Will retry later:',
                         item,
                         fileError
                     );
+
+
+                    failedImages.push({
+                        item:
+                            item,
+
+                        index:
+                            index,
+
+                        fileName:
+                            fileName,
+                    });
+
+
+                    retryCount
+                        .textContent =
+                        failedImages.length;
                 }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Update Progress Bar
+                | Progress Bar
                 |--------------------------------------------------------------------------
                 */
 
                 const percentage =
                     Math.round(
-                        ((index + 1) / total)
-                        * 100
+                        (
+                            (index + 1)
+                            /
+                            total
+                        )
+                        *
+                        100
                     );
 
 
                 downloadProgressBar
                     .style
                     .width =
-                    percentage + '%';
+                    percentage
+                    +
+                    '%';
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | Small Delay
+                | Delay Between Images
                 |--------------------------------------------------------------------------
+                |
+                | Remote server ko too fast requests nahi jayengi.
+                |
                 */
 
                 await sleep(
-                    250
+                    800
                 );
             }
 
 
             /*
             |--------------------------------------------------------------------------
-            | Complete
+            | SECOND PASS
             |--------------------------------------------------------------------------
+            |
+            | Jo images first pass me fail hui hain
+            | unko dobara ek-ek karke try karega.
+            |
             */
 
-            downloadCurrentFile.textContent =
-                failed === 0
-                    ? 'All images downloaded successfully.'
-                    : 'Download completed with some failed images.';
+            if (
+                failedImages.length
+                >
+                0
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Pause Before Retry
+                |--------------------------------------------------------------------------
+                */
+
+                downloadCurrentFile
+                    .textContent =
+                    `${failedImages.length} images retry pending...`;
 
 
-            if (textElement) {
-
-                if (failed === 0) {
+                if (
+                    textElement
+                ) {
 
                     textElement.textContent =
-                        `${downloaded} Downloaded`;
+                        'Retrying Failed Images...';
+                }
 
-                } else {
 
-                    textElement.textContent =
-                        `${downloaded} Downloaded, ${failed} Failed`;
+                await sleep(
+                    2000
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Retry Failed Images
+                |--------------------------------------------------------------------------
+                */
+
+                for (
+                    let retryIndex = 0;
+                    retryIndex < failedImages.length;
+                    retryIndex++
+                ) {
+
+                    const failedRow =
+                        failedImages[
+                            retryIndex
+                        ];
+
+
+                    const item =
+                        failedRow.item;
+
+
+                    const fileName =
+                        failedRow.fileName;
+
+
+                    const imageUrl =
+                        item.media
+                        ??
+                        '';
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | UI
+                    |--------------------------------------------------------------------------
+                    */
+
+                    retryCount
+                        .textContent =
+                        failedImages.length
+                        -
+                        retryIndex;
+
+
+                    downloadCurrentFile
+                        .textContent =
+                        `Retry ${retryIndex + 1}/${failedImages.length}: ${fileName}`;
+
+
+                    if (
+                        textElement
+                    ) {
+
+                        textElement.textContent =
+                            `Retrying ${retryIndex + 1}/${failedImages.length}`;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Retry
+                    |--------------------------------------------------------------------------
+                    */
+
+                    try {
+
+                        const downloadUrl =
+                            buildDownloadUrl(
+                                imageUrl,
+                                fileName
+                            );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Again Browser Retry
+                        |--------------------------------------------------------------------------
+                        */
+
+                        const blob =
+                            await fetchDownloadWithRetry(
+                                downloadUrl,
+                                3
+                            );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | File Handle
+                        |--------------------------------------------------------------------------
+                        */
+
+                        const fileHandle =
+                            await directoryHandle
+                                .getFileHandle(
+                                    fileName,
+                                    {
+                                        create:
+                                            true
+                                    }
+                                );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Write
+                        |--------------------------------------------------------------------------
+                        */
+
+                        const writable =
+                            await fileHandle
+                                .createWritable();
+
+
+                        await writable.write(
+                            blob
+                        );
+
+
+                        await writable.close();
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Success
+                        |--------------------------------------------------------------------------
+                        */
+
+                        downloaded++;
+
+
+                        downloadedCount
+                            .textContent =
+                            downloaded;
+
+
+                    } catch (retryError) {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Completely Failed
+                        |--------------------------------------------------------------------------
+                        */
+
+                        failed++;
+
+
+                        failedCount
+                            .textContent =
+                            failed;
+
+
+                        console.error(
+                            'Demo image completely failed:',
+                            item,
+                            retryError
+                        );
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Remaining Retry Count
+                    |--------------------------------------------------------------------------
+                    */
+
+                    retryCount
+                        .textContent =
+                        Math.max(
+                            0,
+                            failedImages.length
+                            -
+                            retryIndex
+                            -
+                            1
+                        );
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Delay
+                    |--------------------------------------------------------------------------
+                    */
+
+                    await sleep(
+                        1200
+                    );
                 }
             }
 
 
-            if (failed === 0) {
+            /*
+            |--------------------------------------------------------------------------
+            | COMPLETE
+            |--------------------------------------------------------------------------
+            */
+
+            downloadProgressBar
+                .style
+                .width =
+                '100%';
+
+
+            downloadProgressText
+                .textContent =
+                `${total} / ${total}`;
+
+
+            retryCount
+                .textContent =
+                '0';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Complete Message
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                failed === 0
+            ) {
+
+                downloadCurrentFile
+                    .textContent =
+                    'All images downloaded successfully.';
+
+
+                if (
+                    textElement
+                ) {
+
+                    textElement.textContent =
+                        `${downloaded} Downloaded`;
+                }
+
 
                 alert(
                     downloaded
@@ -1543,7 +2359,22 @@
                     ' images successfully downloaded.'
                 );
 
+
             } else {
+
+                downloadCurrentFile
+                    .textContent =
+                    'Download completed with some failed images.';
+
+
+                if (
+                    textElement
+                ) {
+
+                    textElement.textContent =
+                        `${downloaded} Downloaded, ${failed} Failed`;
+                }
+
 
                 alert(
                     downloaded
@@ -1559,17 +2390,35 @@
 
         } catch (error) {
 
+            /*
+            |--------------------------------------------------------------------------
+            | Complete Process Error
+            |--------------------------------------------------------------------------
+            */
+
             console.error(
-                'Bulk demo image download error:',
+                'Bulk download error:',
                 error
             );
+
+
+            downloadCurrentFile
+                .textContent =
+                'Bulk download error.';
 
 
             alert(
                 'Bulk download could not be completed.'
             );
 
+
         } finally {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Reset Running State
+            |--------------------------------------------------------------------------
+            */
 
             bulkDownloadRunning =
                 false;
@@ -1579,26 +2428,37 @@
                 false;
 
 
+            /*
+            |--------------------------------------------------------------------------
+            | Enable Button
+            |--------------------------------------------------------------------------
+            */
+
             setTimeout(
                 function () {
 
                     button.disabled =
                         false;
 
+
                     button.style.opacity =
                         '';
+
 
                     button.style.cursor =
                         '';
 
-                    if (textElement) {
+
+                    if (
+                        textElement
+                    ) {
 
                         textElement.textContent =
                             originalText;
                     }
 
                 },
-                2000
+                2500
             );
         }
     }
@@ -1606,7 +2466,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Laravel Download URL
+    | Build Laravel Download URL
     |--------------------------------------------------------------------------
     */
 
@@ -1639,18 +2499,25 @@
         );
 
 
-        return baseUrl
+        return (
+            baseUrl
             +
             '?'
             +
-            params.toString();
+            params.toString()
+        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Generate Download Filename
+    | Generate Filename
     |--------------------------------------------------------------------------
+    |
+    | Example:
+    |
+    | Kushinagar-2026-09-25-Shop-Name-1.jpg
+    |
     */
 
     function makeDemoFileName(
@@ -1659,7 +2526,9 @@
     ) {
 
         const imageUrl =
-            item.media || '';
+            item.media
+            ||
+            '';
 
 
         /*
@@ -1674,7 +2543,9 @@
             );
 
 
-        if (!extension) {
+        if (
+            !extension
+        ) {
 
             extension =
                 'jpg';
@@ -1683,7 +2554,7 @@
 
         /*
         |--------------------------------------------------------------------------
-        | Name Parts
+        | City
         |--------------------------------------------------------------------------
         */
 
@@ -1691,13 +2562,21 @@
             safeDownloadFileNamePart(
                 item.city
                 ||
-                document.getElementById(
-                    'city'
-                ).value
+                document
+                    .getElementById(
+                        'city'
+                    )
+                    .value
                 ||
                 'demo'
             );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Date
+        |--------------------------------------------------------------------------
+        */
 
         const date =
             safeDownloadFileNamePart(
@@ -1707,6 +2586,12 @@
             );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Customer
+        |--------------------------------------------------------------------------
+        */
+
         const customer =
             safeDownloadFileNamePart(
                 item.customer_name
@@ -1715,6 +2600,12 @@
             );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Parts
+        |--------------------------------------------------------------------------
+        */
+
         const parts = [
             city,
             date,
@@ -1722,20 +2613,33 @@
             String(
                 index + 1
             )
-        ].filter(Boolean);
+        ]
+            .filter(
+                Boolean
+            );
 
 
-        return parts.join('-')
+        /*
+        |--------------------------------------------------------------------------
+        | Final
+        |--------------------------------------------------------------------------
+        */
+
+        return (
+            parts.join(
+                '-'
+            )
             +
             '.'
             +
-            extension;
+            extension
+        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Extension From URL
+    | Get Extension From URL
     |--------------------------------------------------------------------------
     */
 
@@ -1746,34 +2650,66 @@
         try {
 
             const pathname =
-                new URL(url)
+                new URL(
+                    url
+                )
                     .pathname;
 
 
             const fileName =
                 pathname
-                    .split('/')
+                    .split(
+                        '/'
+                    )
                     .pop()
-                    || '';
+                ||
+                '';
 
 
             const dotIndex =
                 fileName
-                    .lastIndexOf('.');
+                    .lastIndexOf(
+                        '.'
+                    );
 
 
             if (
                 dotIndex <= 0
             ) {
+
                 return '';
             }
 
 
-            return fileName
-                .substring(
-                    dotIndex + 1
+            const extension =
+                fileName
+                    .substring(
+                        dotIndex + 1
+                    )
+                    .toLowerCase();
+
+
+            const allowed = [
+                'jpg',
+                'jpeg',
+                'png',
+                'webp',
+                'gif',
+            ];
+
+
+            if (
+                !allowed.includes(
+                    extension
                 )
-                .toLowerCase();
+            ) {
+
+                return 'jpg';
+            }
+
+
+            return extension;
+
 
         } catch (error) {
 
@@ -1793,7 +2729,9 @@
     ) {
 
         return String(
-            value ?? ''
+            value
+            ??
+            ''
         )
             .replace(
                 /[<>:"/\\|?*\x00-\x1F]/g,
@@ -1816,7 +2754,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Safe Full Filename
+    | Safe Complete Filename
     |--------------------------------------------------------------------------
     */
 
@@ -1826,7 +2764,9 @@
 
         name =
             String(
-                name || 'demo-image.jpg'
+                name
+                ||
+                'demo-image.jpg'
             );
 
 
@@ -1851,7 +2791,9 @@
             );
 
 
-        if (!name) {
+        if (
+            !name
+        ) {
 
             name =
                 'demo-image.jpg';
@@ -1880,8 +2822,15 @@
 
 
         let lower =
-            name.toLowerCase();
+            name
+                .toLowerCase();
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Name Available
+        |--------------------------------------------------------------------------
+        */
 
         if (
             !usedNames.has(
@@ -1893,9 +2842,16 @@
                 lower
             );
 
+
             return name;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Extension
+        |--------------------------------------------------------------------------
+        */
 
         const lastDot =
             name.lastIndexOf(
@@ -1905,6 +2861,7 @@
 
         let base =
             name;
+
 
         let extension =
             '';
@@ -1920,12 +2877,19 @@
                     lastDot
                 );
 
+
             extension =
                 name.substring(
                     lastDot
                 );
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Counter
+        |--------------------------------------------------------------------------
+        */
 
         let counter =
             2;
@@ -1950,15 +2914,18 @@
 
             counter++;
 
+
         } while (
             usedNames.has(
-                candidate.toLowerCase()
+                candidate
+                    .toLowerCase()
             )
         );
 
 
         usedNames.add(
-            candidate.toLowerCase()
+            candidate
+                .toLowerCase()
         );
 
 
@@ -1988,7 +2955,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | XSS Safe Text
+    | Escape HTML
     |--------------------------------------------------------------------------
     */
 
@@ -1997,7 +2964,9 @@
     ) {
 
         return String(
-            value ?? ''
+            value
+            ??
+            ''
         )
             .replace(
                 /&/g,
@@ -2024,7 +2993,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Icons
+    | Refresh Lucide Icons
     |--------------------------------------------------------------------------
     */
 
