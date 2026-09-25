@@ -1437,6 +1437,26 @@
 
     {{-- STAT CARDS --}}
     <div class="stats-grid">
+
+        <div class="stat-card">
+            <span class="stat-icon bg-emerald-50 text-emerald-600">
+                <i data-lucide="phone-call"></i>
+            </span>
+
+            <div>
+                <div class="stat-label">
+                    Total Connected
+                </div>
+
+                <div class="stat-number">
+                    {{ number_format($totalConnected) }}
+                </div>
+
+                <div class="stat-sub">
+                    Till Now
+                </div>
+            </div>
+        </div>
         <div class="stat-card">
             <span class="stat-icon bg-emerald-50 text-emerald-600"><i data-lucide="phone"></i></span>
             <div>
@@ -1501,6 +1521,29 @@
 
                 <div class="stat-number">
                     {{ number_format($followUpCount) }}
+                </div>
+            </div>
+        </a>
+
+        <a href="{{ route('followups.index') }}"
+            class="stat-card stat-card-link"
+            title="Open Overdue Follow-ups">
+
+            <span class="stat-icon bg-red-50 text-red-600">
+                <i data-lucide="triangle-alert"></i>
+            </span>
+
+            <div>
+                <div class="stat-label">
+                    Total Overdue Follow Up
+                </div>
+
+                <div class="stat-number">
+                    {{ number_format($overdueFollowUpCount) }}
+                </div>
+
+                <div class="stat-sub">
+                    Follow-up Time Passed
                 </div>
             </div>
         </a>

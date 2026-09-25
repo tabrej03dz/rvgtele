@@ -1032,6 +1032,950 @@ public function callOnMobile(
 // }
 
 
+// public function index(Request $request): View
+// {
+//     $companyId = $this->companyId($request);
+//     $hasFullAccess = $this->hasFullAccess($request);
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Team Leader Access
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $leaderTeamIds = $this->leaderTeamIds($request);
+
+//     $isTeamLeader =
+//         !$hasFullAccess &&
+//         !empty($leaderTeamIds);
+
+//     $canFilterByEmployee =
+//         $hasFullAccess || $isTeamLeader;
+
+//     $canFilterByTeam =
+//         $hasFullAccess || $isTeamLeader;
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Dashboard Quick Metric Filter
+//     |--------------------------------------------------------------------------
+//     |
+//     | Top KPI card se aane wala filter. Ye server/database level par apply hoga,
+//     | sirf browser me already-loaded cards ko hide/show nahi karega.
+//     |
+//     */
+
+//     $quickMetric = (string) $request->input('quick_metric', '');
+
+//     $allowedQuickMetrics = [
+//         'calls_today',
+//         'connected_today',
+//         'employee_total_calls',
+//         'unique_connected',
+//         'follow_up',
+//         'demo_today',
+//         'total_demo',
+//     ];
+
+//     if (!in_array($quickMetric, $allowedQuickMetrics, true)) {
+//         $quickMetric = '';
+//     }
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Remove Board Specific Filters From Existing filteredLeadQuery()
+//     |--------------------------------------------------------------------------
+//     |
+//     | Global search etc. chalega.
+//     |
+//     | Lekin:
+//     | new_category
+//     | dialed_category
+//     | connected_category
+//     |
+//     | wagairah filteredLeadQuery() ko nahi bhejne hain.
+//     |
+//     */
+
+//     $baseRequest = clone $request;
+
+//     $boardFilterKeys = $this->boardFilterKeys();
+
+//     foreach ($boardFilterKeys as $key) {
+//         $baseRequest->query->remove($key);
+//         $baseRequest->request->remove($key);
+//     }
+
+//     $baseRequest->query->remove('call_disposition');
+//     $baseRequest->request->remove('call_disposition');
+
+//     // Quick metric ko filteredLeadQuery() me nahi bhejna hai.
+//     // Isko niche tino board queries par explicitly apply karenge.
+//     $baseRequest->query->remove('quick_metric');
+//     $baseRequest->request->remove('quick_metric');
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Base Accessible Query
+//     |--------------------------------------------------------------------------
+//     |
+//     | Existing Admin / Team Leader / Employee permission logic rahega.
+//     |
+//     */
+
+//     $baseQuery = $this->filteredLeadQuery($baseRequest);
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Relations
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $relations = [
+//         'assignedUser:id,name,employee_code,team_id',
+//         'source:id,name',
+//         'status:id,name,color',
+//         'team:id,name',
+//         'stage:id,name,color',
+//         'labels:id,company_id,name,color',
+
+//         'latestCall' => function ($query) {
+//             $query->with([
+//                 'disposition',
+//                 'user:id,name',
+//             ]);
+//         },
+
+//         'latestNote.user:id,name',
+
+//         'latestFollowUp' => function ($query) {
+//             $query->with([
+//                 'assignedUser:id,name',
+//             ]);
+//         },
+//     ];
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Common Card Data
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $prepareQuery = function (Builder $query) use ($relations) {
+
+//         return $query
+//             ->with($relations)
+//             // Existing global calls_count preserve rahega for compatibility.
+//             ->withCount('calls')
+//             ->addSelect([
+
+//                 /*
+//                 |--------------------------------------------------------------------------
+//                 | Latest Call ID
+//                 |--------------------------------------------------------------------------
+//                 |
+//                 | Dialed / Connected columns ko latest call activity ke basis
+//                 | par descending order me dikhane ke liye.
+//                 |
+//                 */
+
+//                 'latest_call_id' => CallLog::query()
+//                     ->select('id')
+//                     ->whereColumn('call_logs.lead_id', 'leads.id')
+//                     ->where(function (Builder $callScope) {
+//                         $callScope
+//                             ->where(function (Builder $assigned) {
+//                                 $assigned
+//                                     ->whereNotNull('leads.assigned_to')
+//                                     ->whereColumn('call_logs.user_id', 'leads.assigned_to')
+//                                     ->whereRaw(
+//                                         'call_logs.created_at >= COALESCE(('. 'SELECT MAX(la.assigned_at) FROM lead_assignments la '
+//                                         . 'WHERE la.lead_id = leads.id '
+//                                         . 'AND la.new_user_id = leads.assigned_to'
+//                                         . '), leads.created_at)'
+//                                     );
+//                             })
+//                             ->orWhere(function (Builder $unassigned) {
+//                                 // Admin ke unassigned leads ka old/global behavior preserve.
+//                                 $unassigned->whereNull('leads.assigned_to');
+//                             });
+//                     })
+//                     ->latest('call_logs.id')
+//                     ->limit(1),
+
+//                 /*
+//                 |--------------------------------------------------------------------------
+//                 | Latest Note Body
+//                 |--------------------------------------------------------------------------
+//                 */
+
+//                 'latest_note_body' => Note::query()
+//                     ->select('body')
+//                     ->whereColumn(
+//                         'notes.lead_id',
+//                         'leads.id'
+//                     )
+//                     ->latest('notes.id')
+//                     ->limit(1),
+
+
+//                 /*
+//                 |--------------------------------------------------------------------------
+//                 | Latest Note Date
+//                 |--------------------------------------------------------------------------
+//                 */
+
+//                 'latest_note_created_at' => Note::query()
+//                     ->select('created_at')
+//                     ->whereColumn(
+//                         'notes.lead_id',
+//                         'leads.id'
+//                     )
+//                     ->latest('notes.id')
+//                     ->limit(1),
+
+
+//                 /*
+//                 |--------------------------------------------------------------------------
+//                 | Latest Note User
+//                 |--------------------------------------------------------------------------
+//                 */
+
+//                 'latest_note_user_name' => Note::query()
+//                     ->leftJoin(
+//                         'users',
+//                         'users.id',
+//                         '=',
+//                         'notes.user_id'
+//                     )
+//                     ->select('users.name')
+//                     ->whereColumn(
+//                         'notes.lead_id',
+//                         'leads.id'
+//                     )
+//                     ->latest('notes.id')
+//                     ->limit(1),
+//             ]);
+//     };
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | NEW CALL
+//     |--------------------------------------------------------------------------
+//     |
+//     | Ek bhi call log nahi.
+//     |
+//     */
+
+//     $newQuery = clone $baseQuery;
+
+//     // IMPORTANT: New/Dialed/Connected ab current assignment ke hisab se manage honge.
+//     // Purane employee ki call history delete/change nahi hogi.
+//     $this->applyCurrentAssignmentCallState($newQuery, 'new');
+
+//     $this->applyBoardFilters(
+//         $newQuery,
+//         $request,
+//         'new',
+//         $companyId
+//     );
+
+//     $this->applyQuickMetricFilter(
+//         $newQuery,
+//         $quickMetric,
+//         'new'
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | DIALED CALL
+//     |--------------------------------------------------------------------------
+//     |
+//     | Kam se kam ek baar dial hua.
+//     | Disposition kuch bhi ho.
+//     |
+//     */
+
+//     $dialedQuery = clone $baseQuery;
+
+//     $this->applyCurrentAssignmentCallState($dialedQuery, 'dialed');
+
+//     $this->applyBoardFilters(
+//         $dialedQuery,
+//         $request,
+//         'dialed',
+//         $companyId
+//     );
+
+//     $this->applyQuickMetricFilter(
+//         $dialedQuery,
+//         $quickMetric,
+//         'dialed'
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | CONNECTED CALL
+//     |--------------------------------------------------------------------------
+//     |
+//     | Call hona chahiye
+//     |
+//     | AND
+//     |
+//     | Call remarks / auto remarks / notes me data hona chahiye.
+//     |
+//     */
+
+//     $connectedQuery = clone $baseQuery;
+
+//     $this->applyCurrentAssignmentCallState($connectedQuery, 'connected');
+
+//     $this->applyBoardFilters(
+//         $connectedQuery,
+//         $request,
+//         'connected',
+//         $companyId
+//     );
+
+//     $this->applyQuickMetricFilter(
+//         $connectedQuery,
+//         $quickMetric,
+//         'connected'
+//     );
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Counts
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $newCount =
+//         (clone $newQuery)->count();
+
+//     $dialedCount =
+//         (clone $dialedQuery)->count();
+
+//     $connectedCount =
+//         (clone $connectedQuery)->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Pagination
+//     |--------------------------------------------------------------------------
+//     |
+//     | Har column ki apni pagination.
+//     |
+//     */
+
+//     $boardLimit = 10;
+
+//     $newLeads = $prepareQuery(
+//         clone $newQuery
+//     )
+//         ->orderByDesc('leads.id')
+//         ->paginate(
+//             $boardLimit,
+//             ['*'],
+//             'new_page'
+//         )
+//         ->withQueryString();
+
+
+//     $dialedLeads = $prepareQuery(
+//         clone $dialedQuery
+//     )
+//         ->orderByDesc('latest_call_id')
+//         ->orderByDesc('leads.id')
+//         ->paginate(
+//             $boardLimit,
+//             ['*'],
+//             'dialed_page'
+//         )
+//         ->withQueryString();
+
+
+//     $connectedLeads = $prepareQuery(
+//         clone $connectedQuery
+//     )
+//         ->orderByDesc('latest_call_id')
+//         ->orderByDesc('leads.id')
+//         ->paginate(
+//             $boardLimit,
+//             ['*'],
+//             'connected_page'
+//         )
+//         ->withQueryString();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Dashboard Base Query
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $statsRequest = clone $baseRequest;
+
+//     $statsRequest->query->remove('page');
+//     $statsRequest->request->remove('page');
+
+//     $accessibleStatsQuery =
+//         $this->filteredLeadQuery(
+//             $statsRequest
+//         );
+
+//     // Dashboard numbers quick_metric se independent rahenge.
+//     $connectedStatsQuery = clone $accessibleStatsQuery;
+
+//     $connectedStatsQuery
+//         ->whereHas('calls')
+//         ->where(function (Builder $connected) {
+//             $connected->whereHas('notes');
+
+//             if (Schema::hasColumn('call_logs', 'remarks')) {
+//                 $connected->orWhereHas('calls', function (Builder $calls) {
+//                     $calls->whereNotNull('remarks')
+//                         ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
+//                 });
+//             }
+
+//             if (Schema::hasColumn('call_logs', 'remark')) {
+//                 $connected->orWhereHas('calls', function (Builder $calls) {
+//                     $calls->whereNotNull('remark')
+//                         ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
+//                 });
+//             }
+
+//             if (Schema::hasColumn('call_logs', 'auto_remarks')) {
+//                 $connected->orWhereHas('calls', function (Builder $calls) {
+//                     $calls->whereNotNull('auto_remarks')
+//                         ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
+//                 });
+//             }
+//         });
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Total Leads
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $totalLeads =
+//         (clone $accessibleStatsQuery)
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Calls Today
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $callsToday =
+//         DB::table('call_logs')
+//             ->join(
+//                 'leads',
+//                 'leads.id',
+//                 '=',
+//                 'call_logs.lead_id'
+//             )
+//             ->where(
+//                 'leads.company_id',
+//                 $companyId
+//             )
+//             ->whereDate(
+//                 'call_logs.created_at',
+//                 today()
+//             )
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Connected Today
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $connectedToday =
+//         (clone $connectedStatsQuery)
+//             ->whereHas(
+//                 'calls',
+//                 function (Builder $query) {
+
+//                     $query->whereDate(
+//                         'call_logs.created_at',
+//                         today()
+//                     );
+//                 }
+//             )
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Total Demo
+//     |--------------------------------------------------------------------------
+//     |
+//     | Demo count ab demo_send column par based nahi hai.
+//     | Call disposition ka naam "Demo" hona chahiye.
+//     |
+//     */
+
+//     $totalDemo =
+//         (clone $accessibleStatsQuery)
+//             ->whereHas('calls', function (Builder $calls) {
+
+//                 $calls->whereHas(
+//                     'disposition',
+//                     function (Builder $disposition) {
+
+//                         $disposition->whereRaw(
+//                             "LOWER(TRIM(call_dispositions.name)) = 'demo'"
+//                         );
+//                     }
+//                 );
+//             })
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Demo Today
+//     |--------------------------------------------------------------------------
+//     |
+//     | Aaj ke call log me "Demo" disposition laga hona chahiye.
+//     |
+//     */
+
+//     $demoToday =
+//         (clone $accessibleStatsQuery)
+//             ->whereHas('calls', function (Builder $calls) {
+
+//                 $calls
+//                     ->whereDate(
+//                         'call_logs.created_at',
+//                         today()
+//                     )
+//                     ->whereHas(
+//                         'disposition',
+//                         function (Builder $disposition) {
+
+//                             $disposition->whereRaw(
+//                                 "LOWER(TRIM(call_dispositions.name)) = 'demo'"
+//                             );
+//                         }
+//                     );
+//             })
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Follow Up
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $followUpCount =
+//         (clone $accessibleStatsQuery)
+//             ->whereNotNull(
+//                 'next_follow_up_at'
+//             )
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Unique Connected
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $uniqueConnected =
+//         (clone $connectedStatsQuery)
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Total Calls
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $employeeTotalCalls =
+//         DB::table('call_logs')
+//             ->join(
+//                 'leads',
+//                 'leads.id',
+//                 '=',
+//                 'call_logs.lead_id'
+//             )
+//             ->where(
+//                 'leads.company_id',
+//                 $companyId
+//             )
+//             ->count();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Statuses
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $statuses = LeadStatus::query()
+//         ->where(function (Builder $query) use ($companyId) {
+
+//             $query
+//                 ->whereNull('company_id')
+//                 ->orWhere(
+//                     'company_id',
+//                     $companyId
+//                 );
+//         })
+//         ->where(
+//             'is_active',
+//             true
+//         )
+//         ->orderBy('sort_order')
+//         ->orderBy('name')
+//         ->get();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Dispositions
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $dispositions =
+//         CallDisposition::query()
+//             ->where(
+//                 function (Builder $query) use (
+//                     $companyId
+//                 ) {
+
+//                     $query
+//                         ->whereNull('company_id')
+//                         ->orWhere(
+//                             'company_id',
+//                             $companyId
+//                         );
+//                 }
+//             )
+//             ->where(
+//                 'is_active',
+//                 true
+//             )
+//             ->orderBy('name')
+//             ->get();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Sources
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $sources =
+//         LeadSource::query()
+//             ->where(
+//                 function (Builder $query) use (
+//                     $companyId
+//                 ) {
+
+//                     $query
+//                         ->whereNull('company_id')
+//                         ->orWhere(
+//                             'company_id',
+//                             $companyId
+//                         );
+//                 }
+//             )
+//             ->orderBy('name')
+//             ->get();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Categories
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $categories =
+//         Lead::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->whereNotNull('category')
+//             ->where(
+//                 'category',
+//                 '<>',
+//                 ''
+//             )
+//             ->select('category')
+//             ->distinct()
+//             ->orderBy('category')
+//             ->pluck('category');
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Cities
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $cities =
+//         Lead::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->whereNotNull('city')
+//             ->where(
+//                 'city',
+//                 '<>',
+//                 ''
+//             )
+//             ->select('city')
+//             ->distinct()
+//             ->orderBy('city')
+//             ->pluck('city');
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Users
+//     |--------------------------------------------------------------------------
+//     */
+
+//     if ($hasFullAccess) {
+
+//         $users =
+//             User::query()
+//                 ->where(
+//                     'company_id',
+//                     $companyId
+//                 )
+//                 ->where(
+//                     'is_active',
+//                     true
+//                 )
+//                 ->orderBy('name')
+//                 ->get([
+//                     'id',
+//                     'name',
+//                     'employee_code',
+//                     'team_id',
+//                 ]);
+
+//     } elseif ($isTeamLeader) {
+
+//         $users =
+//             User::query()
+//                 ->where(
+//                     'company_id',
+//                     $companyId
+//                 )
+//                 ->where(
+//                     'is_active',
+//                     true
+//                 )
+//                 ->where(
+//                     function (Builder $query) use (
+//                         $request,
+//                         $leaderTeamIds
+//                     ) {
+
+//                         $query
+//                             ->whereKey(
+//                                 $request->user()->id
+//                             )
+//                             ->orWhereIn(
+//                                 'team_id',
+//                                 $leaderTeamIds
+//                             );
+//                     }
+//                 )
+//                 ->orderBy('name')
+//                 ->get([
+//                     'id',
+//                     'name',
+//                     'employee_code',
+//                     'team_id',
+//                 ]);
+
+//     } else {
+
+//         $users = collect([
+//             $request->user()
+//         ]);
+//     }
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Teams
+//     |--------------------------------------------------------------------------
+//     */
+
+//     if ($hasFullAccess) {
+
+//         $teams =
+//             Team::query()
+//                 ->where(
+//                     'company_id',
+//                     $companyId
+//                 )
+//                 ->orderBy('name')
+//                 ->get([
+//                     'id',
+//                     'name',
+//                 ]);
+
+//     } elseif ($isTeamLeader) {
+
+//         $teams =
+//             Team::query()
+//                 ->where(
+//                     'company_id',
+//                     $companyId
+//                 )
+//                 ->whereIn(
+//                     'id',
+//                     $leaderTeamIds
+//                 )
+//                 ->orderBy('name')
+//                 ->get([
+//                     'id',
+//                     'name',
+//                 ]);
+
+//     } else {
+
+//         $teams = collect();
+//     }
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Labels
+//     |--------------------------------------------------------------------------
+//     */
+
+//     $labels =
+//         LeadLabel::query()
+//             ->where(
+//                 'company_id',
+//                 $companyId
+//             )
+//             ->withCount('leads')
+//             ->orderBy('name')
+//             ->get();
+
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Return View
+//     |--------------------------------------------------------------------------
+//     */
+
+//     return view(
+//         'leads.index',
+//         [
+//             'newLeads' =>
+//                 $newLeads,
+
+//             'dialedLeads' =>
+//                 $dialedLeads,
+
+//             'connectedLeads' =>
+//                 $connectedLeads,
+
+//             'newCount' =>
+//                 $newCount,
+
+//             'dialedCount' =>
+//                 $dialedCount,
+
+//             'connectedCount' =>
+//                 $connectedCount,
+
+//             'totalLeads' =>
+//                 $totalLeads,
+
+//             'callsToday' =>
+//                 $callsToday,
+
+//             'connectedToday' =>
+//                 $connectedToday,
+
+//             'employeeTotalCalls' =>
+//                 $employeeTotalCalls,
+
+//             'uniqueConnected' =>
+//                 $uniqueConnected,
+
+//             'followUpCount' =>
+//                 $followUpCount,
+
+//             'demoToday' =>
+//                 $demoToday,
+
+//             'totalDemo' =>
+//                 $totalDemo,
+
+//             'quickMetric' =>
+//                 $quickMetric,
+
+//             'statuses' =>
+//                 $statuses,
+
+//             'dispositions' =>
+//                 $dispositions,
+
+//             'sources' =>
+//                 $sources,
+
+//             'categories' =>
+//                 $categories,
+
+//             'cities' =>
+//                 $cities,
+
+//             'users' =>
+//                 $users,
+
+//             'teams' =>
+//                 $teams,
+
+//             'labels' =>
+//                 $labels,
+
+//             'hasFullAccess' =>
+//                 $hasFullAccess,
+
+//             'isTeamLeader' =>
+//                 $isTeamLeader,
+
+//             'canFilterByEmployee' =>
+//                 $canFilterByEmployee,
+
+//             'canFilterByTeam' =>
+//                 $canFilterByTeam,
+//         ]
+//     );
+// }
+
+
 public function index(Request $request): View
 {
     $companyId = $this->companyId($request);
@@ -1060,10 +2004,6 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     | Dashboard Quick Metric Filter
     |--------------------------------------------------------------------------
-    |
-    | Top KPI card se aane wala filter. Ye server/database level par apply hoga,
-    | sirf browser me already-loaded cards ko hide/show nahi karega.
-    |
     */
 
     $quickMetric = (string) $request->input('quick_metric', '');
@@ -1085,18 +2025,8 @@ public function index(Request $request): View
 
     /*
     |--------------------------------------------------------------------------
-    | Remove Board Specific Filters From Existing filteredLeadQuery()
+    | Remove Board Specific Filters
     |--------------------------------------------------------------------------
-    |
-    | Global search etc. chalega.
-    |
-    | Lekin:
-    | new_category
-    | dialed_category
-    | connected_category
-    |
-    | wagairah filteredLeadQuery() ko nahi bhejne hain.
-    |
     */
 
     $baseRequest = clone $request;
@@ -1111,18 +2041,14 @@ public function index(Request $request): View
     $baseRequest->query->remove('call_disposition');
     $baseRequest->request->remove('call_disposition');
 
-    // Quick metric ko filteredLeadQuery() me nahi bhejna hai.
-    // Isko niche tino board queries par explicitly apply karenge.
     $baseRequest->query->remove('quick_metric');
     $baseRequest->request->remove('quick_metric');
+
 
     /*
     |--------------------------------------------------------------------------
     | Base Accessible Query
     |--------------------------------------------------------------------------
-    |
-    | Existing Admin / Team Leader / Employee permission logic rahega.
-    |
     */
 
     $baseQuery = $this->filteredLeadQuery($baseRequest);
@@ -1169,49 +2095,48 @@ public function index(Request $request): View
 
         return $query
             ->with($relations)
-            // Existing global calls_count preserve rahega for compatibility.
             ->withCount('calls')
             ->addSelect([
 
-                /*
-                |--------------------------------------------------------------------------
-                | Latest Call ID
-                |--------------------------------------------------------------------------
-                |
-                | Dialed / Connected columns ko latest call activity ke basis
-                | par descending order me dikhane ke liye.
-                |
-                */
-
                 'latest_call_id' => CallLog::query()
                     ->select('id')
-                    ->whereColumn('call_logs.lead_id', 'leads.id')
+                    ->whereColumn(
+                        'call_logs.lead_id',
+                        'leads.id'
+                    )
                     ->where(function (Builder $callScope) {
+
                         $callScope
                             ->where(function (Builder $assigned) {
+
                                 $assigned
-                                    ->whereNotNull('leads.assigned_to')
-                                    ->whereColumn('call_logs.user_id', 'leads.assigned_to')
+                                    ->whereNotNull(
+                                        'leads.assigned_to'
+                                    )
+                                    ->whereColumn(
+                                        'call_logs.user_id',
+                                        'leads.assigned_to'
+                                    )
                                     ->whereRaw(
-                                        'call_logs.created_at >= COALESCE(('. 'SELECT MAX(la.assigned_at) FROM lead_assignments la '
+                                        'call_logs.created_at >= COALESCE(('
+                                        . 'SELECT MAX(la.assigned_at) '
+                                        . 'FROM lead_assignments la '
                                         . 'WHERE la.lead_id = leads.id '
                                         . 'AND la.new_user_id = leads.assigned_to'
                                         . '), leads.created_at)'
                                     );
                             })
                             ->orWhere(function (Builder $unassigned) {
-                                // Admin ke unassigned leads ka old/global behavior preserve.
-                                $unassigned->whereNull('leads.assigned_to');
+
+                                $unassigned
+                                    ->whereNull(
+                                        'leads.assigned_to'
+                                    );
                             });
                     })
                     ->latest('call_logs.id')
                     ->limit(1),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Latest Note Body
-                |--------------------------------------------------------------------------
-                */
 
                 'latest_note_body' => Note::query()
                     ->select('body')
@@ -1223,12 +2148,6 @@ public function index(Request $request): View
                     ->limit(1),
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | Latest Note Date
-                |--------------------------------------------------------------------------
-                */
-
                 'latest_note_created_at' => Note::query()
                     ->select('created_at')
                     ->whereColumn(
@@ -1238,12 +2157,6 @@ public function index(Request $request): View
                     ->latest('notes.id')
                     ->limit(1),
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | Latest Note User
-                |--------------------------------------------------------------------------
-                */
 
                 'latest_note_user_name' => Note::query()
                     ->leftJoin(
@@ -1267,16 +2180,14 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     | NEW CALL
     |--------------------------------------------------------------------------
-    |
-    | Ek bhi call log nahi.
-    |
     */
 
     $newQuery = clone $baseQuery;
 
-    // IMPORTANT: New/Dialed/Connected ab current assignment ke hisab se manage honge.
-    // Purane employee ki call history delete/change nahi hogi.
-    $this->applyCurrentAssignmentCallState($newQuery, 'new');
+    $this->applyCurrentAssignmentCallState(
+        $newQuery,
+        'new'
+    );
 
     $this->applyBoardFilters(
         $newQuery,
@@ -1296,15 +2207,14 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     | DIALED CALL
     |--------------------------------------------------------------------------
-    |
-    | Kam se kam ek baar dial hua.
-    | Disposition kuch bhi ho.
-    |
     */
 
     $dialedQuery = clone $baseQuery;
 
-    $this->applyCurrentAssignmentCallState($dialedQuery, 'dialed');
+    $this->applyCurrentAssignmentCallState(
+        $dialedQuery,
+        'dialed'
+    );
 
     $this->applyBoardFilters(
         $dialedQuery,
@@ -1324,18 +2234,14 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     | CONNECTED CALL
     |--------------------------------------------------------------------------
-    |
-    | Call hona chahiye
-    |
-    | AND
-    |
-    | Call remarks / auto remarks / notes me data hona chahiye.
-    |
     */
 
     $connectedQuery = clone $baseQuery;
 
-    $this->applyCurrentAssignmentCallState($connectedQuery, 'connected');
+    $this->applyCurrentAssignmentCallState(
+        $connectedQuery,
+        'connected'
+    );
 
     $this->applyBoardFilters(
         $connectedQuery,
@@ -1371,9 +2277,6 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     | Pagination
     |--------------------------------------------------------------------------
-    |
-    | Har column ki apni pagination.
-    |
     */
 
     $boardLimit = 10;
@@ -1432,33 +2335,86 @@ public function index(Request $request): View
             $statsRequest
         );
 
-    // Dashboard numbers quick_metric se independent rahenge.
-    $connectedStatsQuery = clone $accessibleStatsQuery;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Connected Stats Query
+    |--------------------------------------------------------------------------
+    */
+
+    $connectedStatsQuery =
+        clone $accessibleStatsQuery;
 
     $connectedStatsQuery
         ->whereHas('calls')
         ->where(function (Builder $connected) {
+
             $connected->whereHas('notes');
 
-            if (Schema::hasColumn('call_logs', 'remarks')) {
-                $connected->orWhereHas('calls', function (Builder $calls) {
-                    $calls->whereNotNull('remarks')
-                        ->whereRaw("TRIM(COALESCE(remarks, '')) <> ''");
-                });
+            if (
+                Schema::hasColumn(
+                    'call_logs',
+                    'remarks'
+                )
+            ) {
+
+                $connected->orWhereHas(
+                    'calls',
+                    function (Builder $calls) {
+
+                        $calls
+                            ->whereNotNull(
+                                'remarks'
+                            )
+                            ->whereRaw(
+                                "TRIM(COALESCE(remarks, '')) <> ''"
+                            );
+                    }
+                );
             }
 
-            if (Schema::hasColumn('call_logs', 'remark')) {
-                $connected->orWhereHas('calls', function (Builder $calls) {
-                    $calls->whereNotNull('remark')
-                        ->whereRaw("TRIM(COALESCE(remark, '')) <> ''");
-                });
+            if (
+                Schema::hasColumn(
+                    'call_logs',
+                    'remark'
+                )
+            ) {
+
+                $connected->orWhereHas(
+                    'calls',
+                    function (Builder $calls) {
+
+                        $calls
+                            ->whereNotNull(
+                                'remark'
+                            )
+                            ->whereRaw(
+                                "TRIM(COALESCE(remark, '')) <> ''"
+                            );
+                    }
+                );
             }
 
-            if (Schema::hasColumn('call_logs', 'auto_remarks')) {
-                $connected->orWhereHas('calls', function (Builder $calls) {
-                    $calls->whereNotNull('auto_remarks')
-                        ->whereRaw("TRIM(COALESCE(auto_remarks, '')) <> ''");
-                });
+            if (
+                Schema::hasColumn(
+                    'call_logs',
+                    'auto_remarks'
+                )
+            ) {
+
+                $connected->orWhereHas(
+                    'calls',
+                    function (Builder $calls) {
+
+                        $calls
+                            ->whereNotNull(
+                                'auto_remarks'
+                            )
+                            ->whereRaw(
+                                "TRIM(COALESCE(auto_remarks, '')) <> ''"
+                            );
+                    }
+                );
             }
         });
 
@@ -1522,50 +2478,38 @@ public function index(Request $request): View
 
     /*
     |--------------------------------------------------------------------------
-    | Total Demo
+    | Total Connected
     |--------------------------------------------------------------------------
     |
-    | Demo count ab demo_send column par based nahi hai.
-    | Call disposition ka naam "Demo" hona chahiye.
+    | Connected board wala exact same rule use hoga.
     |
     */
 
-    $totalDemo =
-        (clone $accessibleStatsQuery)
-            ->whereHas('calls', function (Builder $calls) {
+    $totalConnectedQuery =
+        clone $accessibleStatsQuery;
 
-                $calls->whereHas(
-                    'disposition',
-                    function (Builder $disposition) {
+    $this->applyCurrentAssignmentCallState(
+        $totalConnectedQuery,
+        'connected'
+    );
 
-                        $disposition->whereRaw(
-                            "LOWER(TRIM(call_dispositions.name)) = 'demo'"
-                        );
-                    }
-                );
-            })
-            ->count();
+    $totalConnected =
+        $totalConnectedQuery->count();
 
 
     /*
     |--------------------------------------------------------------------------
-    | Demo Today
+    | Total Demo
     |--------------------------------------------------------------------------
-    |
-    | Aaj ke call log me "Demo" disposition laga hona chahiye.
-    |
     */
 
-    $demoToday =
+    $totalDemo =
         (clone $accessibleStatsQuery)
-            ->whereHas('calls', function (Builder $calls) {
+            ->whereHas(
+                'calls',
+                function (Builder $calls) {
 
-                $calls
-                    ->whereDate(
-                        'call_logs.created_at',
-                        today()
-                    )
-                    ->whereHas(
+                    $calls->whereHas(
                         'disposition',
                         function (Builder $disposition) {
 
@@ -1574,7 +2518,41 @@ public function index(Request $request): View
                             );
                         }
                     );
-            })
+                }
+            )
+            ->count();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Today
+    |--------------------------------------------------------------------------
+    */
+
+    $demoToday =
+        (clone $accessibleStatsQuery)
+            ->whereHas(
+                'calls',
+                function (Builder $calls) {
+
+                    $calls
+                        ->whereDate(
+                            'call_logs.created_at',
+                            today()
+                        )
+                        ->whereHas(
+                            'disposition',
+                            function (
+                                Builder $disposition
+                            ) {
+
+                                $disposition->whereRaw(
+                                    "LOWER(TRIM(call_dispositions.name)) = 'demo'"
+                                );
+                            }
+                        );
+                }
+            )
             ->count();
 
 
@@ -1588,6 +2566,28 @@ public function index(Request $request): View
         (clone $accessibleStatsQuery)
             ->whereNotNull(
                 'next_follow_up_at'
+            )
+            ->count();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Total Overdue Follow Up
+    |--------------------------------------------------------------------------
+    |
+    | Jinka follow-up time nikal chuka hai.
+    |
+    */
+
+    $overdueFollowUpCount =
+        (clone $accessibleStatsQuery)
+            ->whereNotNull(
+                'next_follow_up_at'
+            )
+            ->where(
+                'next_follow_up_at',
+                '<',
+                now()
             )
             ->count();
 
@@ -1630,23 +2630,30 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     */
 
-    $statuses = LeadStatus::query()
-        ->where(function (Builder $query) use ($companyId) {
-
-            $query
-                ->whereNull('company_id')
-                ->orWhere(
-                    'company_id',
+    $statuses =
+        LeadStatus::query()
+            ->where(
+                function (Builder $query) use (
                     $companyId
-                );
-        })
-        ->where(
-            'is_active',
-            true
-        )
-        ->orderBy('sort_order')
-        ->orderBy('name')
-        ->get();
+                ) {
+
+                    $query
+                        ->whereNull(
+                            'company_id'
+                        )
+                        ->orWhere(
+                            'company_id',
+                            $companyId
+                        );
+                }
+            )
+            ->where(
+                'is_active',
+                true
+            )
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
 
 
     /*
@@ -1663,7 +2670,9 @@ public function index(Request $request): View
                 ) {
 
                     $query
-                        ->whereNull('company_id')
+                        ->whereNull(
+                            'company_id'
+                        )
                         ->orWhere(
                             'company_id',
                             $companyId
@@ -1692,7 +2701,9 @@ public function index(Request $request): View
                 ) {
 
                     $query
-                        ->whereNull('company_id')
+                        ->whereNull(
+                            'company_id'
+                        )
                         ->orWhere(
                             'company_id',
                             $companyId
@@ -1715,16 +2726,24 @@ public function index(Request $request): View
                 'company_id',
                 $companyId
             )
-            ->whereNotNull('category')
+            ->whereNotNull(
+                'category'
+            )
             ->where(
                 'category',
                 '<>',
                 ''
             )
-            ->select('category')
+            ->select(
+                'category'
+            )
             ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
+            ->orderBy(
+                'category'
+            )
+            ->pluck(
+                'category'
+            );
 
 
     /*
@@ -1739,16 +2758,24 @@ public function index(Request $request): View
                 'company_id',
                 $companyId
             )
-            ->whereNotNull('city')
+            ->whereNotNull(
+                'city'
+            )
             ->where(
                 'city',
                 '<>',
                 ''
             )
-            ->select('city')
+            ->select(
+                'city'
+            )
             ->distinct()
-            ->orderBy('city')
-            ->pluck('city');
+            ->orderBy(
+                'city'
+            )
+            ->pluck(
+                'city'
+            );
 
 
     /*
@@ -1769,7 +2796,9 @@ public function index(Request $request): View
                     'is_active',
                     true
                 )
-                ->orderBy('name')
+                ->orderBy(
+                    'name'
+                )
                 ->get([
                     'id',
                     'name',
@@ -1790,14 +2819,18 @@ public function index(Request $request): View
                     true
                 )
                 ->where(
-                    function (Builder $query) use (
+                    function (
+                        Builder $query
+                    ) use (
                         $request,
                         $leaderTeamIds
                     ) {
 
                         $query
                             ->whereKey(
-                                $request->user()->id
+                                $request
+                                    ->user()
+                                    ->id
                             )
                             ->orWhereIn(
                                 'team_id',
@@ -1805,7 +2838,9 @@ public function index(Request $request): View
                             );
                     }
                 )
-                ->orderBy('name')
+                ->orderBy(
+                    'name'
+                )
                 ->get([
                     'id',
                     'name',
@@ -1835,7 +2870,9 @@ public function index(Request $request): View
                     'company_id',
                     $companyId
                 )
-                ->orderBy('name')
+                ->orderBy(
+                    'name'
+                )
                 ->get([
                     'id',
                     'name',
@@ -1853,7 +2890,9 @@ public function index(Request $request): View
                     'id',
                     $leaderTeamIds
                 )
-                ->orderBy('name')
+                ->orderBy(
+                    'name'
+                )
                 ->get([
                     'id',
                     'name',
@@ -1877,8 +2916,12 @@ public function index(Request $request): View
                 'company_id',
                 $companyId
             )
-            ->withCount('leads')
-            ->orderBy('name')
+            ->withCount(
+                'leads'
+            )
+            ->orderBy(
+                'name'
+            )
             ->get();
 
 
@@ -1918,6 +2961,9 @@ public function index(Request $request): View
             'connectedToday' =>
                 $connectedToday,
 
+            'totalConnected' =>
+                $totalConnected,
+
             'employeeTotalCalls' =>
                 $employeeTotalCalls,
 
@@ -1926,6 +2972,9 @@ public function index(Request $request): View
 
             'followUpCount' =>
                 $followUpCount,
+
+            'overdueFollowUpCount' =>
+                $overdueFollowUpCount,
 
             'demoToday' =>
                 $demoToday,
