@@ -1488,34 +1488,58 @@
             </div>
         </a>
 
-        <a href="{{ $metricUrl('follow_up') }}"
-           class="stat-card stat-card-link {{ $activeQuickMetric === 'follow_up' ? 'active-metric' : '' }}"
-           title="Filter Follow-up Calls">
-            <span class="stat-icon bg-rose-50 text-rose-600"><i data-lucide="refresh-cw"></i></span>
+        <a href="{{ route('followups.index') }}"
+            class="stat-card stat-card-link"
+            title="Open Follow-up Page">
+
+            <span class="stat-icon bg-rose-50 text-rose-600">
+                <i data-lucide="refresh-cw"></i>
+            </span>
+
             <div>
                 <div class="stat-label">Follow-up Calls</div>
-                <div class="stat-number">{{ number_format($followUpCount) }}</div>
+
+                <div class="stat-number">
+                    {{ number_format($followUpCount) }}
+                </div>
             </div>
         </a>
 
         <a href="{{ $metricUrl('demo_today') }}"
-           class="stat-card stat-card-link {{ $activeQuickMetric === 'demo_today' ? 'active-metric' : '' }}"
-           title="Filter Demo Today">
-            <span class="stat-icon bg-blue-50 text-blue-600"><i data-lucide="video"></i></span>
+            class="stat-card stat-card-link {{ $activeQuickMetric === 'demo_today' ? 'active-metric' : '' }}"
+            title="Filter Demo Today">
+
+            <span class="stat-icon bg-blue-50 text-blue-600">
+                <i data-lucide="video"></i>
+            </span>
+
             <div>
                 <div class="stat-label">Demo Today</div>
-                <div class="stat-number">{{ number_format($demoToday) }}</div>
+
+                <div class="stat-number">
+                    {{ number_format($demoToday) }}
+                </div>
             </div>
         </a>
 
         <a href="{{ $metricUrl('total_demo') }}"
-           class="stat-card stat-card-link {{ $activeQuickMetric === 'total_demo' ? 'active-metric' : '' }}"
-           title="Filter Total Demo">
-            <span class="stat-icon bg-amber-50 text-amber-500"><i data-lucide="send"></i></span>
+            class="stat-card stat-card-link {{ $activeQuickMetric === 'total_demo' ? 'active-metric' : '' }}"
+            title="Filter Total Demo">
+
+            <span class="stat-icon bg-amber-50 text-amber-500">
+                <i data-lucide="send"></i>
+            </span>
+
             <div>
                 <div class="stat-label">Total Demo</div>
-                <div class="stat-number">{{ number_format($totalDemo) }}</div>
-                <div class="stat-sub">Till Now</div>
+
+                <div class="stat-number">
+                    {{ number_format($totalDemo) }}
+                </div>
+
+                <div class="stat-sub">
+                    Till Now
+                </div>
             </div>
         </a>
     </div>
