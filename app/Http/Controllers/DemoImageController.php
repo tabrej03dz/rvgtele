@@ -1,409 +1,106 @@
-<?php
-
-namespace App\Http\Controllers;
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class DemoImageController extends Controller
+public function download(Request $request)
 {
+    $validated = $request->validate([
+        'url' => [
+            'required',
+            'url',
+        ],
+
+        'name' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
+    ]);
+
+    $url = trim($validated['url']);
+
     /*
     |--------------------------------------------------------------------------
-    | Demo Images Page
+    | Validate Remote URL
     |--------------------------------------------------------------------------
     */
 
-    public function index()
-    {
-        return view('demo-images.index');
-    }
+    $parsedUrl = parse_url($url);
 
+    $scheme = strtolower(
+        $parsedUrl['scheme'] ?? ''
+    );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Get Demo Images From Main Project
-    |--------------------------------------------------------------------------
-    */
+    $host = strtolower(
+        $parsedUrl['host'] ?? ''
+    );
 
-    public function images(Request $request)
-    {
-        $validated = $request->validate([
-            'city' => [
-                'required',
-                'string',
-                'max:255',
-            ],
+    $path = $parsedUrl['path'] ?? '';
 
-            'number_of_images' => [
-                'nullable',
-                'integer',
-                'min:1',
-                'max:100',
-            ],
-        ]);
-
-        $city = trim($validated['city']);
-
-        $numberOfImages = (int) (
-            $validated['number_of_images'] ?? 10
-        );
-
-        $apiUrl = 'https://post.realvictorygroups.com/api/demo-images';
-
-        if (!$apiUrl) {
-
-            return response()->json([
-                'status' => false,
-                'message' => 'Demo images API URL is not configured.',
-                'data' => [],
-            ], 500);
-        }
-
-        try {
-
-            $response = Http::acceptJson()
-                ->timeout(30)
-                ->retry(2, 500)
-                ->post(
-                    $apiUrl,
-                    [
-                        'city' => $city,
-                        'number_of_images' => $numberOfImages,
-                    ]
-                );
-
-            if (!$response->successful()) {
-
-                Log::warning(
-                    'Demo images external API failed.',
-                    [
-                        'city' => $city,
-                        'status' => $response->status(),
-                        'response' => $response->body(),
-                    ]
-                );
-
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Unable to fetch demo images.',
-                    'city' => $city,
-                    'requested_images' => $numberOfImages,
-                    'total_images' => 0,
-                    'data' => [],
-                ], $response->status());
-            }
-
-            $externalData = $response->json();
-
-            $images = collect(
-                $externalData['data'] ?? []
-            )
-                ->filter(function ($image) {
-
-                    return is_array($image)
-                        && !empty($image['media']);
-                })
-                ->map(function ($image) {
-
-                    return [
-                        'customer_id' =>
-                            $image['customer_id'] ?? null,
-
-                        'customer_name' =>
-                            $image['customer_name'] ?? null,
-
-                        'phone' =>
-                            $image['phone'] ?? null,
-
-                        'city' =>
-                            $image['city'] ?? null,
-
-                        'image_id' =>
-                            $image['image_id'] ?? null,
-
-                        'title' =>
-                            $image['title'] ?? null,
-
-                        'tag' =>
-                            $image['tag'] ?? null,
-
-                        'date' =>
-                            $image['date'] ?? null,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Full Remote Image URL
-                        |--------------------------------------------------------------------------
-                        */
-
-                        'media' =>
-                            $image['media'],
-
-                        'user_id' =>
-                            $image['user_id'] ?? null,
-
-                        'user_package_id' =>
-                            $image['user_package_id'] ?? null,
-
-                        'sent' =>
-                            $image['sent'] ?? null,
-                    ];
-                })
-                ->values();
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Demo images fetched successfully.',
-                'city' => $city,
-                'requested_images' => $numberOfImages,
-                'total_images' => $images->count(),
-                'data' => $images,
-            ]);
-
-        } catch (\Throwable $e) {
-
-            Log::error(
-                'Demo images API exception.',
-                [
-                    'city' => $city,
-                    'message' => $e->getMessage(),
-                ]
-            );
-
-            return response()->json([
-                'status' => false,
-                'message' => 'Unable to fetch demo images.',
-                'city' => $city,
-                'requested_images' => $numberOfImages,
-                'total_images' => 0,
-                'data' => [],
-            ], 500);
-        }
-    }
+    abort_unless(
+        $scheme === 'https'
+        &&
+        $host === 'post.realvictorygroups.com'
+        &&
+        str_starts_with(
+            $path,
+            '/storage/images/'
+        ),
+        403,
+        'Invalid demo image URL.'
+    );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Download Remote Demo Image
+    | Extension
     |--------------------------------------------------------------------------
-    |
-    | Browser ko direct post.realvictorygroups.com se fetch karwane ke bajay
-    | Laravel ke through download karenge.
-    |
-    | Isse CORS problem nahi hogi aur bulk download bhi properly chalega.
-    |
     */
 
-    public function download(Request $request)
-    {
-        $validated = $request->validate([
-            'url' => [
-                'required',
-                'url',
-            ],
+    $extension = strtolower(
+        pathinfo(
+            $path,
+            PATHINFO_EXTENSION
+        )
+    );
 
-            'name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-        ]);
+    $allowedExtensions = [
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'gif',
+    ];
 
-        $url = $validated['url'];
-
-        /*
-        |--------------------------------------------------------------------------
-        | Security Check
-        |--------------------------------------------------------------------------
-        |
-        | Sirf apne main image server se hi download allow karenge.
-        |
-        */
-
-        $parsedUrl = parse_url($url);
-
-        $scheme = strtolower(
-            $parsedUrl['scheme'] ?? ''
-        );
-
-        $host = strtolower(
-            $parsedUrl['host'] ?? ''
-        );
-
-        $path = $parsedUrl['path'] ?? '';
-
-        abort_unless(
-            $scheme === 'https'
-            &&
-            $host === 'post.realvictorygroups.com'
-            &&
-            str_starts_with(
-                $path,
-                '/storage/images/'
-            ),
-            403,
-            'Invalid demo image URL.'
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Original Extension
-        |--------------------------------------------------------------------------
-        */
-
-        $extension = strtolower(
-            pathinfo(
-                $path,
-                PATHINFO_EXTENSION
-            )
-        );
-
-        $allowedExtensions = [
-            'jpg',
-            'jpeg',
-            'png',
-            'webp',
-            'gif',
-        ];
-
-        abort_unless(
-            in_array(
-                $extension,
-                $allowedExtensions,
-                true
-            ),
-            422,
-            'Invalid image format.'
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Download Filename
-        |--------------------------------------------------------------------------
-        */
-
-        $requestedName = trim(
-            (string) (
-                $validated['name'] ?? ''
-            )
-        );
-
-        if ($requestedName !== '') {
-
-            $fileName = $this->safeDownloadName(
-                $requestedName,
-                $extension
-            );
-
-        } else {
-
-            $fileName = basename($path);
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Temporary Directory
-        |--------------------------------------------------------------------------
-        */
-
-        $tempDirectory = storage_path(
-            'app/temp/demo-image-downloads'
-        );
-
-        File::ensureDirectoryExists(
-            $tempDirectory
-        );
-
-        $tempPath =
-            $tempDirectory
-            . DIRECTORY_SEPARATOR
-            . Str::uuid()
-            . '.'
-            . $extension;
-
-
-        try {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Download Remote Image To Temporary File
-            |--------------------------------------------------------------------------
-            */
-
-            $response = Http::timeout(90)
-                ->retry(2, 500)
-                ->withOptions([
-                    'sink' => $tempPath,
-                ])
-                ->get($url);
-
-
-            if (
-                !$response->successful()
-                ||
-                !File::exists($tempPath)
-            ) {
-
-                File::delete($tempPath);
-
-                abort(
-                    404,
-                    'Image could not be downloaded.'
-                );
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Send Download
-            |--------------------------------------------------------------------------
-            */
-
-            return response()
-                ->download(
-                    $tempPath,
-                    $fileName
-                )
-                ->deleteFileAfterSend(
-                    true
-                );
-
-        } catch (\Throwable $e) {
-
-            File::delete($tempPath);
-
-            report($e);
-
-            abort(
-                500,
-                'Unable to download image.'
-            );
-        }
-    }
+    abort_unless(
+        in_array(
+            $extension,
+            $allowedExtensions,
+            true
+        ),
+        422,
+        'Invalid image format.'
+    );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Safe Download Filename
+    | Download File Name
     |--------------------------------------------------------------------------
     */
 
-    private function safeDownloadName(
-        string $name,
-        string $extension
-    ): string {
+    $requestedName = trim(
+        (string) (
+            $validated['name'] ?? ''
+        )
+    );
 
-        /*
-        | Remove extension supplied by browser
-        */
+    if ($requestedName !== '') {
+
         $baseName = pathinfo(
-            $name,
+            $requestedName,
             PATHINFO_FILENAME
         );
 
@@ -428,8 +125,242 @@ class DemoImageController extends Controller
             $baseName = 'demo-image';
         }
 
-        return $baseName
+        $fileName =
+            $baseName
             . '.'
             . $extension;
+
+    } else {
+
+        $fileName =
+            basename($path);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Temp Folder
+    |--------------------------------------------------------------------------
+    */
+
+    $tempDirectory = storage_path(
+        'app/temp/demo-image-downloads'
+    );
+
+    File::ensureDirectoryExists(
+        $tempDirectory
+    );
+
+    $tempPath =
+        $tempDirectory
+        . DIRECTORY_SEPARATOR
+        . Str::uuid()
+        . '.'
+        . $extension;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Multiple Attempts
+    |--------------------------------------------------------------------------
+    */
+
+    $maxAttempts = 5;
+
+    $lastError = null;
+
+
+    for (
+        $attempt = 1;
+        $attempt <= $maxAttempts;
+        $attempt++
+    ) {
+
+        /*
+        | Previous failed/partial file clean
+        */
+        File::delete(
+            $tempPath
+        );
+
+        try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Fetch Like Browser
+            |--------------------------------------------------------------------------
+            */
+
+            $response = Http::withHeaders([
+
+                    'User-Agent' =>
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                        . 'AppleWebKit/537.36 (KHTML, like Gecko) '
+                        . 'Chrome/153.0 Safari/537.36',
+
+                    'Accept' =>
+                        'image/avif,image/webp,image/apng,image/svg+xml,'
+                        . 'image/*,*/*;q=0.8',
+
+                    'Accept-Language' =>
+                        'en-US,en;q=0.9',
+
+                    'Referer' =>
+                        'https://post.realvictorygroups.com/',
+
+                    'Cache-Control' =>
+                        'no-cache',
+                ])
+                ->connectTimeout(20)
+                ->timeout(120)
+                ->withOptions([
+
+                    /*
+                    | Follow redirects
+                    */
+                    'allow_redirects' => [
+                        'max' => 10,
+                        'strict' => false,
+                        'referer' => true,
+                        'track_redirects' => true,
+                    ],
+
+                    /*
+                    | Directly write response to file.
+                    | Large images bhi memory me load nahi hongi.
+                    */
+                    'sink' => $tempPath,
+                ])
+                ->get($url);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Success Check
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $response->successful()
+                &&
+                File::exists($tempPath)
+                &&
+                File::size($tempPath) > 0
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Verify It Is Really An Image
+                |--------------------------------------------------------------------------
+                */
+
+                $mime = File::mimeType(
+                    $tempPath
+                );
+
+                if (
+                    $mime
+                    &&
+                    str_starts_with(
+                        strtolower($mime),
+                        'image/'
+                    )
+                ) {
+
+                    return response()
+                        ->download(
+                            $tempPath,
+                            $fileName,
+                            [
+                                'Content-Type' =>
+                                    $mime,
+
+                                'Cache-Control' =>
+                                    'no-store, no-cache, must-revalidate',
+                            ]
+                        )
+                        ->deleteFileAfterSend(
+                            true
+                        );
+                }
+
+
+                /*
+                | Remote server ne HTML/error page bhej diya.
+                */
+                $lastError =
+                    'Downloaded content is not an image. MIME: '
+                    . ($mime ?: 'unknown');
+
+            } else {
+
+                $lastError =
+                    'Remote status: '
+                    . $response->status();
+            }
+
+        } catch (\Throwable $e) {
+
+            $lastError =
+                $e->getMessage();
+
+            Log::warning(
+                'Demo image download attempt failed.',
+                [
+                    'url' => $url,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Wait Before Retry
+        |--------------------------------------------------------------------------
+        |
+        | Attempt 1 => 800ms
+        | Attempt 2 => 1600ms
+        | Attempt 3 => 2400ms
+        | ...
+        |
+        */
+
+        if (
+            $attempt < $maxAttempts
+        ) {
+
+            usleep(
+                800000 * $attempt
+            );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | All Attempts Failed
+    |--------------------------------------------------------------------------
+    */
+
+    File::delete(
+        $tempPath
+    );
+
+
+    Log::error(
+        'Demo image download completely failed.',
+        [
+            'url' => $url,
+            'error' => $lastError,
+        ]
+    );
+
+
+    return response()->json([
+        'status' => false,
+        'message' => 'Image download failed after multiple attempts.',
+        'error' => $lastError,
+    ], 502);
 }
