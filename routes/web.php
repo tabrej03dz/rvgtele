@@ -27,6 +27,7 @@ use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DataController;
 use App\Http\Controllers\DemoCityController;
+use App\Http\Controllers\DemoImageController;
 use App\Http\Controllers\ManageLeadController;
 use App\Http\Controllers\MobileApkController;
 use App\Http\Controllers\RecycleBinController;
@@ -223,6 +224,27 @@ Route::middleware(['auth', 'verified', 'company.active', 'activitylog'])->group(
     Route::patch('/leads/{lead}', [LeadController::class, 'update'])->middleware('permission:leads.update');
     Route::delete('/leads/{lead}', [LeadController::class, 'destroy'])->middleware('permission:leads.delete')->name('leads.destroy');
 
+
+    Route::post(
+        '/demo-images',
+        [DemoImageController::class, 'images']
+    )->name('api.demo-images');
+    Route::get(
+        '/demo-images',
+        [DemoImageController::class, 'index']
+    )->name('demo-images.index');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Remote Image Download Proxy
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/demo-images/download',
+        [DemoImageController::class, 'download']
+    )->name('demo-images.download');
     Route::post(
         '/leads/{lead}/send-demo',
         [CallLogController::class, 'storeDemo']

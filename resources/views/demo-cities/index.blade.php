@@ -154,6 +154,17 @@
             </form>
 
 
+            {{-- DEMO IMAGES --}}
+
+            <a
+                href="{{ route('demo-images.index') }}"
+                class="demo-btn demo-btn-dark"
+            >
+                <i data-lucide="images"></i>
+
+                Demo Images From Post Panel
+            </a>
+
             {{-- ADD CITY --}}
 
             <a
