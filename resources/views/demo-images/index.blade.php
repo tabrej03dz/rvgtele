@@ -607,7 +607,6 @@
         >
             No demo images found
         </div>
-
         <div
             class="
                 mt-1
@@ -2695,6 +2694,7 @@
                 'png',
                 'webp',
                 'gif',
+                'mp4'
             ];
 
 
