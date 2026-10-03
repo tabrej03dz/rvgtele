@@ -418,6 +418,7 @@ public function download(Request $request)
         'png',
         'webp',
         'gif',
+        'mp4'
     ];
 
 
