@@ -346,7 +346,7 @@
                                 </svg>
 
                                 <span>
-                                    {{ $lead->category }}
+                                    {{ $lead->leadCategory?->name }}
                                 </span>
                             </div>
 

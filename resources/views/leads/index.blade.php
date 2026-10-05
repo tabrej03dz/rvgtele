@@ -2074,8 +2074,8 @@
 
                             <div class="card-bottom">
                                 <div>
-                                    @if($lead->category)
-                                        <span class="category-tag">{{ $lead->category }}</span>
+                                    @if($lead->leadCategory)
+                                        <span class="category-tag">{{ $lead->leadCategory?->name }}</span>
                                     @endif
                                 </div>
 
