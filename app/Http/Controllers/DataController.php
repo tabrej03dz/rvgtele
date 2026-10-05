@@ -1296,7 +1296,50 @@ class DataController extends Controller
                     continue;
                 }
 
+                // Data::create($data);
+                // $inserted++;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Duplicate Check
+                |--------------------------------------------------------------------------
+                | Same company_id + same mobile = duplicate
+                | Different company_id + same mobile = allowed
+                */
+
+                $isDuplicate = false;
+
+                if (!empty($data['mobile'])) {
+
+                    $isDuplicate = Data::query()
+                        ->where('company_id', $data['company_id'])
+                        ->where('mobile', $data['mobile'])
+                        ->exists();
+
+                } elseif (!empty($data['email'])) {
+
+                    // Mobile nahi hai to email se duplicate check
+                    $isDuplicate = Data::query()
+                        ->where('company_id', $data['company_id'])
+                        ->where('email', $data['email'])
+                        ->exists();
+                }
+
+                if ($isDuplicate) {
+                    $skipped++;
+                    continue;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Create Record
+                |--------------------------------------------------------------------------
+                */
+
                 Data::create($data);
+
                 $inserted++;
             }
 
@@ -1410,22 +1453,55 @@ class DataController extends Controller
         return preg_replace('/[^a-z0-9]+/u', '', $heading) ?? '';
     }
 
+    // private function cleanDataImportPhone(mixed $value): ?string
+    // {
+    //     if ($value === null || $value === '') {
+    //         return null;
+    //     }
+
+    //     $value = trim((string) $value);
+
+    //     if (is_numeric($value) && str_contains(strtolower($value), 'e')) {
+    //         $value = sprintf('%.0f', (float) $value);
+    //     }
+
+    //     $value = preg_replace('/[^0-9+]/', '', $value);
+
+    //     return $value ?: null;
+    // }
+
     private function cleanDataImportPhone(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        if (is_numeric($value) && str_contains(strtolower($value), 'e')) {
-            $value = sprintf('%.0f', (float) $value);
-        }
-
-        $value = preg_replace('/[^0-9+]/', '', $value);
-
-        return $value ?: null;
+{
+    if ($value === null || $value === '') {
+        return null;
     }
+
+    $value = trim((string) $value);
+
+    // Excel scientific notation
+    if (is_numeric($value) && str_contains(strtolower($value), 'e')) {
+        $value = sprintf('%.0f', (float) $value);
+    }
+
+    // Only digits
+    $value = preg_replace('/\D+/', '', $value);
+
+    if (!$value) {
+        return null;
+    }
+
+    // +91 / 91XXXXXXXXXX => XXXXXXXXXX
+    if (strlen($value) === 12 && str_starts_with($value, '91')) {
+        $value = substr($value, 2);
+    }
+
+    // Starting zero remove: 09876543210 => 9876543210
+    if (strlen($value) === 11 && str_starts_with($value, '0')) {
+        $value = substr($value, 1);
+    }
+
+    return $value ?: null;
+}
 
     private function cleanDataImportNumber(mixed $value): ?float
     {

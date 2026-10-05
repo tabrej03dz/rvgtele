@@ -177,7 +177,7 @@
                         <th>DEMO SEND</th>
                         <th>ACTION</th>
                         <th>LABELS</th>
-                        <th>SOURCE</th>
+                        <th>Category</th>
                         <th>STATUS</th>
                         <th>PRIORITY</th>
                         <th>TEMP.</th>
@@ -258,10 +258,8 @@
                                 @endforelse
                             </div>
                         </td>
-                        <td>{{ $lead->source?->name ?: '—' }}</td>
+                        <td>{{ $lead->leadCategory?->name ?: '—' }}</td>
                         <td><span class="status-pill">{{ $lead->status?->name ?: 'New' }}</span></td>
-                        <td><span class="priority priority-{{ $priority }}">{{ ucfirst($priority) }}</span></td>
-                        <td><span class="temperature temp-{{ $temp }}">{{ ucfirst($temp) }}</span></td>
                         <td>{{ $lead->team?->name ?: '—' }}</td>
                         <td>{{ $lead->assignedUser?->name ?: 'Unassigned' }}</td>
                     </tr>

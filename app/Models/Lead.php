@@ -126,4 +126,12 @@ class Lead extends Model
         return $this->hasOne(FollowUp::class)->latestOfMany();
     }
 
+    public function leadCategory()
+    {
+        return $this->belongsTo(
+            Category::class,
+            'category_id'
+        );
+    }
+
 }
