@@ -179,8 +179,6 @@
                         <th>LABELS</th>
                         <th>Category</th>
                         <th>STATUS</th>
-                        <th>PRIORITY</th>
-                        <th>TEMP.</th>
                         <th>TEAM</th>
                         <th>OWNER</th>
                     </tr>
