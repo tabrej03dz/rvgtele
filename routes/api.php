@@ -25,6 +25,8 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
 
+    Route::get('categories', [\App\Http\Controllers\Api\CategoryController::class, 'index']);
+
 
     Route::get(
         '/mobile-apk/latest',
@@ -226,7 +228,7 @@ Route::get(
 | Follow-up APIs
 |--------------------------------------------------------------------------
 */
-
+Route::get('follow-ups/category/{category?}', [FollowUpApiController::class, 'followUpsByCategory']);
 Route::prefix('follow-ups')
     ->controller(FollowUpApiController::class)
     ->group(function () {
@@ -241,6 +243,9 @@ Route::prefix('follow-ups')
         Route::patch('/{followUp}/snooze', 'snooze');
         Route::patch('/{followUp}/reschedule', 'reschedule');
         Route::patch('/{followUp}/cancel', 'cancel');
+
+        
+
     });
 
 
