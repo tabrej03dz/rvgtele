@@ -2068,7 +2068,7 @@
 
                             {{-- Assigned User --}}
 
-                            <td class="px-4 py-4">
+                            {{-- <td class="px-4 py-4">
 
                                 <div class="font-semibold text-slate-800">
                                     {{ $followup->assignedUser?->name ?? 'Unassigned' }}
@@ -2077,6 +2077,19 @@
                                 @if($followup->assignedUser?->employee_code)
                                     <div class="mt-1 text-xs text-slate-400">
                                         {{ $followup->assignedUser->employee_code }}
+                                    </div>
+                                @endif
+
+                            </td> --}}
+                            <td class="px-4 py-4">
+
+                                <div class="font-semibold text-slate-800">
+                                    {{ $followup->createdBy?->name ?? 'Unassigned' }}
+                                </div>
+
+                                @if($followup->createdBy?->employee_code)
+                                    <div class="mt-1 text-xs text-slate-400">
+                                        {{ $followup->createdBy->employee_code }}
                                     </div>
                                 @endif
 

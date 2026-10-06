@@ -1280,4 +1280,6 @@ private function visibleAssignedUserIds(User $currentUser): array
             $message
         );
     }
+
+    
 }

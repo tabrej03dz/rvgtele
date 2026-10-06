@@ -1639,43 +1639,235 @@ public function callOnMobile(
 
     private function filteredLeadQuery(
     Request $request
-): Builder {
-    $companyId = $this->companyId($request);
-    $user = $request->user();
-    $hasFullAccess = $this->hasFullAccess($request);
+    ): Builder {
+        $companyId = $this->companyId($request);
+        $user = $request->user();
+        $hasFullAccess = $this->hasFullAccess($request);
 
-    $query = Lead::query()
-        ->where(
-            'company_id',
-            $companyId
-        );
-
-    $leaderTeamIds = [];
-
-    if (!$hasFullAccess) {
-
-        $leaderTeamIds =
-            $this->leaderTeamIds($request);
-
-        if (empty($leaderTeamIds)) {
-
-            $query->where(
-                'assigned_to',
-                $user->id
+        $query = Lead::query()
+            ->where(
+                'company_id',
+                $companyId
             );
 
-        } else {
+        $leaderTeamIds = [];
+
+        if (!$hasFullAccess) {
+
+            $leaderTeamIds =
+                $this->leaderTeamIds($request);
+
+            if (empty($leaderTeamIds)) {
+
+                $query->where(
+                    'assigned_to',
+                    $user->id
+                );
+
+            } else {
+
+                $query->where(
+                    function (Builder $accessQuery) use (
+                        $user,
+                        $companyId,
+                        $leaderTeamIds
+                    ) {
+                        $accessQuery
+                            ->where(
+                                'assigned_to',
+                                $user->id
+                            )
+                            ->orWhereIn(
+                                'assigned_to',
+                                User::query()
+                                    ->select('id')
+                                    ->where(
+                                        'company_id',
+                                        $companyId
+                                    )
+                                    ->whereIn(
+                                        'team_id',
+                                        $leaderTeamIds
+                                    )
+                            );
+                    }
+                );
+            }
+        }
+
+        if ($request->filled('search')) {
+
+            $search = trim(
+                (string) $request->input('search')
+            );
 
             $query->where(
-                function (Builder $accessQuery) use (
-                    $user,
-                    $companyId,
-                    $leaderTeamIds
-                ) {
-                    $accessQuery
+                function (Builder $subQuery) use ($search) {
+
+                    $subQuery
                         ->where(
-                            'assigned_to',
-                            $user->id
+                            'name',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'mobile',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'alternate_mobile',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'whatsapp_number',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'company_name',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'email',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'city',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'category',
+                            'like',
+                            "%{$search}%"
+                        );
+                }
+            );
+        }
+
+        if ($request->filled('status')) {
+            $statusId = (int) $request->input('status');
+
+            $validStatus = LeadStatus::query()
+                ->whereKey($statusId)
+                ->where(function (Builder $statusQuery) use ($companyId) {
+                    $statusQuery
+                        ->whereNull('company_id')
+                        ->orWhere('company_id', $companyId);
+                })
+                ->where('is_active', true)
+                ->exists();
+
+            if ($validStatus) {
+                $query->where('lead_status_id', $statusId);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->filled('source')) {
+            $query->where(
+                'lead_source_id',
+                $request->input('source')
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Category Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('category_id')) {
+
+            $categoryId = (int) $request->input('category_id');
+
+            $validCategory = Category::query()
+                ->whereKey($categoryId)
+                ->where(function (Builder $categoryQuery) use ($companyId) {
+                    $categoryQuery
+                        ->whereNull('company_id')
+                        ->orWhere('company_id', $companyId);
+                })
+                ->exists();
+
+            if ($validCategory) {
+
+                $query->where(
+                    'category_id',
+                    $categoryId
+                );
+
+            } else {
+
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->filled('city')) {
+            $city = trim((string) $request->input('city'));
+
+            $query->where('city', $city);
+        }
+
+        $isTeamLeader =
+            !$hasFullAccess &&
+            !empty($leaderTeamIds);
+
+        if (
+            ($hasFullAccess || $isTeamLeader)
+            &&
+            $request->filled('assigned_to')
+        ) {
+
+            $assignedTo =
+                (string) $request->input('assigned_to');
+
+            if ($assignedTo === 'unassigned') {
+
+                if ($hasFullAccess) {
+
+                    $query->whereNull(
+                        'assigned_to'
+                    );
+
+                } else {
+
+                    $query->whereRaw('1 = 0');
+                }
+
+            } elseif (ctype_digit($assignedTo)) {
+
+                $query->where(
+                    'assigned_to',
+                    (int) $assignedTo
+                );
+
+            } else {
+
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->filled('team_id')) {
+
+            $teamId =
+                (int) $request->input('team_id');
+
+            $query->where(
+                function (Builder $teamQuery) use (
+                    $companyId,
+                    $teamId
+                ) {
+
+                    $teamQuery
+                        ->where(
+                            'team_id',
+                            $teamId
                         )
                         ->orWhereIn(
                             'assigned_to',
@@ -1685,321 +1877,179 @@ public function callOnMobile(
                                     'company_id',
                                     $companyId
                                 )
-                                ->whereIn(
+                                ->where(
                                     'team_id',
-                                    $leaderTeamIds
+                                    $teamId
                                 )
                         );
                 }
             );
         }
-    }
 
-    if ($request->filled('search')) {
+        if ($request->filled('priority')) {
 
-        $search = trim(
-            (string) $request->input('search')
-        );
+            $priority =
+                (string) $request->input('priority');
 
-        $query->where(
-            function (Builder $subQuery) use ($search) {
-
-                $subQuery
-                    ->where(
-                        'name',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'mobile',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'alternate_mobile',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'whatsapp_number',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'company_name',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'email',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'city',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'category',
-                        'like',
-                        "%{$search}%"
-                    );
-            }
-        );
-    }
-
-    if ($request->filled('status')) {
-        $statusId = (int) $request->input('status');
-
-        $validStatus = LeadStatus::query()
-            ->whereKey($statusId)
-            ->where(function (Builder $statusQuery) use ($companyId) {
-                $statusQuery
-                    ->whereNull('company_id')
-                    ->orWhere('company_id', $companyId);
-            })
-            ->where('is_active', true)
-            ->exists();
-
-        if ($validStatus) {
-            $query->where('lead_status_id', $statusId);
-        } else {
-            $query->whereRaw('1 = 0');
-        }
-    }
-
-    if ($request->filled('source')) {
-        $query->where(
-            'lead_source_id',
-            $request->input('source')
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Category Filter
-    |--------------------------------------------------------------------------
-    */
-
-    if ($request->filled('category_id')) {
-
-        $categoryId = (int) $request->input('category_id');
-
-        $validCategory = Category::query()
-            ->whereKey($categoryId)
-            ->where(function (Builder $categoryQuery) use ($companyId) {
-                $categoryQuery
-                    ->whereNull('company_id')
-                    ->orWhere('company_id', $companyId);
-            })
-            ->exists();
-
-        if ($validCategory) {
-
-            $query->where(
-                'category_id',
-                $categoryId
-            );
-
-        } else {
-
-            $query->whereRaw('1 = 0');
-        }
-    }
-
-    if ($request->filled('city')) {
-        $city = trim((string) $request->input('city'));
-
-        $query->where('city', $city);
-    }
-
-    $isTeamLeader =
-        !$hasFullAccess &&
-        !empty($leaderTeamIds);
-
-    if (
-        ($hasFullAccess || $isTeamLeader)
-        &&
-        $request->filled('assigned_to')
-    ) {
-
-        $assignedTo =
-            (string) $request->input('assigned_to');
-
-        if ($assignedTo === 'unassigned') {
-
-            if ($hasFullAccess) {
-
-                $query->whereNull(
-                    'assigned_to'
+            if (in_array(
+                $priority,
+                [
+                    'low',
+                    'normal',
+                    'high',
+                    'urgent',
+                    'hot',
+                ],
+                true
+            )) {
+                $query->where(
+                    'priority',
+                    $priority
                 );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->filled('temperature')) {
+
+            $temperature =
+                (string) $request->input('temperature');
+
+            if (in_array(
+                $temperature,
+                [
+                    'cold',
+                    'warm',
+                    'hot',
+                ],
+                true
+            )) {
+                $query->where(
+                    'temperature',
+                    $temperature
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->filled('call_disposition')) {
+
+            $callDisposition =
+                (string) $request->input(
+                    'call_disposition'
+                );
+
+            if ($callDisposition === 'no_call') {
+
+                $query->whereDoesntHave(
+                    'calls'
+                );
+
+            } elseif (ctype_digit($callDisposition)) {
+
+                $dispositionId =
+                    (int) $callDisposition;
+
+                $validDisposition =
+                    CallDisposition::query()
+                        ->whereKey(
+                            $dispositionId
+                        )
+                        ->where(
+                            function (
+                                Builder $dispositionQuery
+                            ) use ($companyId) {
+
+                                $dispositionQuery
+                                    ->whereNull(
+                                        'company_id'
+                                    )
+                                    ->orWhere(
+                                        'company_id',
+                                        $companyId
+                                    );
+                            }
+                        )
+                        ->where(
+                            'is_active',
+                            true
+                        )
+                        ->exists();
+
+                if ($validDisposition) {
+
+                    $query->whereHas(
+                        'calls',
+                        function (
+                            Builder $callQuery
+                        ) use (
+                            $dispositionId
+                        ) {
+
+                            $callQuery
+                                ->where(
+                                    'call_disposition_id',
+                                    $dispositionId
+                                )
+                                ->whereRaw(
+                                    'call_logs.id = (
+                                        SELECT MAX(latest_call.id)
+                                        FROM call_logs AS latest_call
+                                        WHERE latest_call.lead_id = leads.id
+                                    )'
+                                );
+                        }
+                    );
+
+                } else {
+
+                    $query->whereRaw(
+                        '1 = 0'
+                    );
+                }
 
             } else {
 
-                $query->whereRaw('1 = 0');
+                $query->whereRaw(
+                    '1 = 0'
+                );
             }
-
-        } elseif (ctype_digit($assignedTo)) {
-
-            $query->where(
-                'assigned_to',
-                (int) $assignedTo
-            );
-
-        } else {
-
-            $query->whereRaw('1 = 0');
         }
-    }
 
-    if ($request->filled('team_id')) {
+        if ($request->filled('label_id')) {
 
-        $teamId =
-            (int) $request->input('team_id');
+            $labelId =
+                (int) $request->input(
+                    'label_id'
+                );
 
-        $query->where(
-            function (Builder $teamQuery) use (
-                $companyId,
-                $teamId
-            ) {
-
-                $teamQuery
-                    ->where(
-                        'team_id',
-                        $teamId
-                    )
-                    ->orWhereIn(
-                        'assigned_to',
-                        User::query()
-                            ->select('id')
-                            ->where(
-                                'company_id',
-                                $companyId
-                            )
-                            ->where(
-                                'team_id',
-                                $teamId
-                            )
-                    );
-            }
-        );
-    }
-
-    if ($request->filled('priority')) {
-
-        $priority =
-            (string) $request->input('priority');
-
-        if (in_array(
-            $priority,
-            [
-                'low',
-                'normal',
-                'high',
-                'urgent',
-                'hot',
-            ],
-            true
-        )) {
-            $query->where(
-                'priority',
-                $priority
-            );
-        } else {
-            $query->whereRaw('1 = 0');
-        }
-    }
-
-    if ($request->filled('temperature')) {
-
-        $temperature =
-            (string) $request->input('temperature');
-
-        if (in_array(
-            $temperature,
-            [
-                'cold',
-                'warm',
-                'hot',
-            ],
-            true
-        )) {
-            $query->where(
-                'temperature',
-                $temperature
-            );
-        } else {
-            $query->whereRaw('1 = 0');
-        }
-    }
-
-    if ($request->filled('call_disposition')) {
-
-        $callDisposition =
-            (string) $request->input(
-                'call_disposition'
-            );
-
-        if ($callDisposition === 'no_call') {
-
-            $query->whereDoesntHave(
-                'calls'
-            );
-
-        } elseif (ctype_digit($callDisposition)) {
-
-            $dispositionId =
-                (int) $callDisposition;
-
-            $validDisposition =
-                CallDisposition::query()
+            $validLabel =
+                LeadLabel::query()
                     ->whereKey(
-                        $dispositionId
+                        $labelId
                     )
                     ->where(
-                        function (
-                            Builder $dispositionQuery
-                        ) use ($companyId) {
-
-                            $dispositionQuery
-                                ->whereNull(
-                                    'company_id'
-                                )
-                                ->orWhere(
-                                    'company_id',
-                                    $companyId
-                                );
-                        }
-                    )
-                    ->where(
-                        'is_active',
-                        true
+                        'company_id',
+                        $companyId
                     )
                     ->exists();
 
-            if ($validDisposition) {
+            if ($validLabel) {
 
                 $query->whereHas(
-                    'calls',
+                    'labels',
                     function (
-                        Builder $callQuery
+                        Builder $labelQuery
                     ) use (
-                        $dispositionId
+                        $labelId
                     ) {
 
-                        $callQuery
-                            ->where(
-                                'call_disposition_id',
-                                $dispositionId
-                            )
-                            ->whereRaw(
-                                'call_logs.id = (
-                                    SELECT MAX(latest_call.id)
-                                    FROM call_logs AS latest_call
-                                    WHERE latest_call.lead_id = leads.id
-                                )'
-                            );
+                        $labelQuery->where(
+                            'lead_labels.id',
+                            $labelId
+                        );
                     }
                 );
 
@@ -2009,138 +2059,88 @@ public function callOnMobile(
                     '1 = 0'
                 );
             }
-
-        } else {
-
-            $query->whereRaw(
-                '1 = 0'
-            );
         }
-    }
 
-    if ($request->filled('label_id')) {
-
-        $labelId =
-            (int) $request->input(
-                'label_id'
-            );
-
-        $validLabel =
-            LeadLabel::query()
-                ->whereKey(
-                    $labelId
-                )
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->exists();
-
-        if ($validLabel) {
-
-            $query->whereHas(
-                'labels',
-                function (
-                    Builder $labelQuery
-                ) use (
-                    $labelId
-                ) {
-
-                    $labelQuery->where(
-                        'lead_labels.id',
-                        $labelId
-                    );
-                }
-            );
-
-        } else {
-
-            $query->whereRaw(
-                '1 = 0'
-            );
-        }
-    }
-
-    if ($request->boolean('demo_send')) {
-
-        $query->where(
-            'demo_send',
-            true
-        );
-    }
-
-    if ($request->filled('lead_send')) {
-
-        $leadSend =
-            (string) $request->input(
-                'lead_send'
-            );
-
-        if ($leadSend === 'today') {
-
-            $query
-                ->where(
-                    'demo_send',
-                    true
-                )
-                ->whereNotNull(
-                    'demo_sent_at'
-                )
-                ->whereDate(
-                    'demo_sent_at',
-                    today()
-                );
-
-        } elseif ($leadSend === 'all') {
+        if ($request->boolean('demo_send')) {
 
             $query->where(
                 'demo_send',
                 true
             );
+        }
 
-        } else {
+        if ($request->filled('lead_send')) {
 
-            $query->whereRaw(
-                '1 = 0'
+            $leadSend =
+                (string) $request->input(
+                    'lead_send'
+                );
+
+            if ($leadSend === 'today') {
+
+                $query
+                    ->where(
+                        'demo_send',
+                        true
+                    )
+                    ->whereNotNull(
+                        'demo_sent_at'
+                    )
+                    ->whereDate(
+                        'demo_sent_at',
+                        today()
+                    );
+
+            } elseif ($leadSend === 'all') {
+
+                $query->where(
+                    'demo_send',
+                    true
+                );
+
+            } else {
+
+                $query->whereRaw(
+                    '1 = 0'
+                );
+            }
+        }
+
+        if (
+            $request->input(
+                'created_filter'
+            ) === 'today'
+        ) {
+            $query->whereDate(
+                'created_at',
+                today()
             );
         }
+
+        if ($request->filled('date_from')) {
+
+            $query->whereDate(
+                'created_at',
+                '>=',
+                $request->input(
+                    'date_from'
+                )
+            );
+        }
+
+        if ($request->filled('date_to')) {
+
+            $query->whereDate(
+                'created_at',
+                '<=',
+                $request->input(
+                    'date_to'
+                )
+            );
+        }
+
+        return $query;
     }
-
-    if (
-        $request->input(
-            'created_filter'
-        ) === 'today'
-    ) {
-        $query->whereDate(
-            'created_at',
-            today()
-        );
-    }
-
-    if ($request->filled('date_from')) {
-
-        $query->whereDate(
-            'created_at',
-            '>=',
-            $request->input(
-                'date_from'
-            )
-        );
-    }
-
-    if ($request->filled('date_to')) {
-
-        $query->whereDate(
-            'created_at',
-            '<=',
-            $request->input(
-                'date_to'
-            )
-        );
-    }
-
-    return $query;
-}
 
     private function formData(
         Request $request

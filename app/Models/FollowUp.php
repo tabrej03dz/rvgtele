@@ -23,4 +23,8 @@ class FollowUp extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to');
     }
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }
