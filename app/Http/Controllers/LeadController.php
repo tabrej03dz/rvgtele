@@ -3054,6 +3054,7 @@ public function index(Request $request): View
         $companyId = $this->companyId($request);
 
         $validated = $this->validateData($request);
+        $validated['next_follow_up_at'] = now()->addHours(2);
 
 
         /*
@@ -3432,6 +3433,8 @@ public function index(Request $request): View
         $request,
         $lead
     );
+
+    $validated['next_follow_up_at'] = now()->addHours(2);
 
     /*
     |--------------------------------------------------------------------------
