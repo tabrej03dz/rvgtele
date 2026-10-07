@@ -22,6 +22,7 @@ use App\Services\MobileCallService;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 use App\Models\CallLog;
+use App\Models\Category;
 use Illuminate\Support\Facades\Schema;
 
 class LeadController extends Controller
@@ -3347,178 +3348,178 @@ public function index(Request $request): View
 
 
     public function update(
-    Request $request,
-    Lead $lead
-): RedirectResponse {
-    $this->guard(
-        $request,
-        $lead
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Demo Send Quick Update
-    |--------------------------------------------------------------------------
-    |
-    | demo_send_only request aane par normal lead edit validation run nahi hogi.
-    |
-    | demo_send = 1:
-    | - Lead ko demo sent mark karenge.
-    | - Agar pehle demo_sent_at nahi hai to current timestamp save hoga.
-    |
-    | demo_send = 0:
-    | - Demo Send mark remove hoga.
-    | - demo_sent_at bhi NULL kar diya jayega.
-    |
-    */
-
-    if ($request->boolean('demo_send_only')) {
-
-        $demoValidated = $request->validate([
-            'demo_send' => ['required', 'boolean'],
-            'call_disposition_id' => ['nullable', 'integer'],
-        ]);
-
-        $isDemoSend = (bool) $demoValidated['demo_send'];
-
-        DB::transaction(function () use (
-            $lead,
+        Request $request,
+        Lead $lead
+    ): RedirectResponse {
+        $this->guard(
             $request,
-            $demoValidated,
-            $isDemoSend
-        ) {
-            if ($isDemoSend) {
-                $lead->demo_send = true;
-
-                // First demo send date preserve rahegi. Resend is date ko overwrite nahi karega.
-                if (empty($lead->demo_sent_at)) {
-                    $lead->demo_sent_at = now();
-                }
-
-                $lead->save();
-
-                // Har Send Demo / Resend Demo par ek fresh Demo disposition log.
-                $demoDispositionId = !empty($demoValidated['call_disposition_id'])
-                    ? (int) $demoValidated['call_disposition_id']
-                    : $this->demoDispositionId($request);
-
-                $this->saveDemoDispositionLog(
-                    request: $request,
-                    lead: $lead,
-                    dispositionId: $demoDispositionId
-                );
-            } else {
-                // Existing remove behavior preserve.
-                $lead->demo_send = false;
-                $lead->demo_sent_at = null;
-                $lead->save();
-            }
-        });
-
-        return back()->with(
-            'success',
-            $isDemoSend
-                ? 'Demo sent successfully and Demo disposition saved.'
-                : 'Demo Send mark removed.'
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Normal Lead Update
-    |--------------------------------------------------------------------------
-    */
-
-    $validated = $this->validateData(
-        $request,
-        $lead
-    );
-
-    $validated['next_follow_up_at'] = now()->addHours(2);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Employee Cannot Change Owner
-    |--------------------------------------------------------------------------
-    */
-
-    if (!$this->hasFullAccess($request)) {
-        $validated['assigned_to'] =
-            $lead->assigned_to;
-    }
-
-    $oldAssignedUserId =
-        $lead->assigned_to;
-
-    $newAssignedUserId =
-        $validated['assigned_to'] ?? null;
-
-    DB::transaction(
-        function () use (
-            $lead,
-            $validated,
-            $oldAssignedUserId,
-            $newAssignedUserId,
-            $request
-        ) {
-            /*
-            |--------------------------------------------------------------------------
-            | Update Lead
-            |--------------------------------------------------------------------------
-            */
-
-            $lead->update(
-                $validated
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Admin Changed Assignment From Edit Form
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                $this->hasFullAccess($request)
-                &&
-                (int) $oldAssignedUserId !==
-                (int) $newAssignedUserId
-                &&
-                !empty($newAssignedUserId)
-            ) {
-                $this->createAssignmentHistory(
-                    lead: $lead,
-
-                    previousUserId:
-                        $oldAssignedUserId
-                            ? (int) $oldAssignedUserId
-                            : null,
-
-                    newUserId:
-                        (int) $newAssignedUserId,
-
-                    assignedBy:
-                        (int) $request->user()->id,
-
-                    reason:
-                        'Lead owner changed from edit form',
-
-                    companyId:
-                        $this->companyId($request)
-                );
-            }
-        }
-    );
-
-    return redirect()
-        ->route(
-            'leads.show',
             $lead
-        )
-        ->with(
-            'success',
-            'Lead updated successfully.'
         );
-}
+
+        /*
+        |--------------------------------------------------------------------------
+        | Demo Send Quick Update
+        |--------------------------------------------------------------------------
+        |
+        | demo_send_only request aane par normal lead edit validation run nahi hogi.
+        |
+        | demo_send = 1:
+        | - Lead ko demo sent mark karenge.
+        | - Agar pehle demo_sent_at nahi hai to current timestamp save hoga.
+        |
+        | demo_send = 0:
+        | - Demo Send mark remove hoga.
+        | - demo_sent_at bhi NULL kar diya jayega.
+        |
+        */
+
+        if ($request->boolean('demo_send_only')) {
+
+            $demoValidated = $request->validate([
+                'demo_send' => ['required', 'boolean'],
+                'call_disposition_id' => ['nullable', 'integer'],
+            ]);
+
+            $isDemoSend = (bool) $demoValidated['demo_send'];
+
+            DB::transaction(function () use (
+                $lead,
+                $request,
+                $demoValidated,
+                $isDemoSend
+            ) {
+                if ($isDemoSend) {
+                    $lead->demo_send = true;
+
+                    // First demo send date preserve rahegi. Resend is date ko overwrite nahi karega.
+                    if (empty($lead->demo_sent_at)) {
+                        $lead->demo_sent_at = now();
+                    }
+
+                    $lead->save();
+
+                    // Har Send Demo / Resend Demo par ek fresh Demo disposition log.
+                    $demoDispositionId = !empty($demoValidated['call_disposition_id'])
+                        ? (int) $demoValidated['call_disposition_id']
+                        : $this->demoDispositionId($request);
+
+                    $this->saveDemoDispositionLog(
+                        request: $request,
+                        lead: $lead,
+                        dispositionId: $demoDispositionId
+                    );
+                } else {
+                    // Existing remove behavior preserve.
+                    $lead->demo_send = false;
+                    $lead->demo_sent_at = null;
+                    $lead->save();
+                }
+            });
+
+            return back()->with(
+                'success',
+                $isDemoSend
+                    ? 'Demo sent successfully and Demo disposition saved.'
+                    : 'Demo Send mark removed.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Normal Lead Update
+        |--------------------------------------------------------------------------
+        */
+
+        $validated = $this->validateData(
+            $request,
+            $lead
+        );
+
+        $validated['next_follow_up_at'] = now()->addHours(2);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employee Cannot Change Owner
+        |--------------------------------------------------------------------------
+        */
+
+        if (!$this->hasFullAccess($request)) {
+            $validated['assigned_to'] =
+                $lead->assigned_to;
+        }
+
+        $oldAssignedUserId =
+            $lead->assigned_to;
+
+        $newAssignedUserId =
+            $validated['assigned_to'] ?? null;
+
+        DB::transaction(
+            function () use (
+                $lead,
+                $validated,
+                $oldAssignedUserId,
+                $newAssignedUserId,
+                $request
+            ) {
+                /*
+                |--------------------------------------------------------------------------
+                | Update Lead
+                |--------------------------------------------------------------------------
+                */
+
+                $lead->update(
+                    $validated
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Admin Changed Assignment From Edit Form
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    $this->hasFullAccess($request)
+                    &&
+                    (int) $oldAssignedUserId !==
+                    (int) $newAssignedUserId
+                    &&
+                    !empty($newAssignedUserId)
+                ) {
+                    $this->createAssignmentHistory(
+                        lead: $lead,
+
+                        previousUserId:
+                            $oldAssignedUserId
+                                ? (int) $oldAssignedUserId
+                                : null,
+
+                        newUserId:
+                            (int) $newAssignedUserId,
+
+                        assignedBy:
+                            (int) $request->user()->id,
+
+                        reason:
+                            'Lead owner changed from edit form',
+
+                        companyId:
+                            $this->companyId($request)
+                    );
+                }
+            }
+        );
+
+        return redirect()
+            ->route(
+                'leads.show',
+                $lead
+            )
+            ->with(
+                'success',
+                'Lead updated successfully.'
+            );
+    }
 
 
 
@@ -5042,6 +5043,131 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     */
 
+    // private function formData(
+    //     Request $request
+    // ): array {
+    //     $companyId =
+    //         $this->companyId($request);
+
+    //     $hasFullAccess =
+    //         $this->hasFullAccess($request);
+
+    //     /*
+    //     |--------------------------------------------------------------------------
+    //     | Users
+    //     |--------------------------------------------------------------------------
+    //     |
+    //     | Normal employee ko doosra employee choose nahi karna hai.
+    //     |
+    //     */
+
+    //     $users = $hasFullAccess
+    //         ? User::query()
+    //         ->where(
+    //             'company_id',
+    //             $companyId
+    //         )
+    //         ->where(
+    //             'is_active',
+    //             true
+    //         )
+    //         ->orderBy('name')
+    //         ->get([
+    //             'id',
+    //             'name',
+    //             'employee_code',
+    //         ])
+    //         : collect([
+    //             $request->user(),
+    //         ]);
+
+    //     return [
+    //         'sources' =>
+    //         LeadSource::query()
+    //             ->where(
+    //                 function (
+    //                     Builder $query
+    //                 ) use ($companyId) {
+    //                     $query
+    //                         ->whereNull(
+    //                             'company_id'
+    //                         )
+    //                         ->orWhere(
+    //                             'company_id',
+    //                             $companyId
+    //                         );
+    //                 }
+    //             )
+    //             ->where(
+    //                 'is_active',
+    //                 true
+    //             )
+    //             ->orderBy('name')
+    //             ->get(),
+
+    //         'statuses' =>
+    //         LeadStatus::query()
+    //             ->where(
+    //                 function (
+    //                     Builder $query
+    //                 ) use ($companyId) {
+    //                     $query
+    //                         ->whereNull(
+    //                             'company_id'
+    //                         )
+    //                         ->orWhere(
+    //                             'company_id',
+    //                             $companyId
+    //                         );
+    //                 }
+    //             )
+    //             ->where(
+    //                 'is_active',
+    //                 true
+    //             )
+    //             ->orderBy(
+    //                 'sort_order'
+    //             )
+    //             ->orderBy('name')
+    //             ->get(),
+
+    //         'users' =>
+    //         $users,
+
+    //         'teams' =>
+    //         Team::query()
+    //             ->where(
+    //                 'company_id',
+    //                 $companyId
+    //             )
+    //             ->orderBy('name')
+    //             ->get([
+    //                 'id',
+    //                 'name',
+    //             ]),
+
+    //         'stages' =>
+    //         PipelineStage::query()
+    //             ->whereHas(
+    //                 'pipeline',
+    //                 fn(
+    //                     Builder $query
+    //                 ) =>
+    //                 $query->where(
+    //                     'company_id',
+    //                     $companyId
+    //                 )
+    //             )
+    //             ->orderBy(
+    //                 'sort_order'
+    //             )
+    //             ->get(),
+
+    //         'hasFullAccess' =>
+    //         $hasFullAccess,
+    //     ];
+    // }
+
     private function formData(
         Request $request
     ): array {
@@ -5100,6 +5226,31 @@ public function index(Request $request): View
                 ->where(
                     'is_active',
                     true
+                )
+                ->orderBy('name')
+                ->get(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Categories
+            |--------------------------------------------------------------------------
+            */
+
+            'categories' =>
+            Category::query()
+                ->where(
+                    function (
+                        Builder $query
+                    ) use ($companyId) {
+                        $query
+                            ->whereNull(
+                                'company_id'
+                            )
+                            ->orWhere(
+                                'company_id',
+                                $companyId
+                            );
+                    }
                 )
                 ->orderBy('name')
                 ->get(),
@@ -5173,6 +5324,257 @@ public function index(Request $request): View
     |--------------------------------------------------------------------------
     */
 
+    // private function validateData(
+    //     Request $request,
+    //     ?Lead $lead = null
+    // ): array {
+    //     $companyId =
+    //         $this->companyId($request);
+
+    //     return $request->validate([
+    //         'name' => [
+    //             'required',
+    //             'string',
+    //             'max:255',
+    //         ],
+
+    //         'mobile' => [
+    //             'required',
+    //             'string',
+    //             'max:20',
+
+    //             Rule::unique(
+    //                 'leads',
+    //                 'mobile'
+    //             )
+    //                 ->where(
+    //                     fn($query) =>
+    //                     $query->where(
+    //                         'company_id',
+    //                         $companyId
+    //                     )
+    //                 )
+    //                 ->ignore(
+    //                     $lead?->id
+    //                 ),
+    //         ],
+
+    //         'alternate_mobile' => [
+    //             'nullable',
+    //             'string',
+    //             'max:20',
+    //         ],
+
+    //         'whatsapp_number' => [
+    //             'nullable',
+    //             'string',
+    //             'max:20',
+    //         ],
+
+    //         'email' => [
+    //             'nullable',
+    //             'email',
+    //             'max:255',
+    //         ],
+
+    //         'company_name' => [
+    //             'nullable',
+    //             'string',
+    //             'max:255',
+    //         ],
+
+    //         'lead_source_id' => [
+    //             'required',
+    //             'integer',
+
+    //             Rule::exists(
+    //                 'lead_sources',
+    //                 'id'
+    //             )->where(
+    //                 function ($query) use (
+    //                     $companyId
+    //                 ) {
+    //                     $query->where(
+    //                         function (
+    //                             $subQuery
+    //                         ) use ($companyId) {
+    //                             $subQuery
+    //                                 ->whereNull(
+    //                                     'company_id'
+    //                                 )
+    //                                 ->orWhere(
+    //                                     'company_id',
+    //                                     $companyId
+    //                                 );
+    //                         }
+    //                     );
+    //                 }
+    //             ),
+    //         ],
+
+    //         'lead_status_id' => [
+    //             'required',
+    //             'integer',
+
+    //             Rule::exists(
+    //                 'lead_statuses',
+    //                 'id'
+    //             )->where(
+    //                 function ($query) use (
+    //                     $companyId
+    //                 ) {
+    //                     $query->where(
+    //                         function (
+    //                             $subQuery
+    //                         ) use ($companyId) {
+    //                             $subQuery
+    //                                 ->whereNull(
+    //                                     'company_id'
+    //                                 )
+    //                                 ->orWhere(
+    //                                     'company_id',
+    //                                     $companyId
+    //                                 );
+    //                         }
+    //                     );
+    //                 }
+    //             ),
+    //         ],
+
+    //         'assigned_to' => [
+    //             'nullable',
+    //             'integer',
+
+    //             Rule::exists(
+    //                 'users',
+    //                 'id'
+    //             )->where(
+    //                 function ($query) use (
+    //                     $companyId
+    //                 ) {
+    //                     $query
+    //                         ->where(
+    //                             'company_id',
+    //                             $companyId
+    //                         )
+    //                         ->where(
+    //                             'is_active',
+    //                             true
+    //                         );
+    //                 }
+    //             ),
+    //         ],
+
+    //         'team_id' => [
+    //             'nullable',
+    //             'integer',
+
+    //             Rule::exists(
+    //                 'teams',
+    //                 'id'
+    //             )->where(
+    //                 fn($query) =>
+    //                 $query->where(
+    //                     'company_id',
+    //                     $companyId
+    //                 )
+    //             ),
+    //         ],
+
+    //         'pipeline_stage_id' => [
+    //             'nullable',
+    //             'integer',
+    //             'exists:pipeline_stages,id',
+    //         ],
+
+    //         'priority' => [
+    //             'required',
+
+    //             Rule::in([
+    //                 'low',
+    //                 'normal',
+    //                 'high',
+    //                 'urgent',
+    //                 'hot',
+    //             ]),
+    //         ],
+
+    //         'temperature' => [
+    //             'required',
+
+    //             Rule::in([
+    //                 'cold',
+    //                 'warm',
+    //                 'hot',
+    //             ]),
+    //         ],
+
+    //         'preferred_language' => [
+    //             'nullable',
+    //             'string',
+    //             'max:50',
+    //         ],
+
+    //         'address' => [
+    //             'nullable',
+    //             'string',
+    //             'max:5000',
+    //         ],
+
+    //         'city' => [
+    //             'nullable',
+    //             'string',
+    //             'max:100',
+    //         ],
+
+    //         'district' => [
+    //             'nullable',
+    //             'string',
+    //             'max:100',
+    //         ],
+
+    //         'state' => [
+    //             'nullable',
+    //             'string',
+    //             'max:100',
+    //         ],
+
+    //         'pincode' => [
+    //             'nullable',
+    //             'string',
+    //             'max:10',
+    //         ],
+
+    //         'required_product' => [
+    //             'nullable',
+    //             'string',
+    //             'max:255',
+    //         ],
+
+    //         'estimated_budget' => [
+    //             'nullable',
+    //             'numeric',
+    //             'min:0',
+    //         ],
+
+    //         'expected_deal_value' => [
+    //             'nullable',
+    //             'numeric',
+    //             'min:0',
+    //         ],
+
+    //         'expected_closing_date' => [
+    //             'nullable',
+    //             'date',
+    //         ],
+
+    //         'next_follow_up_at' => [
+    //             'nullable',
+    //             'date',
+    //         ],
+    //     ]);
+    // }
+
     private function validateData(
         Request $request,
         ?Lead $lead = null
@@ -5232,6 +5634,12 @@ public function index(Request $request): View
                 'max:255',
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Lead Source
+            |--------------------------------------------------------------------------
+            */
+
             'lead_source_id' => [
                 'required',
                 'integer',
@@ -5260,6 +5668,47 @@ public function index(Request $request): View
                     }
                 ),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Lead Category
+            |--------------------------------------------------------------------------
+            */
+
+            'category_id' => [
+                'required',
+                'integer',
+
+                Rule::exists(
+                    'categories',
+                    'id'
+                )->where(
+                    function ($query) use (
+                        $companyId
+                    ) {
+                        $query->where(
+                            function (
+                                $subQuery
+                            ) use ($companyId) {
+                                $subQuery
+                                    ->whereNull(
+                                        'company_id'
+                                    )
+                                    ->orWhere(
+                                        'company_id',
+                                        $companyId
+                                    );
+                            }
+                        );
+                    }
+                ),
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Lead Status
+            |--------------------------------------------------------------------------
+            */
 
             'lead_status_id' => [
                 'required',
@@ -5290,6 +5739,12 @@ public function index(Request $request): View
                 ),
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Assigned User
+            |--------------------------------------------------------------------------
+            */
+
             'assigned_to' => [
                 'nullable',
                 'integer',
@@ -5314,6 +5769,12 @@ public function index(Request $request): View
                 ),
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Team
+            |--------------------------------------------------------------------------
+            */
+
             'team_id' => [
                 'nullable',
                 'integer',
@@ -5330,11 +5791,23 @@ public function index(Request $request): View
                 ),
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Pipeline Stage
+            |--------------------------------------------------------------------------
+            */
+
             'pipeline_stage_id' => [
                 'nullable',
                 'integer',
                 'exists:pipeline_stages,id',
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Priority
+            |--------------------------------------------------------------------------
+            */
 
             'priority' => [
                 'required',
@@ -5347,6 +5820,12 @@ public function index(Request $request): View
                     'hot',
                 ]),
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Temperature
+            |--------------------------------------------------------------------------
+            */
 
             'temperature' => [
                 'required',
@@ -5363,6 +5842,12 @@ public function index(Request $request): View
                 'string',
                 'max:50',
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Address
+            |--------------------------------------------------------------------------
+            */
 
             'address' => [
                 'nullable',
@@ -5393,6 +5878,12 @@ public function index(Request $request): View
                 'string',
                 'max:10',
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Sales Details
+            |--------------------------------------------------------------------------
+            */
 
             'required_product' => [
                 'nullable',

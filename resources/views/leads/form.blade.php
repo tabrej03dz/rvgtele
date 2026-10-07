@@ -256,7 +256,7 @@
                         @foreach ($sources as $source)
                             <option
                                 value="{{ $source->id }}"
-                                @selected((string) old('lead_source_id', $lead->lead_source_id ?? '') === (string) $source->id)
+                                @selected((string) old('lead_source_id', $lead->lead_source_id ?? '') == (string) $source->id)
                             >
                                 {{ $source->name }}
                             </option>
@@ -264,6 +264,33 @@
                     </select>
 
                     @error('lead_source_id')
+                        <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                    @enderror
+                </label>
+
+                <label class="block">
+                    <span class="mb-1.5 block text-sm font-medium text-slate-700">
+                        Category <span class="text-rose-500">*</span>
+                    </span>
+
+                    <select
+                        name="category_id"
+                        required
+                        class="w-full rounded-lg border px-3 py-2.5 text-sm {{ $inputClass('category_id') }}"
+                    >
+                        <option value="">Select category</option>
+
+                        @foreach ($categories as $category)
+                            <option
+                                value="{{ $category->id }}"
+                                @selected((string) old('category_id', $lead->category_id ?? '') == (string) $category->id)
+                            >
+                                {{ $category->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    @error('category_id')
                         <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
                     @enderror
                 </label>
