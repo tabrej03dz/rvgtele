@@ -1247,9 +1247,7 @@
 
     $quickMetricLabels = [
         'calls_today' => 'Calls Today',
-        'connected_today' => 'Connected Today',
-        'employee_total_calls' => 'Employee Total Calls',
-        'unique_connected' => 'Unique Connected',
+        'connected_today' => 'Connected Today',        
         'follow_up' => 'Follow-up Calls',
         'demo_today' => 'Demo Today',
         'total_demo' => 'Total Demo',
@@ -1486,27 +1484,6 @@
             </div>
         </a>
 
-        <a href="{{ $metricUrl('employee_total_calls') }}"
-           class="stat-card stat-card-link {{ $activeQuickMetric === 'employee_total_calls' ? 'active-metric' : '' }}"
-           title="Filter Employee Total Calls">
-            <span class="stat-icon bg-orange-50 text-orange-600"><i data-lucide="badge-headset"></i></span>
-            <div>
-                <div class="stat-label">Employee Total Calls</div>
-                <div class="stat-number">{{ number_format($employeeTotalCalls) }}</div>
-                <div class="stat-sub">Since Joining</div>
-            </div>
-        </a>
-
-        <a href="{{ $metricUrl('unique_connected') }}"
-           class="stat-card stat-card-link {{ $activeQuickMetric === 'unique_connected' ? 'active-metric' : '' }}"
-           title="Filter Unique Connected">
-            <span class="stat-icon bg-cyan-50 text-cyan-600"><i data-lucide="users-round"></i></span>
-            <div>
-                <div class="stat-label">Unique Connected</div>
-                <div class="stat-number">{{ number_format($uniqueConnected) }}</div>
-                <div class="stat-sub">Distinct Leads</div>
-            </div>
-        </a>
 
         <a href="{{ route('followups.index') }}"
             class="stat-card stat-card-link"
