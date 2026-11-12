@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\WhatsappMessageTemplateController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FollowUpApiController;
 use App\Http\Controllers\Api\CallDispositionApiController;
+use App\Http\Controllers\Api\CallingCrmController;
 use App\Http\Controllers\Api\CallingSettingController;
 use App\Http\Controllers\Api\DemoCityController;
 use App\Http\Controllers\Api\DeviceCallLogController;
@@ -23,6 +24,10 @@ Route::middleware('auth:sanctum')->group(function () {
         '/leads/{lead}/communication-history',
         [LeadApiController::class, 'communicationHistory']
     );
+
+
+    Route::get('lead-contacts', [CallingCrmController::class, 'index']);
+    Route::post('lead-contacts/call_status/{lead_contact}', [CallingCrmController::class, 'callStatus']);
 
 
     Route::get('categories', [\App\Http\Controllers\Api\CategoryController::class, 'index']);
