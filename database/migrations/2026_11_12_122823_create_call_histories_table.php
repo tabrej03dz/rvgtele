@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('call_histories', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('email_contacts_id');
+            $table->unsignedBigInteger('lead_id');
     
             $table->string('call_status', 255)->nullable();
 
@@ -26,6 +26,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unsignedInteger('call_duration')->nullable();
+            $table->foreign('lead_id')->references('id')->on('leads')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
 
             // Index for faster lookup
             $table->index('lead_id');
