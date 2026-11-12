@@ -3,40 +3,68 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lead;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class CallingCrmController extends Controller
 {
     
-    public function index(Request $request)
+public function index(Request $request)
     {
         $user = $request->user();
 
-        $search = trim((string) $request->query('search', ''));
-        $category = $request->query('category');
-        $status = $request->query('status');
+        $isSuperAdmin = $user->hasRole('super_admin');
+
+        // Validate filter inputs
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'category' => 'nullable|string|max:255',
+            'status' => 'nullable|string|max:255',
+            'user_id' => 'nullable|integer|min:1',
+        ]);
+
+        $search = trim($filters['search'] ?? '');
+        $category = $filters['category'] ?? null;
+        $status = $filters['status'] ?? null;
+
+        // User filter sirf super admin ke liye
+        $selectedUserId = $isSuperAdmin
+            ? ($filters['user_id'] ?? null)
+            : $user->id;
 
         /*
         |--------------------------------------------------------------------------
         | Base Query
         |--------------------------------------------------------------------------
-        | Sirf logged-in user ki assigned leads.
-        | Pending status wali leads nahi aayengi.
-        | NULL status bhi exclude rahega.
+        | Super Admin = All assigned leads
+        | Normal User = Only own assigned leads
+        | Pending leads excluded
         */
 
         $baseQuery = Lead::query()
-            ->where('assigned_to', $user->id)
             ->whereNotNull('call_status')
             ->where('call_status', '!=', 'pending');
 
+        if (!$isSuperAdmin) {
+            $baseQuery->where('assigned_to', $user->id);
+        }
+
         /*
         |--------------------------------------------------------------------------
-        | Category Filter Options
+        | Category Dropdown
         |--------------------------------------------------------------------------
         */
 
-        $categories = (clone $baseQuery)
+        $categoryQuery = clone $baseQuery;
+
+        if ($selectedUserId !== null) {
+            $categoryQuery->where(
+                'assigned_to',
+                $selectedUserId
+            );
+        }
+
+        $categories = $categoryQuery
             ->whereNotNull('category')
             ->where('category', '!=', '')
             ->distinct()
@@ -45,67 +73,119 @@ class CallingCrmController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Call Status Filter Options
+        | Users Dropdown
+        |--------------------------------------------------------------------------
+        | Show users who have assigned non-pending leads
+        */
+
+        $users = collect();
+
+        if ($isSuperAdmin) {
+
+            $assignedUserIds = (clone $baseQuery)
+                ->whereNotNull('assigned_to')
+                ->distinct()
+                ->pluck('assigned_to');
+
+            $users = User::query()
+                ->whereIn('id', $assignedUserIds)
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status Dropdown
         |--------------------------------------------------------------------------
         */
 
-        $statuses = (clone $baseQuery)
+        $statusQuery = clone $baseQuery;
+
+        if ($selectedUserId !== null) {
+            $statusQuery->where(
+                'assigned_to',
+                $selectedUserId
+            );
+        }
+
+        if ($category !== null && $category !== '') {
+            $statusQuery->where('category', $category);
+        }
+
+        $statuses = $statusQuery
             ->distinct()
             ->orderBy('call_status')
             ->pluck('call_status');
 
         /*
         |--------------------------------------------------------------------------
-        | Leads With Complete Call History
+        | Main Leads Query
         |--------------------------------------------------------------------------
         */
 
-        $contacts = (clone $baseQuery)
+        $contactsQuery = clone $baseQuery;
 
-            ->when($search !== '', function ($query) use ($search) {
+        // Filter by assigned user
+        if ($selectedUserId !== null) {
+            $contactsQuery->where(
+                'assigned_to',
+                $selectedUserId
+            );
+        }
 
-                $query->where(function ($q) use ($search) {
+        // Category filter
+        if ($category !== null && $category !== '') {
+            $contactsQuery->where(
+                'category',
+                $category
+            );
+        }
 
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('phone', 'like', "%{$search}%");
+        // Status filter
+        if ($status !== null && $status !== '') {
+            $contactsQuery->where(
+                'call_status',
+                $status
+            );
+        }
 
-                    if (ctype_digit($search)) {
-                        $q->orWhere('id', (int) $search);
-                    }
+        // Search by name, phone, lead ID
+        if ($search !== '') {
 
-                });
+            $contactsQuery->where(function ($query) use ($search) {
 
-            })
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
 
-            ->when(
-                $category !== null && $category !== '',
-                function ($query) use ($category) {
-                    $query->where('category', $category);
+                if (ctype_digit($search)) {
+                    $query->orWhere(
+                        'id',
+                        (int) $search
+                    );
                 }
-            )
+            });
+        }
 
-            ->when(
-                $status !== null && $status !== '',
-                function ($query) use ($status) {
-                    $query->where('call_status', $status);
-                }
-            )
+        /*
+        |--------------------------------------------------------------------------
+        | Load Lead + History + User Information
+        |--------------------------------------------------------------------------
+        */
 
-            // Complete call history
+        $contacts = $contactsQuery
             ->with([
+                'assignedUser:id,name',
+
                 'callHistories' => function ($query) {
-                    $query->orderByDesc('call_at')
-                          ->orderByDesc('id');
-                }
+                    $query
+                        ->with('user:id,name')
+                        ->orderByDesc('call_at')
+                        ->orderByDesc('id');
+                },
             ])
-
-            // Total call history count
             ->withCount('callHistories')
-
-            // Existing updated_at column
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-
             ->paginate(20)
             ->withQueryString();
 
@@ -114,6 +194,9 @@ class CallingCrmController extends Controller
             'contacts' => $contacts,
             'categories' => $categories,
             'statuses' => $statuses,
+            'users' => $users,
+            'isSuperAdmin' => $isSuperAdmin,
+            'selectedUserId' => $selectedUserId,
         ]);
     }
 
