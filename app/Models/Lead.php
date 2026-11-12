@@ -134,4 +134,13 @@ class Lead extends Model
         );
     }
 
+    public function callHistories()
+    {
+        return $this->hasMany(
+            \App\Models\CallHistory::class,
+            'lead_id',
+            'id'
+        );
+    }
+
 }

@@ -430,6 +430,15 @@
                         'dashboard.view'
                     ],
 
+                    
+                    [
+                        'Calling CRM',
+                        'calling-crm.index',
+                        'calling-crm.*',
+                        'calling-crm.view',
+                    ],
+
+
                     [
                         'Leads',
                         'leads.index',
@@ -623,6 +632,7 @@
             $menuIcons = [
                 'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard','recycle-bin.index' => 'trash-2',
                 'data.index' => 'database',
+                'calling-crm.index' => 'headset',
                 'leads.index' => 'users',
                 'manage.leads.index' => 'users',
                 'demo-cities.index' => 'gallery-vertical-end',

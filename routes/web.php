@@ -4,6 +4,7 @@ use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CallDispositionController;
+use App\Http\Controllers\CallingCrmController;
 use App\Http\Controllers\CallLogController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CategoryController;
@@ -40,6 +41,9 @@ Route::get('mobile-apks/{mobileApk}/download', [MobileApkController::class, 'dow
                 ->name('mobile-apks.download');
 
 Route::middleware(['auth'])->group(function () {
+
+
+    Route::get('calling-crm', [CallingCrmController::class, 'index'])->name('calling-crm.index');
 
 
 
