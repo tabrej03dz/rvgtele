@@ -28,7 +28,7 @@ class NoAnswerLeadController extends Controller
         return Lead::query()
             ->whereRaw(
                 'LOWER(TRIM(call_status)) IN (?, ?)',
-                ['not_answer', 'no answer']
+                ['not answer', 'no answer']
             )
             ->has('callHistories', '=', 1);
     }
