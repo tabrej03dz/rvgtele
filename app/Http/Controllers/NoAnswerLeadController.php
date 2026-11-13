@@ -24,14 +24,27 @@ class NoAnswerLeadController extends Controller
     }
 
     private function eligibleQuery(): Builder
-    {
-        return Lead::query()
-            ->whereRaw(
-                'LOWER(TRIM(call_status)) IN (?, ?, ?, ?)',
-                ['not answer', 'no answer', 'Not Answered', 'No Answer']
-            )
-            ->has('callHistories', '=', 1);
-    }
+{
+    return Lead::query()
+        ->whereRaw(
+            "
+            LOWER(
+                REPLACE(
+                    REPLACE(TRIM(call_status), '_', ' '),
+                    '-',
+                    ' '
+                )
+            ) IN (?, ?, ?, ?)
+            ",
+            [
+                'not answer',
+                'not answered',
+                'no answer',
+                'no answered',
+            ]
+        )
+        ->has('callHistories', '=', 1);
+}
 
     public function index(Request $request)
     {
