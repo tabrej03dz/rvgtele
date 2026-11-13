@@ -349,547 +349,181 @@
 
 
         {{-- ===================================================== --}}
-        {{-- MENU CONFIGURATION --}}
+        {{-- SIDEBAR MENU CONFIGURATION --}}
         {{-- ===================================================== --}}
-
         @php
-
             $user = auth()->user();
-
             $isSuperAdmin = $user->hasRole('super_admin');
 
+            // Retain existing nearest follow-up reminder feature.
+            $nearestSidebarFollowUp = \App\Models\FollowUp::query()
+                ->where('company_id', $user->company_id)
+                ->where('assigned_to', $user->id)
+                ->where('status', 'pending')
+                ->whereNotNull('scheduled_at')
+                ->orderByRaw('ABS(TIMESTAMPDIFF(SECOND, NOW(), scheduled_at)) ASC')
+                ->first();
 
+            $nearestFollowUpIso = $nearestSidebarFollowUp?->scheduled_at?->toIso8601String();
+            $nearestFollowUpIsOverdue = $nearestSidebarFollowUp?->scheduled_at?->isPast() ?? false;
 
-                /*
-                |--------------------------------------------------------------------------
-                | Nearest Pending / Overdue Follow-up For Sidebar
-                |--------------------------------------------------------------------------
-                |
-                | Current time ke sabse paas scheduled_at wala pending
-                | follow-up select hoga. Future aur overdue dono include hain.
-                |
-                */
-
-                $nearestSidebarFollowUp = \App\Models\FollowUp::query()
-                    ->where('company_id', $user->company_id)
-                    ->where('assigned_to', $user->id)
-                    ->where('status', 'pending')
-                    ->whereNotNull('scheduled_at')
-                    ->orderByRaw("
-                        ABS(
-                            TIMESTAMPDIFF(
-                                SECOND,
-                                NOW(),
-                                scheduled_at
-                            )
-                        ) ASC
-                    ")
-                    ->first();
-
-                $nearestFollowUpIso = null;
-                $nearestFollowUpIsOverdue = false;
-
-                if ($nearestSidebarFollowUp?->scheduled_at) {
-
-                    $nearestFollowUpIso =
-                        $nearestSidebarFollowUp
-                            ->scheduled_at
-                            ->toIso8601String();
-
-                    $nearestFollowUpIsOverdue =
-                        $nearestSidebarFollowUp
-                            ->scheduled_at
-                            ->isPast();
-                }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Sidebar Sections
-            |--------------------------------------------------------------------------
-            */
-
-            $sections = [
-
-                'Platform' => [
-
-                    [
-                        'Companies',
-                        'companies.index',
-                        'companies.*',
-                        'companies.view'
-                    ],
-
+            // Each entry: label, named route, active route pattern, permission, icon.
+            $menuGroups = [
+                'Calling CRM' => [
+                    ['Call History', 'calling-crm.index', 'calling-crm.*', 'calling-crm.view', 'history'],
+                    ['Manage Leads', 'manage.leads.index', 'manage.leads.*', 'manage.leads.view', 'contact-round'],
+                    ['Recycle Bin', 'recycle-bin.index', 'recycle-bin.*', 'recycle-bin.view', 'trash-2'],
+                    ['Demo Cities', 'demo-cities.index', 'demo-cities.*', 'demo-cities.view', 'map-pinned'],
                 ],
-
                 'Workspace' => [
 
-                    [
-                        'Dashboard',
-                        'dashboard',
-                        'dashboard',
-                        'dashboard.view'
-                    ],
-
-                    
-                    [
-                        'Calling CRM',
-                        'calling-crm.index',
-                        'calling-crm.*',
-                        'calling-crm.view',
-                    ],
-
-
-                    [
-                        'Leads',
-                        'leads.index',
-                        'leads.*',
-                        'leads.view'
-                    ],
-
-                    [
-                        'Manage Leads',
-                        'manage.leads.index',
-                        'manage.leads.*',
-                        'manage.leads.view'
-                    ],
-                    [
-                        'Recycle Bin',
-                        'recycle-bin.index',
-                        'recycle-bin.*',
-                        'recycle-bin.view',
-                    ],
-
-                    [
-                        'Data',
-                        'data.index',
-                        'data.*',
-                        'data.view'
-                    ],
-
-                    [
-                        'Pipeline',
-                        'pipeline.index',
-                        'pipeline.*',
-                        'pipeline.view'
-                    ],
-
-                    [
-                        'Follow-ups',
-                        'followups.index',
-                        'followups.*',
-                        'followups.view'
-                    ],
-
-                    [
-                        'Call Logs',
-                        'calls.index',
-                        'calls.*',
-                        'calls.view'
-                    ],
-
-                     /*
-                    |--------------------------------------------------------------------------
-                    | Demo Management
-                    |--------------------------------------------------------------------------
-                    */
-
-                    [
-                        'Demo Cities',
-                        'demo-cities.index',
-                        'demo-cities.*',
-                        'demo-cities.view'
-                    ],
-
+                    ['Categories', 'categories.index', 'categories.*', 'categories.view|categories.create', 'folder-tree'],
+                    ['Leads', 'leads.index', 'leads.*', 'leads.view', 'users'],
+                    ['Data', 'data.index', 'data.*', 'data.view', 'database'],
+                    ['Pipeline', 'pipeline.index', 'pipeline.*', 'pipeline.view', 'workflow'],
+                    ['Follow-ups', 'followups.index', 'followups.*', 'followups.view', 'phone-forwarded'],
+                    ['Call Logs', 'calls.index', 'calls.*', 'calls.view', 'phone'],
                 ],
-
                 'Organization' => [
-
-                    [
-                        'Employees',
-                        'employees.index',
-                        'employees.*',
-                        'employees.view'
-                    ],
-
-                    [
-                        'Branches',
-                        'branches.index',
-                        'branches.*',
-                        'branches.view'
-                    ],
-
-                    [
-                        'Teams',
-                        'teams.index',
-                        'teams.*',
-                        'teams.view'
-                    ],
-
-                    [
-                        'Roles & Permissions',
-                        'access-control.index',
-                        'access-control.*',
-                        'access-control.view'
-                    ],
-
+                    ['Companies', 'companies.index', 'companies.*', 'companies.view', 'building-2'],
+                    ['Employees', 'employees.index', 'employees.*', 'employees.view', 'user-round'],
+                    ['Branches', 'branches.index', 'branches.*', 'branches.view', 'map-pin'],
+                    ['Teams', 'teams.index', 'teams.*', 'teams.view', 'users-round'],
+                    ['Roles & Permissions', 'access-control.index', 'access-control.*', 'access-control.view', 'shield-check'],
                 ],
-
                 'Sales' => [
-
-                    [
-                        'Campaigns',
-                        'campaigns.index',
-                        'campaigns.*',
-                        'campaigns.view'
-                    ],
-
-                    [
-                        'Products',
-                        'products.index',
-                        'products.*',
-                        'products.view'
-                    ],
-
-                    [
-                        'Customers',
-                        'customers.index',
-                        'customers.*',
-                        'customers.view'
-                    ],
-
-                    [
-                        'Tasks',
-                        'tasks.index',
-                        'tasks.*',
-                        'tasks.view'
-                    ],
-
-                    [
-                        'Orders',
-                        'orders.index',
-                        'orders.*',
-                        'orders.view'
-                    ],
-
-                    [
-                        'Payments',
-                        'payments.index',
-                        'payments.*',
-                        'payments.view'
-                    ],
-
-                    [
-                        'Reports',
-                        'reports.index',
-                        'reports.*',
-                        'reports.view'
-                    ],
-
-                     // ✅ ADD THIS
-    [
-        'WhatsApp Templates',
-        'whatsapp-templates.index',
-        'whatsapp-templates.*',
-        'whatsapp-template.view-own|whatsapp-template.view-all'
-    ],
-
+                    ['Campaigns', 'campaigns.index', 'campaigns.*', 'campaigns.view', 'megaphone'],
+                    ['Products', 'products.index', 'products.*', 'products.view', 'package'],
+                    ['Customers', 'customers.index', 'customers.*', 'customers.view', 'circle-user-round'],
+                    ['Tasks', 'tasks.index', 'tasks.*', 'tasks.view', 'list-checks'],
+                    ['Orders', 'orders.index', 'orders.*', 'orders.view', 'shopping-cart'],
+                    ['Payments', 'payments.index', 'payments.*', 'payments.view', 'credit-card'],
+                    ['Reports', 'reports.index', 'reports.*', 'reports.view', 'chart-no-axes-combined'],
+                    ['WhatsApp Templates', 'whatsapp-templates.index', 'whatsapp-templates.*', 'whatsapp-template.view-own|whatsapp-template.view-all', 'message-circle'],
                 ],
-
                 'CRM Settings' => [
-
-                    [
-                        'Lead Sources',
-                        'crm-settings.lead-sources.index',
-                        'crm-settings.lead-sources.*',
-                        'lead-sources.view'
-                    ],
-
-                    [
-                        'Lead Statuses',
-                        'crm-settings.lead-statuses.index',
-                        'crm-settings.lead-statuses.*',
-                        'lead-statuses.view'
-                    ],
-
-                    [
-                        'Call Dispositions',
-                        'crm-settings.call-dispositions.index',
-                        'crm-settings.call-dispositions.*',
-                        'call-dispositions.view'
-                    ],
-
-                    [
-                        'Mobile APKs',
-                        'mobile-apks.index',
-                        'mobile-apks.*',
-                        'mobile-apks.view'
-                    ],
-
+                    ['Lead Sources', 'crm-settings.lead-sources.index', 'crm-settings.lead-sources.*', 'lead-sources.view', 'waypoints'],
+                    ['Lead Statuses', 'crm-settings.lead-statuses.index', 'crm-settings.lead-statuses.*', 'lead-statuses.view', 'list-filter'],
+                    ['Call Dispositions', 'crm-settings.call-dispositions.index', 'crm-settings.call-dispositions.*', 'call-dispositions.view', 'sliders-horizontal'],
+                    ['Mobile APKs', 'mobile-apks.index', 'mobile-apks.*', 'mobile-apks.view', 'smartphone'],
                 ],
-
             ];
 
-            $menuIcons = [
-                'companies.index' => 'building-2', 'dashboard' => 'layout-dashboard','recycle-bin.index' => 'trash-2',
-                'data.index' => 'database',
-                'calling-crm.index' => 'headset',
-                'leads.index' => 'users',
-                'manage.leads.index' => 'users',
-                'demo-cities.index' => 'gallery-vertical-end',
-                'mobile-apks.index' => 'smartphone',
-                
-                'pipeline.index' => 'workflow',
-                'followups.index' => 'phone-forwarded', 'calls.index' => 'phone',
-                'employees.index' => 'user-round', 'branches.index' => 'map-pin',
-                'teams.index' => 'users-round', 'access-control.index' => 'shield-check',
-                'campaigns.index' => 'megaphone', 'products.index' => 'package',
-                'customers.index' => 'circle-user-round', 'tasks.index' => 'list-checks',
-                'orders.index' => 'shopping-cart', 'payments.index' => 'credit-card',
-                'reports.index' => 'chart-no-axes-combined',
-                'crm-settings.lead-sources.index' => 'waypoints',
-                'crm-settings.lead-statuses.index' => 'list-filter',
-                'crm-settings.call-dispositions.index' => 'sliders-horizontal',
+            $groupIcons = [
+                'Calling CRM' => 'headset',
+                'Workspace' => 'layout-grid',
+                'Organization' => 'building-2',
+                'Sales' => 'badge-indian-rupee',
+                'CRM Settings' => 'settings-2',
             ];
 
+            // Keep only the links that the user can actually open.
+            // Pipe-separated permissions mean ANY of them, not a single permission name.
+            $visibleMenuGroups = [];
+            foreach ($menuGroups as $groupName => $items) {
+                foreach ($items as $item) {
+                    [$label, $routeName, $activePattern, $permissions, $icon] = $item;
+                    $canView = $isSuperAdmin;
+                    foreach (explode('|', $permissions) as $permission) {
+                        if ($user->can(trim($permission))) {
+                            $canView = true;
+                            break;
+                        }
+                    }
+                    if ($canView && \Illuminate\Support\Facades\Route::has($routeName)) {
+                        $visibleMenuGroups[$groupName][] = $item;
+                    }
+                }
+            }
         @endphp
 
+        <style>
+            .crm-menu-group > summary { list-style: none; cursor: pointer; }
+            .crm-menu-group > summary::-webkit-details-marker { display: none; }
+            .crm-menu-group > summary .crm-menu-chevron { transition: transform .2s ease; }
+            .crm-menu-group[open] > summary .crm-menu-chevron { transform: rotate(180deg); }
+            .crm-menu-group[open] > summary { background: rgba(255,255,255,.10); color: #fff; }
+            .crm-menu-group > summary:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+            .crm-menu-children { margin: 5px 0 8px 19px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.15); }
+            .crm-menu-children .crm-nav-link svg { width: 16px; height: 16px; }
+        </style>
 
-        {{-- ===================================================== --}}
-        {{-- SIDEBAR NAVIGATION --}}
-        {{-- ===================================================== --}}
-
-        <nav class="space-y-5 p-3 pb-6">
-
+        <nav class="space-y-1 p-3 pb-6" aria-label="Main navigation">
             @if (session()->has('impersonator_id'))
-
-                <div
-                    class="
-                        sticky
-                        top-0
-                        z-[9999]
-                        border-b
-                        border-amber-300
-                        bg-amber-50
-                    "
-                >
-
-                    <div
-                        class="
-                            mx-auto
-                            flex
-                            max-w-7xl
-                            items-center
-                            justify-between
-                            gap-4
-                            px-4
-                            py-3
-                        "
-                    >
-
-                        <div class="text-sm text-amber-900">
-
-                            You are viewing
-
-                            <strong>
-                                {{ auth()->user()->name }}
-                            </strong>
-
-                            dashboard.
-
-                        </div>
-
-                        <form
-                            method="POST"
-                            action="{{ route('employees.stop-impersonating') }}"
-                        >
-
-                            @csrf
-
-                            <button
-                                type="submit"
-                                class="
-                                    rounded-lg
-                                    bg-slate-900
-                                    px-4
-                                    py-2
-                                    text-sm
-                                    font-semibold
-                                    text-white
-                                    hover:bg-slate-800
-                                "
-                            >
-                                ← Back to My Account
-                            </button>
-
-                        </form>
-
-                    </div>
-
+                <div class="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900">
+                    <div class="mb-2 text-xs">Viewing <strong>{{ $user->name }}</strong> dashboard.</div>
+                    <form method="POST" action="{{ route('employees.stop-impersonating') }}">
+                        @csrf
+                        <button type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+                            ← Back to My Account
+                        </button>
+                    </form>
                 </div>
-
             @endif
 
 
-            @foreach($sections as $label => $links)
+            {{-- DASHBOARD - MAIN MENU (TOP) --}}
+            @if(
+                \Illuminate\Support\Facades\Route::has('dashboard')
+                && ($isSuperAdmin || $user->can('dashboard.view'))
+            )
+                <a
+                    href="{{ route('dashboard') }}"
+                    @if(request()->routeIs('dashboard')) aria-current="page" @endif
+                    class="crm-nav-link flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition
+                    {{ request()->routeIs('dashboard')
+                        ? 'is-active text-white'
+                        : 'text-slate-200 hover:bg-white/10 hover:text-white' }}"
+                >
+                    <i data-lucide="layout-dashboard"
+                    class="h-[19px] w-[19px] shrink-0"></i>
 
-                <div>
-
-                    {{-- Section Heading --}}
-
-                    <div
-                        class="
-                            mb-2
-                            px-3
-                            text-[11px]
-                            font-semibold
-                            uppercase
-                            tracking-widest
-                            text-slate-500
-                        "
-                    >
-                        {{ $label }}
-                    </div>
+                    <span>Dashboard</span>
+                </a>
+            @endif
 
 
-                    <div class="space-y-1">
-
+            @foreach($visibleMenuGroups as $groupName => $links)
+                @php
+                    $groupActive = collect($links)->contains(fn ($link) => request()->routeIs($link[2]));
+                @endphp
+                <details class="crm-menu-group rounded-xl" {{ $groupActive ? 'open' : '' }}>
+                    <summary class="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white {{ $groupActive ? 'bg-white/10 text-white' : '' }}">
+                        <span class="flex min-w-0 items-center gap-3">
+                            <i data-lucide="{{ $groupIcons[$groupName] ?? 'folder' }}" class="h-[19px] w-[19px] shrink-0"></i>
+                            <span class="truncate">{{ $groupName }}</span>
+                        </span>
+                        <i data-lucide="chevron-down" class="crm-menu-chevron h-4 w-4 shrink-0 text-slate-400"></i>
+                    </summary>
+                    <div class="crm-menu-children space-y-1">
                         @foreach($links as $link)
-
                             @php
-                                $text = $link[0];
-                                $route = $link[1];
-                                $pattern = $link[2];
-                                $permission = $link[3];
+                                [$text, $route, $pattern, $permission, $icon] = $link;
+                                $isActive = request()->routeIs($pattern);
                             @endphp
-
-                            @can($permission)
-
-                                <a
-                                    href="{{ route($route) }}"
-                                    class="
-                                        crm-nav-link
-                                        flex
-                                        items-center
-                                        justify-between
-                                        gap-3
-                                        rounded-lg
-                                        px-4
-                                        py-2.5
-                                        text-sm
-                                        transition
-
-                                        {{
-                                            request()->routeIs($pattern)
-                                                ? 'is-active text-white'
-                                                : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                                        }}
-                                    "
-                                >
-
-                                    <span class="flex min-w-0 items-center gap-3">
-                                        <i data-lucide="{{ $menuIcons[$route] ?? 'circle' }}" class="shrink-0"></i>
-                                        <span class="truncate">{{ $text }}</span>
+                            <a href="{{ route($route) }}"
+                               @if($isActive) aria-current="page" @endif
+                               class="crm-nav-link flex min-h-[39px] items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] font-medium transition {{ $isActive ? 'is-active text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                                <span class="flex min-w-0 items-center gap-2.5">
+                                    <i data-lucide="{{ $icon }}" class="shrink-0"></i>
+                                    <span class="truncate">{{ $text }}</span>
+                                </span>
+                                @if($route === 'followups.index')
+                                    <span id="sidebarNearestFollowup"
+                                          data-time="{{ $nearestFollowUpIso }}"
+                                          class="{{ $nearestSidebarFollowUp ? '' : 'hidden' }} inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-1 text-[9px] font-black tabular-nums {{ $nearestFollowUpIsOverdue ? 'sidebar-followup-reminder border-red-400/50 bg-red-500 text-white' : 'border-amber-300/40 bg-amber-400 text-slate-950' }}"
+                                          title="Nearest pending follow-up">
+                                        <span id="sidebarNearestFollowupDot" class="sidebar-followup-dot h-1.5 w-1.5 rounded-full bg-current"></span>
+                                        <span id="sidebarNearestFollowupText">Loading...</span>
                                     </span>
-
-
-                                    {{-- ========================================================= --}}
-                                    {{-- Nearest Follow-up Live Timer --}}
-                                    {{-- ========================================================= --}}
-
-                                    @if($route === 'followups.index')
-
-                                        <span
-                                            id="sidebarNearestFollowup"
-                                            data-time="{{ $nearestFollowUpIso }}"
-                                            class="
-                                                {{ $nearestSidebarFollowUp ? '' : 'hidden' }}
-                                                inline-flex
-                                                shrink-0
-                                                items-center
-                                                gap-1.5
-                                                rounded-full
-                                                border
-                                                px-2
-                                                py-1
-                                                text-[10px]
-                                                font-black
-                                                tabular-nums
-
-                                                {{
-                                                    $nearestFollowUpIsOverdue
-                                                        ? 'sidebar-followup-reminder border-red-400/50 bg-red-500 text-white'
-                                                        : 'border-amber-300/40 bg-amber-400 text-slate-950'
-                                                }}
-                                            "
-                                            title="Nearest pending follow-up"
-                                        >
-                                            <span
-                                                id="sidebarNearestFollowupDot"
-                                                class="
-                                                    sidebar-followup-dot
-                                                    h-1.5
-                                                    w-1.5
-                                                    rounded-full
-                                                    bg-current
-                                                "
-                                            ></span>
-
-                                            <span id="sidebarNearestFollowupText">
-                                                Loading...
-                                            </span>
-                                        </span>
-
-                                    @endif
-
-                                </a>
-
-                            @endcan
-
+                                @endif
+                            </a>
                         @endforeach
-
                     </div>
-
-                </div>
-
+                </details>
             @endforeach
 
-            @if(
-                    auth()->user()->can('categories.view')
-                    ||
-                    auth()->user()->can('categories.create')
-                )
-                    <a
-                        href="{{ route('categories.index') }}"
-                        class="flex items-center gap-3 rounded-lg px-3 py-2.5
-                            text-sm font-medium
-                            {{ request()->routeIs('categories.*')
-                                    ? 'bg-blue-50 text-blue-700'
-                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                            }}"
-                    >
-
-                        <svg
-                            class="h-5 w-5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M4 6h16M4 12h16M4 18h10"
-                            />
-                        </svg>
-
-                        <span>
-                            Categories
-                        </span>
-
-                    </a>
-                @endif
-
-            <div class="rounded-xl border border-white/10 bg-white/[.07] p-3 text-white shadow-lg">
+            <div class="!mt-5 rounded-xl border border-white/10 bg-white/[.07] p-3 text-white shadow-lg">
                 <div class="flex items-center gap-3">
                     <div class="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
                         <i data-lucide="headphones" class="h-5 w-5"></i>
@@ -901,7 +535,6 @@
                     <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i>
                 </div>
             </div>
-
         </nav>
 
     </aside>
