@@ -31,6 +31,7 @@ use App\Http\Controllers\DemoCityController;
 use App\Http\Controllers\DemoImageController;
 use App\Http\Controllers\ManageLeadController;
 use App\Http\Controllers\MobileApkController;
+use App\Http\Controllers\NoAnswerLeadController;
 use App\Http\Controllers\RecycleBinController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
 
@@ -45,90 +46,100 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('calling-crm', [CallingCrmController::class, 'index'])->name('calling-crm.index');
 
+    Route::get(
+        'calling-crm/no-answer',
+        [NoAnswerLeadController::class, 'index']
+    )
+        ->middleware('permission:leads.assign')
+        ->name('calling-crm.no-answer');
+
+    Route::post(
+        'calling-crm/no-answer/reassign',
+        [NoAnswerLeadController::class, 'reassign']
+    )
+        ->middleware('permission:leads.assign')
+        ->name('calling-crm.no-answer.reassign');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Data List
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/data', [DataController::class, 'index'])
+        ->name('data.index');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create / Store
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/data/create', [DataController::class, 'create'])
+        ->name('data.create');
+
+    Route::post('/data', [DataController::class, 'store'])
+        ->name('data.store');
 
 
 
+    Route::get(
+        '/data/import',
+        [DataController::class, 'importCreate']
+    )->name('data.import.create');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Data List
-        |--------------------------------------------------------------------------
-        */
-        Route::get('/data', [DataController::class, 'index'])
-            ->name('data.index');
+    Route::post(
+        '/data/import',
+        [DataController::class, 'importStore']
+    )->name('data.import.store');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Create / Store
-        |--------------------------------------------------------------------------
-        */
-        Route::get('/data/create', [DataController::class, 'create'])
-            ->name('data.create');
+    /*
+    |--------------------------------------------------------------------------
+    | Bulk Actions
+    |--------------------------------------------------------------------------
+    */
+    Route::delete('/data/bulk-delete', [DataController::class, 'bulkDelete'])
+        ->name('data.bulk-delete');
 
-        Route::post('/data', [DataController::class, 'store'])
-            ->name('data.store');
+    Route::post('/data/bulk-convert-to-lead', [DataController::class, 'bulkConvertToLead'])
+        ->name('data.bulk-convert-to-lead');
 
+    /*
+    |--------------------------------------------------------------------------
+    | Restore / Force Delete
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/data/{id}/restore', [DataController::class, 'restore'])
+        ->name('data.restore');
 
+    Route::delete('/data/{id}/force-delete', [DataController::class, 'forceDelete'])
+        ->name('data.force-delete');
 
-        Route::get(
-            '/data/import',
-            [DataController::class, 'importCreate']
-        )->name('data.import.create');
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Conversion
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/data/{data}/convert-to-lead', [DataController::class, 'convertToLead'])
+        ->name('data.convert-to-lead');
 
-        Route::post(
-            '/data/import',
-            [DataController::class, 'importStore']
-        )->name('data.import.store');
+    Route::post('/data/{data}/mark-unconverted', [DataController::class, 'markUnconverted'])
+        ->name('data.mark-unconverted');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Bulk Actions
-        |--------------------------------------------------------------------------
-        */
-        Route::delete('/data/bulk-delete', [DataController::class, 'bulkDelete'])
-            ->name('data.bulk-delete');
+    /*
+    |--------------------------------------------------------------------------
+    | Show / Edit / Update / Delete
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/data/{data}', [DataController::class, 'show'])
+        ->name('data.show');
 
-        Route::post('/data/bulk-convert-to-lead', [DataController::class, 'bulkConvertToLead'])
-            ->name('data.bulk-convert-to-lead');
+    Route::get('/data/{data}/edit', [DataController::class, 'edit'])
+        ->name('data.edit');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Restore / Force Delete
-        |--------------------------------------------------------------------------
-        */
-        Route::post('/data/{id}/restore', [DataController::class, 'restore'])
-            ->name('data.restore');
+    Route::put('/data/{data}', [DataController::class, 'update'])
+        ->name('data.update');
 
-        Route::delete('/data/{id}/force-delete', [DataController::class, 'forceDelete'])
-            ->name('data.force-delete');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Lead Conversion
-        |--------------------------------------------------------------------------
-        */
-        Route::post('/data/{data}/convert-to-lead', [DataController::class, 'convertToLead'])
-            ->name('data.convert-to-lead');
-
-        Route::post('/data/{data}/mark-unconverted', [DataController::class, 'markUnconverted'])
-            ->name('data.mark-unconverted');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Show / Edit / Update / Delete
-        |--------------------------------------------------------------------------
-        */
-        Route::get('/data/{data}', [DataController::class, 'show'])
-            ->name('data.show');
-
-        Route::get('/data/{data}/edit', [DataController::class, 'edit'])
-            ->name('data.edit');
-
-        Route::put('/data/{data}', [DataController::class, 'update'])
-            ->name('data.update');
-
-        Route::delete('/data/{data}', [DataController::class, 'destroy'])
-            ->name('data.destroy');
+    Route::delete('/data/{data}', [DataController::class, 'destroy'])
+        ->name('data.destroy');
 
     Route::post(
         '/leads/{lead}/call-on-mobile',
