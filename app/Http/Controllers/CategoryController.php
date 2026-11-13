@@ -17,19 +17,29 @@ class CategoryController extends Controller
     {
         $companyId = $this->companyId($request);
 
-        $search = trim((string) $request->get('search'));
+        $search = trim((string) $request->get('search', ''));
 
         $categories = Category::query()
-            ->where('company_id', $companyId)
+            ->where('categories.company_id', $companyId)
 
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
+                    $q->where('categories.name', 'like', "%{$search}%")
+                    ->orWhere('categories.description', 'like', "%{$search}%");
                 });
             })
 
-            ->latest('id')
+            ->select('categories.*')
+
+            ->selectSub(
+                Lead::query()
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('leads.category', 'categories.name')
+                    ->where('leads.company_id', $companyId),
+                'leads_count'
+            )
+
+            ->latest('categories.id')
             ->paginate(20)
             ->withQueryString();
 
@@ -42,6 +52,7 @@ class CategoryController extends Controller
     /**
      * Create Category Page
      */
+
     public function create(Request $request): View
     {
         return view('categories.create', [

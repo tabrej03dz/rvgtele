@@ -180,6 +180,10 @@
                             Description
                         </th>
 
+                        <th class="px-4 py-3 text-center">
+                            Total Leads
+                        </th>
+
                         <th class="px-4 py-3">
                             Created
                         </th>
@@ -240,6 +244,19 @@
                                 >
                                     {{ $category->description ?: '—' }}
                                 </div>
+
+                            </td>
+
+                            <td class="px-4 py-4 text-center">
+
+                                <span
+                                    class="inline-flex min-w-[65px] items-center
+                                        justify-center rounded-lg
+                                        bg-blue-50 px-3 py-1.5
+                                        text-sm font-bold text-blue-700"
+                                >
+                                    {{ number_format($category->leads_count ?? 0) }}
+                                </span>
 
                             </td>
 
@@ -330,7 +347,7 @@
                         <tr>
 
                             <td
-                                colspan="5"
+                                colspan="6"
                                 class="px-5 py-16 text-center"
                             >
 
