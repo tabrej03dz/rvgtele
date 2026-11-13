@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http\Controllers;
@@ -7,11 +8,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
     /**
-     * Category Listing
+     * Category Listing With Lead Count
      */
     public function index(Request $request): View
     {
@@ -24,23 +26,35 @@ class CategoryController extends Controller
 
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('categories.name', 'like', "%{$search}%")
-                    ->orWhere('categories.description', 'like', "%{$search}%");
+                    $q->where(
+                        'categories.name',
+                        'like',
+                        "%{$search}%"
+                    )->orWhere(
+                        'categories.description',
+                        'like',
+                        "%{$search}%"
+                    );
                 });
             })
 
             ->select('categories.*')
 
+            // Count leads using category_id, not name
             ->selectSub(
-                Lead::query()
+                DB::table('leads')
                     ->selectRaw('COUNT(*)')
-                    ->whereColumn('leads.category', 'categories.name')
-                    ->where('leads.company_id', $companyId),
+                    ->whereColumn(
+                        'leads.category_id',
+                        'categories.id'
+                    ),
                 'leads_count'
             )
 
-            ->latest('categories.id')
+            ->orderByDesc('categories.id')
+
             ->paginate(20)
+
             ->withQueryString();
 
         return view('categories.index', [
@@ -52,7 +66,6 @@ class CategoryController extends Controller
     /**
      * Create Category Page
      */
-
     public function create(Request $request): View
     {
         return view('categories.create', [
@@ -75,7 +88,10 @@ class CategoryController extends Controller
 
                 Rule::unique('categories', 'name')
                     ->where(function ($query) use ($companyId) {
-                        return $query->where('company_id', $companyId);
+                        return $query->where(
+                            'company_id',
+                            $companyId
+                        );
                     }),
             ],
 
@@ -109,7 +125,17 @@ class CategoryController extends Controller
         Request $request,
         Category $category
     ): View {
-        $this->ensureCategoryBelongsToCompany($request, $category);
+        $this->ensureCategoryBelongsToCompany(
+            $request,
+            $category
+        );
+
+        $category->setAttribute(
+            'leads_count',
+            DB::table('leads')
+                ->where('category_id', $category->id)
+                ->count()
+        );
 
         return view('categories.show', [
             'title' => 'Category Details',
@@ -124,7 +150,10 @@ class CategoryController extends Controller
         Request $request,
         Category $category
     ): View {
-        $this->ensureCategoryBelongsToCompany($request, $category);
+        $this->ensureCategoryBelongsToCompany(
+            $request,
+            $category
+        );
 
         return view('categories.edit', [
             'title' => 'Edit Category',
@@ -139,7 +168,10 @@ class CategoryController extends Controller
         Request $request,
         Category $category
     ): RedirectResponse {
-        $this->ensureCategoryBelongsToCompany($request, $category);
+        $this->ensureCategoryBelongsToCompany(
+            $request,
+            $category
+        );
 
         $companyId = $this->companyId($request);
 
@@ -152,7 +184,10 @@ class CategoryController extends Controller
                 Rule::unique('categories', 'name')
                     ->ignore($category->id)
                     ->where(function ($query) use ($companyId) {
-                        return $query->where('company_id', $companyId);
+                        return $query->where(
+                            'company_id',
+                            $companyId
+                        );
                     }),
             ],
 
@@ -185,7 +220,24 @@ class CategoryController extends Controller
         Request $request,
         Category $category
     ): RedirectResponse {
-        $this->ensureCategoryBelongsToCompany($request, $category);
+        $this->ensureCategoryBelongsToCompany(
+            $request,
+            $category
+        );
+
+        // Prevent deletion of categories containing leads
+        $hasLeads = DB::table('leads')
+            ->where('category_id', $category->id)
+            ->exists();
+
+        if ($hasLeads) {
+            return redirect()
+                ->route('categories.index')
+                ->with(
+                    'error',
+                    'This category has leads assigned to it. Please move or remove those leads before deleting the category.'
+                );
+        }
 
         try {
             $category->delete();
@@ -212,7 +264,7 @@ class CategoryController extends Controller
      */
     private function companyId(Request $request): int
     {
-        $companyId = auth()->user()?->company_id;
+        $companyId = $request->user()?->company_id;
 
         abort_if(
             !$companyId,
@@ -231,7 +283,8 @@ class CategoryController extends Controller
         Category $category
     ): void {
         abort_unless(
-            (int) $category->company_id === $this->companyId($request),
+            (int) $category->company_id
+                === $this->companyId($request),
             404
         );
     }
