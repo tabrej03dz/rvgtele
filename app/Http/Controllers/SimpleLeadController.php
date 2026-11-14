@@ -40,14 +40,23 @@ class SimpleLeadController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['nullable', 'integer'],
+
+            'category_id' => ['nullable', 'integer', 'min:1'],
+
             'employee' => [
                 'nullable',
                 'string',
                 'regex:/^(unassigned|[1-9][0-9]*)$/',
             ],
+
             'call_status' => ['nullable', 'string', 'max:255'],
+
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:500'],
+
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
+
+        $perPage = (int) ($filters['per_page'] ?? 50);
 
         $query = Lead::query()
             ->where('company_id', $companyId);
@@ -78,10 +87,39 @@ class SimpleLeadController extends Controller
         }
 
         $leads = $query
-            ->with(['assignedUser:id,name', 'leadCategory:id,name'])
+            ->with([
+                'assignedUser:id,name',
+                'leadCategory:id,name',
+            ])
             ->orderByDesc('id')
-            ->paginate(50)
+            ->paginate($perPage)
             ->withQueryString();
+
+        /*
+        * Example:
+        * Last page 5 hai aur user page 20 enter karta hai,
+        * to automatically page 5 khulega.
+        *
+        * Delete/assign ke baad last page empty hone par bhi
+        * valid page par redirect hoga.
+        */
+        if ($leads->currentPage() > $leads->lastPage()) {
+            return redirect()->route(
+                'simple-leads.index',
+                array_merge(
+                    $request->only([
+                        'search',
+                        'category_id',
+                        'employee',
+                        'call_status',
+                    ]),
+                    [
+                        'per_page' => $perPage,
+                        'page' => $leads->lastPage(),
+                    ]
+                )
+            );
+        }
 
         $employees = User::query()
             ->where('company_id', $companyId)
@@ -109,7 +147,8 @@ class SimpleLeadController extends Controller
             'leads',
             'employees',
             'categories',
-            'statuses'
+            'statuses',
+            'perPage'
         ));
     }
 
@@ -192,7 +231,7 @@ class SimpleLeadController extends Controller
         $companyId = $this->companyId($request);
 
         $validated = $request->validate([
-            'lead_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'lead_ids' => ['required', 'array', 'min:1', 'max:1000'],
             'lead_ids.*' => [
                 'required',
                 'integer',
@@ -255,7 +294,7 @@ class SimpleLeadController extends Controller
         $companyId = $this->companyId($request);
 
         $validated = $request->validate([
-            'lead_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'lead_ids' => ['required', 'array', 'min:1', 'max:1000'],
             'lead_ids.*' => [
                 'required',
                 'integer',
