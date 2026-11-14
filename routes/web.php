@@ -33,6 +33,7 @@ use App\Http\Controllers\ManageLeadController;
 use App\Http\Controllers\MobileApkController;
 use App\Http\Controllers\NoAnswerLeadController;
 use App\Http\Controllers\RecycleBinController;
+use App\Http\Controllers\SimpleLeadController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
 
 
@@ -59,6 +60,38 @@ Route::middleware(['auth'])->group(function () {
     )
         ->middleware('permission:leads.assign')
         ->name('calling-crm.no-answer.reassign');
+
+
+
+
+
+        Route::get(
+            '/calling-crm/simple-leads',
+            [SimpleLeadController::class, 'index']
+        )
+            ->middleware('permission:leads.view')
+            ->name('simple-leads.index');
+
+        Route::post(
+            '/calling-crm/simple-leads/upload',
+            [SimpleLeadController::class, 'upload']
+        )
+            ->middleware('permission:leads.import')
+            ->name('simple-leads.upload');
+
+        Route::post(
+            '/calling-crm/simple-leads/assign',
+            [SimpleLeadController::class, 'assign']
+        )
+            ->middleware('permission:leads.assign')
+            ->name('simple-leads.assign');
+
+        Route::post(
+            '/calling-crm/simple-leads/delete',
+            [SimpleLeadController::class, 'delete']
+        )
+            ->middleware('permission:leads.delete')
+            ->name('simple-leads.delete');
 
     /*
     |--------------------------------------------------------------------------

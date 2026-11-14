@@ -375,6 +375,7 @@
                     ['Manage Leads', 'manage.leads.index', 'manage.leads.*', 'manage.leads.view', 'contact-round'],
                     ['Recycle Bin', 'recycle-bin.index', 'recycle-bin.*', 'recycle-bin.view', 'trash-2'],
                     ['Demo Cities', 'demo-cities.index', 'demo-cities.*', 'demo-cities.view', 'map-pinned'],
+                    ['Simple Leads', 'simple-leads.index', 'simple-leads.*', 'leads.view', 'users'],
                 ],
                 'Workspace' => [
 
