@@ -370,6 +370,7 @@
             // Each entry: label, named route, active route pattern, permission, icon.
             $menuGroups = [
                 'Calling CRM' => [
+                    ['Categories', 'categories.index', 'categories.*', 'categories.view|categories.create', 'folder-tree'],
                     ['Call History', 'calling-crm.index', 'calling-crm.*', 'calling-crm.view', 'history'],
                     ['No Answer — 1 Call', 'calling-crm.no-answer', 'calling-crm.no-answer*', 'leads.assign', 'phone-missed'],
                     ['Manage Leads', 'manage.leads.index', 'manage.leads.*', 'manage.leads.view', 'contact-round'],
@@ -379,7 +380,6 @@
                 ],
                 'Workspace' => [
 
-                    ['Categories', 'categories.index', 'categories.*', 'categories.view|categories.create', 'folder-tree'],
                     ['Leads', 'leads.index', 'leads.*', 'leads.view', 'users'],
                     ['Data', 'data.index', 'data.*', 'data.view', 'database'],
                     ['Pipeline', 'pipeline.index', 'pipeline.*', 'pipeline.view', 'workflow'],
