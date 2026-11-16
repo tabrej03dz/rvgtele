@@ -408,10 +408,10 @@
                             {{-- PHONE --}}
                             <td class="px-4 py-4">
 
-                                @if($contact->phone)
+                                @if($contact->mobile)
 
                                     <a
-                                        href="tel:{{ preg_replace('/[^0-9+]/', '', $contact->phone) }}"
+                                        href="tel:{{ preg_replace('/[^0-9+]/', '', $contact->mobile) }}"
                                         class="font-medium text-blue-600 hover:underline"
                                     >
                                         {{ $contact->mobile }}
