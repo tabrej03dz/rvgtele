@@ -433,7 +433,7 @@
                                              bg-slate-100 px-3 py-1
                                              text-xs font-medium text-slate-700">
 
-                                    {{ $contact->category ?: '—' }}
+                                    {{ $contact->leadCategory ?: '—' }}
 
                                 </span>
 

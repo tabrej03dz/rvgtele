@@ -55,6 +55,7 @@ class CallingCrmController extends Controller
     //     ], 200);
     // }
 
+
     public function index(Request $request, $category = null)
     {
         $user = $request->user();
@@ -66,13 +67,31 @@ class CallingCrmController extends Controller
             ], 401);
         }
 
-        $category = $request->query('category');
+        // Query parameter या request body से category लें।
+        $requestCategory = $request->input('category');
+
+        // गलत format जैसे category[]=1 आने पर स्पष्ट error दें।
+        if ($requestCategory !== null && !is_scalar($requestCategory)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Category must be a single value.',
+            ], 422);
+        }
+
+        $requestCategory = $requestCategory !== null
+            ? trim((string) $requestCategory)
+            : '';
+
+        // Request में category खाली हो तो URL वाली category लें।
+        $category = $requestCategory !== ''
+            ? $requestCategory
+            : trim((string) ($category ?? ''));
 
         $contacts = Lead::query()
-            ->where('leads.assigned_to', '=', $user->id)
-            ->where('leads.call_status', '=', 'pending')
-            ->when($category !== null && $category !== '', function ($query) use ($category) {
-                $query->where('leads.category', '=', $category);
+            ->where('leads.assigned_to', $user->id)
+            ->where('leads.call_status', 'pending')
+            ->when($category !== '', function ($query) use ($category) {
+                $query->where('leads.category', $category);
             })
             ->get();
 
