@@ -55,7 +55,7 @@ class CallingCrmController extends Controller
     //     ], 200);
     // }
 
-    public function index(Request $request)
+    public function index(Request $request, $category = null)
     {
         $user = $request->user();
 
