@@ -217,7 +217,7 @@
                             @endif
 
                             <td class="p-3">
-                                {{ $lead->category ?: '—' }}
+                                {{ $lead->leadCategory->name ?: '—' }}
                             </td>
 
                             <td class="p-3">
