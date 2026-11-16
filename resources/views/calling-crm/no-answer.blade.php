@@ -103,6 +103,10 @@
         <strong>{{ number_format($leads->total()) }}</strong>
     </div>
 
+    @php
+        $selectedLeadIds = array_map('strval', (array) old('lead_ids', []));
+    @endphp
+
     <form
         method="POST"
         action="{{ route('calling-crm.no-answer.reassign') }}"
@@ -130,9 +134,6 @@
                             @selected(old('assigned_to') == $employee->id)
                         >
                             {{ $employee->name }}
-                            @if($isSuperAdmin)
-                                — Company #{{ $employee->company_id }}
-                            @endif
                         </option>
                     @endforeach
                 </select>
@@ -160,25 +161,39 @@
                                 type="checkbox"
                                 id="select-all"
                                 aria-label="Select all leads on this page"
+                                @disabled($leads->isEmpty())
                             >
                         </th>
                         <th class="p-3">Lead ID</th>
                         <th class="p-3">Name / Phone</th>
-                        @if($isSuperAdmin)
-                            <th class="p-3">Company</th>
-                        @endif
                         <th class="p-3">Category</th>
                         <th class="p-3">Assigned To</th>
                         <th class="p-3">Status</th>
                         <th class="p-3">History Count</th>
                         <th class="p-3">Last Call / Called By</th>
+                        <th class="p-3">Last Call Duration</th>
                     </tr>
                 </thead>
 
                 <tbody class="divide-y">
                     @forelse($leads as $lead)
                         @php
-                            $history = $lead->callHistories->first();
+                            $history = $lead->callHistories
+                                ->sortByDesc('call_at')
+                                ->first();
+
+                            $duration = $history?->call_duration;
+                            $durationText = '—';
+
+                            if ($duration !== null && is_numeric($duration)) {
+                                $durationSeconds = max(0, (int) $duration);
+
+                                $durationText = sprintf(
+                                    '%02d:%02d',
+                                    intdiv($durationSeconds, 60),
+                                    $durationSeconds % 60
+                                );
+                            }
                         @endphp
 
                         <tr>
@@ -192,32 +207,29 @@
                                     @checked(
                                         in_array(
                                             (string) $lead->id,
-                                            array_map('strval', old('lead_ids', [])),
+                                            $selectedLeadIds,
                                             true
                                         )
                                     )
                                 >
                             </td>
 
-                            <td class="p-3">{{ $lead->id }}</td>
+                            <td class="p-3">
+                                {{ $lead->id }}
+                            </td>
 
                             <td class="p-3">
                                 <div class="font-semibold">
                                     {{ $lead->name ?: '—' }}
                                 </div>
+
                                 <div class="text-slate-500">
-                                    {{ $lead->phone ?: '—' }}
+                                    {{ $lead->mobile ?: '—' }}
                                 </div>
                             </td>
 
-                            @if($isSuperAdmin)
-                                <td class="p-3">
-                                    #{{ $lead->company_id }}
-                                </td>
-                            @endif
-
                             <td class="p-3">
-                                {{ $lead->leadCategory->name ?: '—' }}
+                                {{ $lead->leadCategory?->name ?? '—' }}
                             </td>
 
                             <td class="p-3">
@@ -234,19 +246,32 @@
                                 {{ $lead->call_histories_count }}
                             </td>
 
-                            <td class="p-3">
+                            <td class="whitespace-nowrap p-3">
                                 <div>
                                     {{ $history?->call_at?->format('d M Y, h:i A') ?? '—' }}
                                 </div>
+
                                 <div class="text-slate-500">
                                     {{ $history?->user?->name ?? '—' }}
                                 </div>
+                            </td>
+
+                            <td class="whitespace-nowrap p-3">
+                                <div class="font-semibold text-slate-900">
+                                    {{ $durationText }}
+                                </div>
+
+                                @if($durationText !== '—')
+                                    <div class="text-xs text-slate-500">
+                                        min:sec
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td
-                                colspan="{{ $isSuperAdmin ? 9 : 8 }}"
+                                colspan="9"
                                 class="p-8 text-center text-slate-500"
                             >
                                 No matching leads found.
@@ -259,16 +284,49 @@
     </form>
 
     <div>
-        {{ $leads->links() }}
+        {{ $leads->withQueryString()->links() }}
     </div>
 
 </div>
 
 <script>
-document.getElementById('select-all').addEventListener('change', function () {
-    document.querySelectorAll('.lead-checkbox').forEach((checkbox) => {
-        checkbox.checked = this.checked;
+(function () {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = Array.from(
+        document.querySelectorAll('.lead-checkbox')
+    );
+
+    if (!selectAll) {
+        return;
+    }
+
+    function updateSelectAll() {
+        const selectedCount = checkboxes.filter(
+            (checkbox) => checkbox.checked
+        ).length;
+
+        selectAll.checked =
+            checkboxes.length > 0 &&
+            selectedCount === checkboxes.length;
+
+        selectAll.indeterminate =
+            selectedCount > 0 &&
+            selectedCount < checkboxes.length;
+    }
+
+    selectAll.addEventListener('change', function () {
+        checkboxes.forEach((checkbox) => {
+            checkbox.checked = selectAll.checked;
+        });
+
+        updateSelectAll();
     });
-});
+
+    checkboxes.forEach((checkbox) => {
+        checkbox.addEventListener('change', updateSelectAll);
+    });
+
+    updateSelectAll();
+})();
 </script>
 @endsection

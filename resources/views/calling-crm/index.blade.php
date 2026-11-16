@@ -414,7 +414,7 @@
                                         href="tel:{{ preg_replace('/[^0-9+]/', '', $contact->phone) }}"
                                         class="font-medium text-blue-600 hover:underline"
                                     >
-                                        {{ $contact->phone }}
+                                        {{ $contact->mobile }}
                                     </a>
 
                                 @else
