@@ -6,22 +6,22 @@
 
 @php
     $statusLabels = [
-        'answered' => 'Answered',
-        'not_answered' => 'Not Answered',
-        'not_answer' => 'Not Answer',
-        'busy' => 'Busy',
-        'demo_sent' => 'Demo Sent',
+        'answered'       => 'Answered',
+        'not_answered'   => 'Not Answered',
+        'not_answer'     => 'Not Answer',
+        'busy'           => 'Busy',
+        'demo_sent'      => 'Demo Sent',
         'not_interested' => 'Not Interested',
-        'converted' => 'Converted',
+        'converted'      => 'Converted',
     ];
 
     $statusColors = [
-        'answered' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        'converted' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        'demo_sent' => 'bg-blue-50 text-blue-700 border-blue-200',
-        'not_answered' => 'bg-amber-50 text-amber-700 border-amber-200',
-        'not_answer' => 'bg-amber-50 text-amber-700 border-amber-200',
-        'busy' => 'bg-orange-50 text-orange-700 border-orange-200',
+        'answered'       => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'converted'      => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'demo_sent'      => 'bg-blue-50 text-blue-700 border-blue-200',
+        'not_answered'   => 'bg-amber-50 text-amber-700 border-amber-200',
+        'not_answer'     => 'bg-amber-50 text-amber-700 border-amber-200',
+        'busy'           => 'bg-orange-50 text-orange-700 border-orange-200',
         'not_interested' => 'bg-rose-50 text-rose-700 border-rose-200',
     ];
 
@@ -110,14 +110,28 @@
         </div>
     </div>
 
+    {{-- CALL STATUS COUNT BOXES --}}
+    @if($statuses->isNotEmpty())
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+            @foreach($statuses as $boxStatus)
+                <div class="rounded-xl border p-5 shadow-sm {{ $statusColors[$boxStatus] ?? $defaultColor }}">
+                    <p class="text-xs font-semibold uppercase">
+                        {{ $statusLabels[$boxStatus] ?? (ucwords(str_replace('_', ' ', $boxStatus)) ?: 'Unknown') }}
+                    </p>
+
+                    <p class="mt-2 text-3xl font-bold">
+                        {{ number_format($statusCounts->get($boxStatus, 0)) }}
+                    </p>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
     {{-- FILTERS --}}
     <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="mb-4 flex items-center gap-2">
             <i data-lucide="filter" class="h-5 w-5 text-blue-600"></i>
-
-            <h2 class="font-bold text-slate-900">
-                Search & Filters
-            </h2>
+            <h2 class="font-bold text-slate-900">Search & Filters</h2>
         </div>
 
         <form
@@ -188,8 +202,7 @@
                                 value="{{ $assignedUser->id }}"
                                 @selected((string) request('user_id') === (string) $assignedUser->id)
                             >
-                                {{ $assignedUser->name }}
-                                (#{{ $assignedUser->id }})
+                                {{ $assignedUser->name }} (#{{ $assignedUser->id }})
                             </option>
                         @endforeach
                     </select>
@@ -199,7 +212,7 @@
                         type="text"
                         value="{{ auth()->user()->name }}"
                         readonly
-                        class="w-full rounded-lg border-slate-200 bg-slate-50 py-2.5 text-sm text-slate-600"
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600"
                     >
                 @endif
             </div>
@@ -249,9 +262,7 @@
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div class="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h2 class="font-bold text-slate-900">
-                    Calling Lead List
-                </h2>
+                <h2 class="font-bold text-slate-900">Calling Lead List</h2>
 
                 <p class="mt-1 text-sm text-slate-500">
                     {{ $contacts->firstItem() ?? 0 }}
@@ -292,16 +303,10 @@
                         $statusText = $statusLabels[$currentStatus]
                             ?? ucwords(str_replace('_', ' ', $currentStatus));
 
-                        $badgeClass = $statusColors[$currentStatus]
-                            ?? $defaultColor;
-
+                        $badgeClass = $statusColors[$currentStatus] ?? $defaultColor;
                         $historyRowId = 'history-row-' . $contact->id;
 
-                        /*
-                         * Latest call first.
-                         * Use created_at when call_at is missing.
-                         * Use ID to break ties.
-                         */
+                        // Latest call first. Fall back to created_at and break ties by ID.
                         $sortedHistories = $contact->callHistories
                             ->sort(static function ($first, $second) {
                                 $firstDate = $first->call_at ?? $first->created_at;
@@ -321,10 +326,7 @@
                             ->values();
 
                         $latestHistory = $sortedHistories->first();
-
-                        $latestDurationText = $formatCallDuration(
-                            $latestHistory?->call_duration
-                        );
+                        $latestDurationText = $formatCallDuration($latestHistory?->call_duration);
                     @endphp
 
                     <tbody class="border-b border-slate-100">
@@ -437,30 +439,20 @@
                                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
                                 >
                                     <i data-lucide="history" class="h-4 w-4"></i>
-
-                                    <span data-history-label>
-                                        View History
-                                    </span>
+                                    <span data-history-label>View History</span>
                                 </button>
                             </td>
                         </tr>
 
                         {{-- EXPANDED HISTORY --}}
-                        <tr
-                            id="{{ $historyRowId }}"
-                            data-history-row
-                            class="hidden bg-slate-50/80"
-                        >
+                        <tr id="{{ $historyRowId }}" data-history-row class="hidden bg-slate-50/80">
                             <td colspan="10" class="p-3 sm:p-5">
                                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                                     <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
                                             <div class="flex items-center gap-2">
                                                 <i data-lucide="history" class="h-5 w-5 text-blue-600"></i>
-
-                                                <h3 class="font-bold text-slate-900">
-                                                    Complete Call History
-                                                </h3>
+                                                <h3 class="font-bold text-slate-900">Complete Call History</h3>
                                             </div>
 
                                             <p class="mt-1 text-xs text-slate-500">
@@ -471,8 +463,7 @@
                                         </div>
 
                                         <span class="inline-flex self-start rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                                            {{ $contact->call_histories_count }}
-                                            Call Records
+                                            {{ $contact->call_histories_count }} Call Records
                                         </span>
                                     </div>
 
@@ -501,9 +492,7 @@
                                                         $historyColor = $statusColors[$historyStatus]
                                                             ?? $defaultColor;
 
-                                                        $durationText = $formatCallDuration(
-                                                            $history->call_duration
-                                                        );
+                                                        $durationText = $formatCallDuration($history->call_duration);
 
                                                         $callDate = $history->call_at
                                                             ? \Carbon\Carbon::parse($history->call_at)
@@ -594,9 +583,7 @@
                                                                     </a>
                                                                 </div>
                                                             @else
-                                                                <span class="text-xs text-slate-400">
-                                                                    No Recording
-                                                                </span>
+                                                                <span class="text-xs text-slate-400">No Recording</span>
                                                             @endif
                                                         </td>
                                                     </tr>
@@ -607,13 +594,8 @@
                                                                 <i data-lucide="history" class="h-6 w-6 text-slate-400"></i>
                                                             </div>
 
-                                                            <h3 class="mt-3 font-semibold text-slate-700">
-                                                                No Call History Found
-                                                            </h3>
-
-                                                            <p class="mt-1 text-sm text-slate-500">
-                                                                No call records available for this lead.
-                                                            </p>
+                                                            <h3 class="mt-3 font-semibold text-slate-700">No Call History Found</h3>
+                                                            <p class="mt-1 text-sm text-slate-500">No call records available for this lead.</p>
                                                         </td>
                                                     </tr>
                                                 @endforelse
@@ -627,12 +609,12 @@
                 @empty
                     <tbody>
                         <tr>
-                            <td colspan="10" class="px-5 py-16 text-center">
-                                <i data-lucide="users" class="mx-auto h-10 w-10 text-slate-400"></i>
+                            <td colspan="10" class="px-5 py-14 text-center">
+                                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                                    <i data-lucide="search" class="h-6 w-6 text-slate-400"></i>
+                                </div>
 
-                                <h3 class="mt-4 font-semibold text-slate-700">
-                                    No Calling Leads Found
-                                </h3>
+                                <h3 class="mt-3 font-semibold text-slate-700">No Calling Leads Found</h3>
 
                                 <p class="mt-1 text-sm text-slate-500">
                                     No leads match the selected filters.
@@ -673,9 +655,7 @@
             button.dataset.initialized = '1';
 
             button.addEventListener('click', function () {
-                const historyRow = document.getElementById(
-                    button.dataset.target
-                );
+                const historyRow = document.getElementById(button.dataset.target);
 
                 if (!historyRow) {
                     return;
@@ -683,21 +663,19 @@
 
                 const shouldOpen = historyRow.classList.contains('hidden');
 
-                document.querySelectorAll('[data-history-row]')
-                    .forEach(function (row) {
-                        row.classList.add('hidden');
-                    });
+                document.querySelectorAll('[data-history-row]').forEach(function (row) {
+                    row.classList.add('hidden');
+                });
 
-                document.querySelectorAll('[data-history-toggle]')
-                    .forEach(function (btn) {
-                        btn.setAttribute('aria-expanded', 'false');
+                document.querySelectorAll('[data-history-toggle]').forEach(function (btn) {
+                    btn.setAttribute('aria-expanded', 'false');
 
-                        const label = btn.querySelector('[data-history-label]');
+                    const label = btn.querySelector('[data-history-label]');
 
-                        if (label) {
-                            label.textContent = 'View History';
-                        }
-                    });
+                    if (label) {
+                        label.textContent = 'View History';
+                    }
+                });
 
                 if (shouldOpen) {
                     historyRow.classList.remove('hidden');
@@ -718,10 +696,7 @@
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener(
-            'DOMContentLoaded',
-            initializeCallingHistory
-        );
+        document.addEventListener('DOMContentLoaded', initializeCallingHistory);
     } else {
         initializeCallingHistory();
     }
