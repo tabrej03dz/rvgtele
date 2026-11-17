@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CallingSettingController;
 use App\Http\Controllers\Api\DemoCityController;
 use App\Http\Controllers\Api\DeviceCallLogController;
 use App\Http\Controllers\Api\MobileApkController;
+use App\Http\Controllers\Api\GetMoreLeadsController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -25,6 +26,22 @@ Route::middleware('auth:sanctum')->group(function () {
         [LeadApiController::class, 'communicationHistory']
     );
 
+
+
+    Route::get(
+        'get-more-leads/states',
+        [GetMoreLeadsController::class, 'states']
+    );
+
+    Route::post(
+        'get-more-leads',
+        [GetMoreLeadsController::class, 'store']
+    );
+
+    Route::get(
+        'get-more-leads/call-history',
+        [GetMoreLeadsController::class, 'history']
+    );
 
     Route::get('lead-contacts/{category?}', [CallingCrmController::class, 'index']);
     Route::post('lead-contacts/call_status/{lead_contact}', [CallingCrmController::class, 'callStatus']);
