@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\DemoCityController;
 use App\Http\Controllers\Api\DeviceCallLogController;
 use App\Http\Controllers\Api\MobileApkController;
 use App\Http\Controllers\Api\GetMoreLeadsController;
+use App\Http\Controllers\Api\SmartDistributionController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -29,19 +30,44 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::get(
+        'get-more-leads/categories',
+        [SmartDistributionController::class, 'categories']
+    );
+
+    Route::get(
         'get-more-leads/states',
-        [GetMoreLeadsController::class, 'states']
+        [SmartDistributionController::class, 'states']
+    );
+
+    Route::post(
+        'get-more-leads/preference',
+        [SmartDistributionController::class, 'preference']
     );
 
     Route::post(
         'get-more-leads',
-        [GetMoreLeadsController::class, 'store']
+        [SmartDistributionController::class, 'more']
+    );
+
+    Route::get(
+        'get-more-leads/current',
+        [SmartDistributionController::class, 'current']
+    );
+
+    Route::get(
+        'get-more-leads/city-status',
+        [SmartDistributionController::class, 'cities']
     );
 
     Route::get(
         'get-more-leads/call-history',
-        [GetMoreLeadsController::class, 'history']
+        [SmartDistributionController::class, 'history']
     );
+
+    Route::post(
+        'get-more-leads/{leadContact}/call-result',
+        [SmartDistributionController::class, 'result']
+    )->whereNumber('leadContact');
 
     Route::get('lead-contacts/{category?}', [CallingCrmController::class, 'index']);
     Route::post('lead-contacts/call_status/{lead_contact}', [CallingCrmController::class, 'callStatus']);

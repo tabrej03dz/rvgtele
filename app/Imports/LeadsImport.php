@@ -17,6 +17,7 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use Throwable;
+use App\Support\DistributionValue;
 
 class LeadsImport implements
     ToCollection,
@@ -1468,51 +1469,19 @@ class LeadsImport implements
     |--------------------------------------------------------------------------
     */
 
-    private function cleanPhone(
-        mixed $value
-    ): ?string {
-        $value =
-            $this->clean($value);
+    private function cleanPhone(mixed $value): ?string
+    {
+        $value = $this->clean($value);
 
-        if (!$value) {
+        if ($value === null || $value === '') {
             return null;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Excel Numeric Scientific Notation Safety
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            is_numeric($value)
-            &&
-            str_contains(
-                strtolower($value),
-                'e'
-            )
-        ) {
-            $value =
-                sprintf(
-                    '%.0f',
-                    (float) $value
-                );
+        if (is_numeric($value) && str_contains(strtolower($value), 'e')) {
+            $value = sprintf('%.0f', (float) $value);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Remove unnecessary characters
-        |--------------------------------------------------------------------------
-        */
-
-        $value =
-            preg_replace(
-                '/[^0-9+]/',
-                '',
-                $value
-            );
-
-        return $value ?: null;
+        return \App\Support\DistributionValue::phone($value);
     }
 
     /*

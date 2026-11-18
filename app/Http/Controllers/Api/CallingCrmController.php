@@ -105,6 +105,21 @@ class CallingCrmController extends Controller
     
 public function callStatus(Request $request, Lead $leadContact)
 {
+
+        $registered = \Illuminate\Support\Facades\DB::table('distribution_numbers')
+            ->where('company_id', $leadContact->company_id)
+            ->where('phone', $leadContact->distribution_phone)
+            ->exists();
+
+        if ($registered) {
+            return app(
+                \App\Http\Controllers\Api\SmartDistributionController::class
+            )->result(
+                $request,
+                $leadContact,
+                app(\App\Services\SmartLeadDistribution::class)
+            );
+        }
     $userId = $request->user()->id;
 
 

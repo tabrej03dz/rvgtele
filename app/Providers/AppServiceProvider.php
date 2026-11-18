@@ -39,6 +39,10 @@ class AppServiceProvider extends ServiceProvider
                     : null;
             }
         );
+
+        \App\Models\Lead::observe(
+            \App\Observers\DistributionLeadObserver::class
+        );
     }
 
     protected function configureDefaults(): void

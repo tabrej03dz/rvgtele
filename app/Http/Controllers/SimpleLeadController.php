@@ -215,6 +215,11 @@ class SimpleLeadController extends Controller
 
         Excel::import($import, $request->file('file'));
 
+        $distribution = app(\App\Services\SmartLeadDistribution::class);
+
+        $distribution->sync($companyId);
+        $distribution->refill($companyId);
+
         $result = $import->result();
 
         return redirect()
