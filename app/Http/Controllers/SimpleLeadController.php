@@ -382,13 +382,7 @@ class SimpleLeadController extends Controller
          | remains unchanged.
          */
 
-        $distribution = app(
-            \App\Services\SmartLeadDistribution::class
-        );
-
-        $distribution->sync($companyId);
-        $distribution->refill($companyId);
-
+        
         $result = $import->result();
 
         return redirect()
