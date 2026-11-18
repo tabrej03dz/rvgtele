@@ -957,114 +957,139 @@ class LeadsImport implements
     /**
      * Read an Excel value using flexible heading names.
      */
-    private function field(
-        Collection $row,
-        string $field
-    ): mixed {
-        $aliases = self::HEADING_ALIASES[$field] ?? [$field];
+    
+/**
+ * Read CSV / Excel values using heading aliases.
+ *
+ * Fixes:
+ * 1. Missing columns return null.
+ * 2. Empty columns return null.
+ * 3. "name" cannot accidentally match
+ *    "state_name" or "city_name".
+ * 4. Flexible headings are still supported.
+ */
+private function field(
+    Collection $row,
+    string $field
+): mixed {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Build normalized row only once for this call
-        |--------------------------------------------------------------------------
-        */
+    $aliases = self::HEADING_ALIASES[$field]
+        ?? [$field];
 
-        $normalizedRow = [];
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize CSV headings
+    |--------------------------------------------------------------------------
+    */
 
-        foreach ($row as $heading => $value) {
-            $normalizedHeading =
-                $this->normalizeHeading(
-                    (string) $heading
-                );
+    $normalizedRow = [];
 
-            if ($normalizedHeading !== '') {
-                $normalizedRow[$normalizedHeading] = $value;
-            }
+    foreach ($row as $heading => $value) {
+
+        $normalizedHeading =
+            $this->normalizeHeading(
+                (string) $heading
+            );
+
+        if ($normalizedHeading === '') {
+            continue;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Exact normalized alias match
-        |--------------------------------------------------------------------------
-        |
-        | "Mobile Number", "mobile_number", "MOBILE-NUMBER",
-        | "mobile.number" => all normalize to "mobilenumber"
-        |
-        */
+        $normalizedRow[$normalizedHeading] = $value;
+    }
 
-        foreach ($aliases as $alias) {
-            $key =
-                $this->normalizeHeading(
-                    $alias
-                );
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 1: Exact heading match
+    |--------------------------------------------------------------------------
+    */
+
+    foreach ($aliases as $alias) {
+
+        $aliasKey =
+            $this->normalizeHeading($alias);
+
+        if (
+            !array_key_exists(
+                $aliasKey,
+                $normalizedRow
+            )
+        ) {
+            continue;
+        }
+
+        $value = $normalizedRow[$aliasKey];
+
+        if (
+            $value !== null &&
+            trim((string) $value) !== ''
+        ) {
+            return $value;
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 2: Safe relaxed heading match
+    |--------------------------------------------------------------------------
+    |
+    | Allow:
+    | Customer Mobile Number -> Mobile Number
+    | Lead Contact Number -> Contact Number
+    |
+    | Do NOT allow:
+    | name -> state_name
+    | name -> city_name
+    |
+    */
+
+    foreach ($aliases as $alias) {
+
+        $aliasKey =
+            $this->normalizeHeading($alias);
+
+        if (strlen($aliasKey) < 5) {
+            continue;
+        }
+
+        foreach ($normalizedRow as $headingKey => $value) {
+
+            /*
+             | Only match when the CSV heading
+             | contains the expected alias.
+             |
+             | Never do the reverse comparison.
+             */
 
             if (
-                array_key_exists(
-                    $key,
-                    $normalizedRow
+                !str_contains(
+                    $headingKey,
+                    $aliasKey
                 )
             ) {
-                $value = $normalizedRow[$key];
-
-                if (
-                    $value !== null
-                    &&
-                    trim((string) $value) !== ''
-                ) {
-                    return $value;
-                }
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Safe relaxed match
-        |--------------------------------------------------------------------------
-        |
-        | Allows headings such as:
-        |   "Customer Mobile Number"
-        |   "Lead Contact Number"
-        |   "Business Company Name"
-        |
-        | Very short aliases are ignored here to avoid accidental matches.
-        |
-        */
-
-        foreach ($aliases as $alias) {
-            $aliasKey =
-                $this->normalizeHeading(
-                    $alias
-                );
-
-            if (strlen($aliasKey) < 5) {
                 continue;
             }
 
-            foreach ($normalizedRow as $headingKey => $value) {
-                if (
-                    (
-                        str_contains(
-                            $headingKey,
-                            $aliasKey
-                        )
-                        ||
-                        str_contains(
-                            $aliasKey,
-                            $headingKey
-                        )
-                    )
-                    &&
-                    $value !== null
-                    &&
-                    trim((string) $value) !== ''
-                ) {
-                    return $value;
-                }
+            if (
+                $value === null ||
+                trim((string) $value) === ''
+            ) {
+                continue;
             }
-        }
 
-        return null;
+            return $value;
+        }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Column missing or empty
+    |--------------------------------------------------------------------------
+    */
+
+    return null;
+}
+
 
     /**
      * Normalize Excel heading for comparison.
