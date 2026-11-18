@@ -126,7 +126,7 @@ class PipelineController extends Controller
         $leadQuery->where(function ($query) use ($search) {
             $query->where('name', 'like', "%{$search}%")
                 ->orWhere('company_name', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('mobile', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%");
         });
     }

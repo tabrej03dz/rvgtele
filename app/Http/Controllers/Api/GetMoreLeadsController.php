@@ -610,119 +610,263 @@ class GetMoreLeadsController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function history(Request $request)
-    {
-        $filters = $request->validate([
-            'batch_id' => [
-                'nullable',
-                'integer',
-                'min:1',
-            ],
-            'lead_id' => [
-                'nullable',
-                'integer',
-                'min:1',
-            ],
-            'call_status' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-            'per_page' => [
-                'nullable',
-                'integer',
-                'between:1,100',
-            ],
-        ]);
+    // public function history(Request $request)
+    // {
+    //     $filters = $request->validate([
+    //         'batch_id' => [
+    //             'nullable',
+    //             'integer',
+    //             'min:1',
+    //         ],
+    //         'lead_id' => [
+    //             'nullable',
+    //             'integer',
+    //             'min:1',
+    //         ],
+    //         'call_status' => [
+    //             'nullable',
+    //             'string',
+    //             'max:255',
+    //         ],
+    //         'per_page' => [
+    //             'nullable',
+    //             'integer',
+    //             'between:1,100',
+    //         ],
+    //     ]);
 
-        $companyId = $this->companyId($request);
-        $userId = (int) $request->user()->id;
+    //     $companyId = $this->companyId($request);
+    //     $userId = (int) $request->user()->id;
 
-        if (!empty($filters['batch_id'])) {
+    //     if (!empty($filters['batch_id'])) {
 
-            $batch = DB::table(
-                'get_more_lead_batches'
-            )
-                ->where(
-                    'company_id',
-                    $companyId
-                )
-                ->where(
-                    'user_id',
-                    $userId
-                )
-                ->where(
-                    'id',
-                    $filters['batch_id']
-                )
-                ->first();
+    //         $batch = DB::table(
+    //             'get_more_lead_batches'
+    //         )
+    //             ->where(
+    //                 'company_id',
+    //                 $companyId
+    //             )
+    //             ->where(
+    //                 'user_id',
+    //                 $userId
+    //             )
+    //             ->where(
+    //                 'id',
+    //                 $filters['batch_id']
+    //             )
+    //             ->first();
 
-            if (!$batch) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Batch not found.',
-                ], 404);
-            }
+    //         if (!$batch) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Batch not found.',
+    //             ], 404);
+    //         }
 
-            $query = $this->batchHistory($batch);
+    //         $query = $this->batchHistory($batch);
 
-        } else {
+    //     } else {
 
-            $query = CallHistory::query()
-                ->where('user_id', $userId);
+    //         $query = CallHistory::query()
+    //             ->where('user_id', $userId);
+    //     }
+
+    //     /*
+    //      | Only leads belonging to user's company.
+    //      */
+
+    //     $query->whereHas(
+    //         'lead',
+    //         fn ($q) => $q->withTrashed()
+    //             ->where('company_id', $companyId)
+    //     );
+
+    //     $query->with([
+    //         'lead' => fn ($q) => $q->withTrashed()
+    //             ->select(
+    //                 'id',
+    //                 'name',
+    //                 'mobile',
+    //                 'state',
+    //                 'city'
+    //             ),
+    //     ]);
+
+    //     if (!empty($filters['lead_id'])) {
+
+    //         $query->where(
+    //             'lead_id',
+    //             $filters['lead_id']
+    //         );
+    //     }
+
+    //     if (!empty($filters['call_status'])) {
+
+    //         $query->where(
+    //             'call_status',
+    //             $filters['call_status']
+    //         );
+    //     }
+
+    //     $history = $query
+    //         ->orderByDesc('call_at')
+    //         ->orderByDesc('id')
+    //         ->paginate(
+    //             $filters['per_page'] ?? 25
+    //         )
+    //         ->withQueryString();
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Call history fetched.',
+    //         'data' => $history,
+    //     ]);
+    // }
+
+
+public function history(Request $request)
+{
+    $filters = $request->validate([
+        'batch_id' => 'nullable|integer|min:1',
+        'lead_id' => 'nullable|integer|min:1',
+        'call_status' => 'nullable|string|max:255',
+        'direction' => 'nullable|in:incoming,outgoing',
+        'call_type' => 'nullable|in:incoming,outgoing,missed,rejected',
+        'mobile' => 'nullable|string|max:30',
+        'per_page' => 'nullable|integer|between:1,100',
+    ]);
+
+    $companyId = $this->companyId($request);
+    $userId = (int) $request->user()->id;
+
+    // पुराना batch filter बरकरार
+    if (!empty($filters['batch_id'])) {
+
+        $batch = DB::table('get_more_lead_batches')
+            ->where('company_id', $companyId)
+            ->where('user_id', $userId)
+            ->where('id', $filters['batch_id'])
+            ->first();
+
+        if (!$batch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batch not found.',
+            ], 404);
         }
 
-        /*
-         | Only leads belonging to user's company.
-         */
+        $query = $this->batchHistory($batch);
 
-        $query->whereHas(
-            'lead',
-            fn ($q) => $q->withTrashed()
-                ->where('company_id', $companyId)
+    } else {
+
+        // Employee की सभी call histories
+        $query = CallHistory::query()
+            ->where('user_id', $userId);
+    }
+
+    // Lead नहीं है, तब भी history दिखनी चाहिए
+    $query->where(function ($q) use ($companyId) {
+
+        $q->whereNull('lead_id')
+
+          ->orWhereHas('lead', function ($leadQuery) use ($companyId) {
+
+              $leadQuery->withTrashed()
+                  ->where('company_id', $companyId);
+
+          });
+    });
+
+    // Lead की जानकारी
+    $query->with([
+        'lead' => fn ($q) => $q
+            ->withTrashed()
+            ->select(
+                'id',
+                'name',
+                'mobile',
+                'state',
+                'city'
+            ),
+    ]);
+
+    // Existing + new filters
+    foreach ([
+        'lead_id',
+        'call_status',
+        'direction',
+        'call_type'
+    ] as $field) {
+
+        if (
+            isset($filters[$field]) &&
+            $filters[$field] !== ''
+        ) {
+            $query->where($field, $filters[$field]);
+        }
+    }
+
+    // Mobile filter
+    if (!empty($filters['mobile'])) {
+
+        $digits = preg_replace(
+            '/\D+/',
+            '',
+            $filters['mobile']
         );
 
-        $query->with([
-            'lead' => fn ($q) => $q->withTrashed()
-                ->select(
-                    'id',
-                    'name',
-                    'mobile',
-                    'state',
-                    'city'
-                ),
-        ]);
-
-        if (!empty($filters['lead_id'])) {
-
-            $query->where(
-                'lead_id',
-                $filters['lead_id']
-            );
+        if (
+            strlen($digits) === 12 &&
+            str_starts_with($digits, '91')
+        ) {
+            $digits = substr($digits, 2);
+        } elseif (
+            strlen($digits) === 11 &&
+            str_starts_with($digits, '0')
+        ) {
+            $digits = substr($digits, 1);
         }
 
-        if (!empty($filters['call_status'])) {
-
-            $query->where(
-                'call_status',
-                $filters['call_status']
-            );
+        if (!preg_match('/^[6-9][0-9]{9}$/', $digits)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid mobile number.',
+            ], 422);
         }
 
-        $history = $query
-            ->orderByDesc('call_at')
-            ->orderByDesc('id')
-            ->paginate(
-                $filters['per_page'] ?? 25
-            )
-            ->withQueryString();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Call history fetched.',
-            'data' => $history,
-        ]);
+        $query->where('mobile', $digits);
     }
+
+    $history = $query
+        ->orderByDesc('call_at')
+        ->orderByDesc('id')
+        ->paginate($filters['per_page'] ?? 25)
+        ->withQueryString();
+
+    // Response में lead name और has_lead जोड़ना
+    $history->getCollection()->transform(
+        function (CallHistory $item) {
+
+            $data = $item->toArray();
+
+            $data['has_lead'] =
+                $item->lead_id !== null;
+
+            $data['lead_name'] =
+                $item->lead?->name;
+
+            return $data;
+        }
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Call history fetched.',
+        'data' => $history,
+    ]);
+}
+
 
     /*
     |--------------------------------------------------------------------------

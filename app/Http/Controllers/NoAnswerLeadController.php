@@ -73,7 +73,7 @@ class NoAnswerLeadController extends Controller
         if ($search !== '') {
             $query->where(function (Builder $query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('mobile', 'like', "%{$search}%");
 
                 if (ctype_digit($search)) {
                     $query->orWhere('id', (int) $search);

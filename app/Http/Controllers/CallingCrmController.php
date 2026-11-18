@@ -88,7 +88,7 @@ class CallingCrmController extends Controller
         if ($search !== '') {
             $contactsQuery->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('mobile', 'like', "%{$search}%");
 
                 if (ctype_digit($search)) {
                     $query->orWhere('id', (int) $search);

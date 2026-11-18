@@ -44,7 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
     Route::get('lead-contacts/{category?}', [CallingCrmController::class, 'index']);
-    Route::post('lead-contacts/call_status/{lead_contact}', [CallingCrmController::class, 'callStatus']);
+    Route::post('lead-contacts/call_status/{lead_contact?}', [CallingCrmController::class, 'callStatus']);
     Route::get('/lead-contacts/{id}/check_status', [CallingCrmController::class, 'checkCallStatus']);
 
     Route::get('categories', [\App\Http\Controllers\Api\CategoryController::class, 'index']);

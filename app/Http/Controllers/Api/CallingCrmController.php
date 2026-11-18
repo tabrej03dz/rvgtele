@@ -103,136 +103,326 @@ class CallingCrmController extends Controller
 
 
     
-public function callStatus(Request $request, Lead $leadContact)
+
+public function callStatus(Request $request, ?Lead $leadContact = null)
 {
+    $user = $request->user();
+    $userId = (int) $user->id;
+    $companyId = (int) $user->company_id;
 
-abort_unless(
-    (int) $leadContact->company_id ===
-    (int) $request->user()->company_id,
-    403,
-    'Lead does not belong to your company.'
-);
-    $userId = $request->user()->id;
+    abort_if($companyId <= 0, 403, 'Company not assigned.');
 
+    // URL में lead ID दी गई है या नहीं?
+    $isLeadStatusUpdate = $request->route('lead_contact') !== null;
 
-    // Only assigned user can update this lead
-    if ((int) $leadContact->assigned_to !== (int) $userId) {
-        return response()->json([
-            'success' => false,
-            'message' => 'You are not authorized to update this lead.',
-        ], 403);
+    // पुरानी API की permissions पहले जैसी
+    if ($isLeadStatusUpdate && $leadContact) {
+
+        abort_unless(
+            (int) $leadContact->company_id === $companyId,
+            403,
+            'Lead does not belong to your company.'
+        );
+
+        abort_unless(
+            (int) $leadContact->assigned_to === $userId,
+            403,
+            'You are not authorized to update this lead.'
+        );
     }
 
-    // Validate request
     $validated = $request->validate([
-        'call_status' => 'required|string|max:255',
+        'call_status' => 'nullable|string|max:255',
         'recording' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm,mp4,3gp,amr|max:20480',
         'remarks' => 'nullable|string',
-        'call_duration' => 'nullable|integer|min:0',
+        'call_duration' => 'nullable|integer|min:0|max:86400',
+
+        // नए fields
+        'mobile' => 'nullable|string|max:30',
+        'direction' => 'nullable|in:incoming,outgoing',
+        'call_type' => 'nullable|in:incoming,outgoing,missed,rejected',
+        'call_at' => 'nullable|date_format:Y-m-d H:i:s',
+        'client_call_id' => 'nullable|uuid',
     ]);
 
-    $now = Carbon::now();
-    $recordingPath = null;
+    // पुरानी lead status API में status जरूरी रहेगा
+    if ($isLeadStatusUpdate && empty($validated['call_status'])) {
+        return response()->json([
+            'success' => false,
+            'message' => 'call_status is required.',
+        ], 422);
+    }
 
-    $callDuration = $validated['call_duration'] ?? null;
+    // बिना lead ID के mobile और unique call ID जरूरी
+    if (!$isLeadStatusUpdate) {
+        if (
+            empty($validated['mobile']) ||
+            empty($validated['client_call_id'])
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'mobile and client_call_id are required.',
+            ], 422);
+        }
+
+        if (
+            empty($validated['direction']) &&
+            empty($validated['call_type'])
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'direction or call_type is required.',
+            ], 422);
+        }
+    }
+
+    // Mobile normalize
+    $normalize = static function ($number) {
+        $digits = preg_replace('/\D+/', '', (string) $number);
+
+        if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+            $digits = substr($digits, 2);
+        } elseif (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            $digits = substr($digits, 1);
+        }
+
+        return preg_match('/^[6-9][0-9]{9}$/', $digits)
+            ? $digits
+            : '';
+    };
+
+    $mobile = $normalize(
+        $validated['mobile'] ?? $leadContact?->mobile
+    );
+
+    if ($mobile === '') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Valid 10-digit mobile number required.',
+        ], 422);
+    }
+
+    // पुरानी lead API में गलत नंबर स्वीकार न करें
+    if (
+        $isLeadStatusUpdate &&
+        isset($validated['mobile']) &&
+        $mobile !== $normalize($leadContact->mobile)
+    ) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Mobile does not match the lead.',
+        ], 422);
+    }
+
+    // बिना ID के आई call को leads में search करें
+    if (!$isLeadStatusUpdate) {
+
+        $possibleNumbers = [
+            $mobile,
+            '91' . $mobile,
+            '+91' . $mobile,
+            '0' . $mobile,
+        ];
+
+        $leadContact = Lead::query()
+            ->where('company_id', $companyId)
+            ->whereIn('mobile', $possibleNumbers)
+            ->orderByRaw(
+                'CASE WHEN assigned_to = ? THEN 0 ELSE 1 END',
+                [$userId]
+            )
+            ->orderBy('id')
+            ->first();
+    }
+
+    // Incoming / outgoing पहचानना
+    $direction = $validated['direction'] ?? null;
+    $callType = $validated['call_type'] ?? null;
+
+    $typeDirection = match ($callType) {
+        'outgoing' => 'outgoing',
+        'incoming', 'missed', 'rejected' => 'incoming',
+        default => null,
+    };
+
+    if (
+        $direction &&
+        $typeDirection &&
+        $direction !== $typeDirection
+    ) {
+        return response()->json([
+            'success' => false,
+            'message' => 'direction and call_type do not match.',
+        ], 422);
+    }
+
+    $direction ??= $typeDirection;
+    $callType ??= $direction;
+
+    $clientCallId = $validated['client_call_id'] ?? null;
+
+    // Duplicate call save नहीं करनी
+    if ($clientCallId) {
+        $existing = CallHistory::query()
+            ->where('user_id', $userId)
+            ->where('client_call_id', $clientCallId)
+            ->first();
+
+        if ($existing) {
+            if ($existing->mobile !== $mobile) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Call ID belongs to another number.',
+                ], 409);
+            }
+
+            return response()->json([
+                'success' => true,
+                'duplicate' => true,
+                'message' => 'Call already saved.',
+                'data' => $existing,
+            ]);
+        }
+    }
+
+    $recordingPath = null;
 
     try {
 
-        // 1. Upload recording (optional)
+        // पुरानी recording upload सुविधा
         if ($request->hasFile('recording')) {
-
             $recordingPath = $request->file('recording')
                 ->store('call_recordings', 'public');
 
             if (!$recordingPath) {
-                throw new \RuntimeException(
-                    'Recording upload failed.'
-                );
+                throw new \RuntimeException('Recording upload failed.');
             }
         }
 
-        // 2. Update lead and create call history
+        $status = $validated['call_status']
+            ?? (
+                in_array($callType, ['missed', 'rejected'], true)
+                ? $callType
+                : 'completed'
+            );
+
+        $callAt = isset($validated['call_at'])
+            ? \Carbon\Carbon::createFromFormat(
+                'Y-m-d H:i:s',
+                $validated['call_at']
+            )
+            : now();
+
         $history = DB::transaction(function () use (
             $leadContact,
-            $validated,
-            $now,
+            $isLeadStatusUpdate,
+            $status,
+            $userId,
+            $mobile,
+            $direction,
+            $callType,
+            $clientCallId,
+            $callAt,
             $recordingPath,
-            $callDuration,
-            $userId
+            $validated
         ) {
 
-            // Update lead
-            $leadContact->update([
-                'call_status' => $validated['call_status'],
-            ]);
+            // सिर्फ पुरानी lead-ID वाली API status बदलेगी
+            if ($isLeadStatusUpdate && $leadContact) {
+                $leadContact->update([
+                    'call_status' => $status,
+                ]);
+            }
 
-            // Save call history
+            // एक ही existing call_histories table में save
             return CallHistory::create([
-                'lead_id' => $leadContact->id,
+                'lead_id' => $leadContact?->id,
                 'user_id' => $userId,
-                'call_status' => $validated['call_status'],
-                'call_at' => $now,
+                'mobile' => $mobile,
+                'direction' => $direction,
+                'call_type' => $callType,
+                'client_call_id' => $clientCallId,
+                'call_status' => $status,
+                'call_at' => $callAt,
                 'recording' => $recordingPath,
                 'remarks' => $validated['remarks'] ?? null,
-                'call_duration' => $callDuration,
+                'call_duration' => $validated['call_duration'] ?? null,
             ]);
-
         });
 
-        // 3. Refresh lead data
-        $leadContact->refresh();
+        if ($isLeadStatusUpdate && $leadContact) {
+            $leadContact->refresh();
+        }
 
-        // 4. Recording public URL
-        $recordingUrl = $recordingPath
-            ? Storage::disk('public')->url($recordingPath)
-            : null;
-
-        // 5. Success response
         return response()->json([
             'success' => true,
-            'message' => 'Call status updated successfully.',
+            'duplicate' => false,
+            'message' => 'Call history saved successfully.',
             'data' => [
-                'id' => $leadContact->id,
+                'id' => $leadContact?->id,
+                'lead_id' => $history->lead_id,
+                'mobile' => $history->mobile,
+                'direction' => $history->direction,
+                'call_type' => $history->call_type,
+                'call_status' => $status,
+                'call_status_updated_at' => $isLeadStatusUpdate
+                    ? $leadContact?->call_status_updated_at
+                    : null,
                 'user_id' => $userId,
-                'call_status' => $leadContact->call_status,
-                'call_status_updated_at' => $leadContact->call_status_updated_at,
                 'history_id' => $history->id,
+                'call_at' => $history->call_at?->format('Y-m-d H:i:s'),
                 'call_duration' => $history->call_duration,
                 'remarks' => $history->remarks,
                 'recording' => $recordingPath,
-                'recording_url' => $recordingUrl,
+                'recording_url' => $recordingPath
+                    ? Storage::disk('public')->url($recordingPath)
+                    : null,
+                'client_call_id' => $clientCallId,
+                'has_lead' => $history->lead_id !== null,
             ],
         ], 200);
 
-    } catch (\Throwable $e) {
+    } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
 
-        // Delete uploaded recording if database operation fails
         if ($recordingPath) {
-            try {
-                Storage::disk('public')->delete($recordingPath);
-            } catch (\Throwable $cleanupError) {
-                report($cleanupError);
-            }
+            Storage::disk('public')->delete($recordingPath);
         }
 
-        // Log actual error
-        \Illuminate\Support\Facades\Log::error(
-            'CallStatus API Failed',
-            [
-                'lead_id' => $leadContact->id,
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]
-        );
+        $existing = $clientCallId
+            ? CallHistory::where('user_id', $userId)
+                ->where('client_call_id', $clientCallId)
+                ->first()
+            : null;
+
+        if ($existing && $existing->mobile === $mobile) {
+            return response()->json([
+                'success' => true,
+                'duplicate' => true,
+                'message' => 'Call already saved.',
+                'data' => $existing,
+            ]);
+        }
 
         return response()->json([
             'success' => false,
-            'message' => 'Failed to update call status or save recording.',
+            'message' => 'Call ID conflict.',
+        ], 409);
+
+    } catch (\Throwable $e) {
+
+        if ($recordingPath) {
+            Storage::disk('public')->delete($recordingPath);
+        }
+
+        report($e);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to save call history.',
         ], 500);
     }
 }
+
 
 
 public function checkCallStatus(Request $request, $id)
