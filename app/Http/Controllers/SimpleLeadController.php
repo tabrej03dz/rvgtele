@@ -19,7 +19,10 @@ class SimpleLeadController extends Controller
     private function companyId(Request $request): int
     {
         abort_unless(
-            $request->user()->hasAnyRole(['super_admin', 'admin']),
+            $request->user()->hasAnyRole([
+                'super_admin',
+                'admin',
+            ]),
             403
         );
 
@@ -39,52 +42,132 @@ class SimpleLeadController extends Controller
         $companyId = $this->companyId($request);
 
         $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:255'],
-
-            'category_id' => ['nullable', 'integer', 'min:1'],
-
+            'search' => [
+                'nullable', 'string', 'max:255'
+            ],
+            'category_id' => [
+                'nullable', 'integer', 'min:1'
+            ],
             'employee' => [
                 'nullable',
                 'string',
                 'regex:/^(unassigned|[1-9][0-9]*)$/',
             ],
-
-            'call_status' => ['nullable', 'string', 'max:255'],
-
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:500'],
-
-            'page' => ['nullable', 'integer', 'min:1'],
+            'call_status' => [
+                'nullable', 'string', 'max:255'
+            ],
+            'state' => [
+                'nullable', 'string', 'max:255'
+            ],
+            'city' => [
+                'nullable', 'string', 'max:255'
+            ],
+            'per_page' => [
+                'nullable', 'integer', 'min:1', 'max:500'
+            ],
+            'page' => [
+                'nullable', 'integer', 'min:1'
+            ],
         ]);
 
         $perPage = (int) ($filters['per_page'] ?? 50);
 
+        $selectedState = trim(
+            (string) ($filters['state'] ?? '')
+        );
+
+        $selectedCity = trim(
+            (string) ($filters['city'] ?? '')
+        );
+
+        /*
+         |-----------------------------------------
+         | MAIN LEADS QUERY
+         |-----------------------------------------
+         */
+
         $query = Lead::query()
             ->where('company_id', $companyId);
 
-        $search = trim($filters['search'] ?? '');
+        $search = trim(
+            (string) ($filters['search'] ?? '')
+        );
 
         if ($search !== '') {
-            $query->where(function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
                     ->orWhere('mobile', 'like', "%{$search}%");
             });
         }
 
         if (!empty($filters['category_id'])) {
-            $query->where('category_id', $filters['category_id']);
+            $query->where(
+                'category_id',
+                $filters['category_id']
+            );
         }
+
+        /*
+         |-----------------------------------------
+         | EMPLOYEE FILTER
+         |-----------------------------------------
+         */
 
         $employee = $filters['employee'] ?? '';
 
         if ($employee === 'unassigned') {
             $query->whereNull('assigned_to');
         } elseif ($employee !== '') {
-            $query->where('assigned_to', (int) $employee);
+            $query->where(
+                'assigned_to',
+                (int) $employee
+            );
         }
 
+        /*
+         |-----------------------------------------
+         | CALL STATUS FILTER
+         |-----------------------------------------
+         */
+
         if (!empty($filters['call_status'])) {
-            $query->where('call_status', $filters['call_status']);
+            $query->where(
+                'call_status',
+                $filters['call_status']
+            );
         }
+
+        /*
+         |-----------------------------------------
+         | STATE FILTER
+         |-----------------------------------------
+         */
+
+        if ($selectedState !== '') {
+            $query->whereRaw(
+                'TRIM(state) = ?',
+                [$selectedState]
+            );
+        }
+
+        /*
+         |-----------------------------------------
+         | CITY FILTER
+         |-----------------------------------------
+         */
+
+        if ($selectedCity !== '') {
+            $query->whereRaw(
+                'TRIM(city) = ?',
+                [$selectedCity]
+            );
+        }
+
+        /*
+         |-----------------------------------------
+         | PAGINATION
+         |-----------------------------------------
+         */
 
         $leads = $query
             ->with([
@@ -96,14 +179,14 @@ class SimpleLeadController extends Controller
             ->withQueryString();
 
         /*
-        * Example:
-        * Last page 5 hai aur user page 20 enter karta hai,
-        * to automatically page 5 khulega.
-        *
-        * Delete/assign ke baad last page empty hone par bhi
-        * valid page par redirect hoga.
-        */
-        if ($leads->currentPage() > $leads->lastPage()) {
+         | If requested page exceeds last page,
+         | redirect to the last valid page.
+         */
+
+        if (
+            $leads->currentPage() >
+            $leads->lastPage()
+        ) {
             return redirect()->route(
                 'simple-leads.index',
                 array_merge(
@@ -112,6 +195,8 @@ class SimpleLeadController extends Controller
                         'category_id',
                         'employee',
                         'call_status',
+                        'state',
+                        'city',
                     ]),
                     [
                         'per_page' => $perPage,
@@ -121,19 +206,37 @@ class SimpleLeadController extends Controller
             );
         }
 
+        /*
+         |-----------------------------------------
+         | EMPLOYEES
+         |-----------------------------------------
+         */
+
         $employees = User::query()
             ->where('company_id', $companyId)
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        /*
+         |-----------------------------------------
+         | CATEGORIES
+         |-----------------------------------------
+         */
+
         $categories = Category::query()
-            ->where(function ($query) use ($companyId) {
-                $query->where('company_id', $companyId)
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
                     ->orWhereNull('company_id');
             })
             ->orderBy('name')
             ->get(['id', 'name']);
+
+        /*
+         |-----------------------------------------
+         | CALL STATUSES
+         |-----------------------------------------
+         */
 
         $statuses = Lead::query()
             ->where('company_id', $companyId)
@@ -143,14 +246,72 @@ class SimpleLeadController extends Controller
             ->orderBy('call_status')
             ->pluck('call_status');
 
-        return view('calling-crm.simple-leads', compact(
-            'leads',
-            'employees',
-            'categories',
-            'statuses',
-            'perPage'
-        ));
+        /*
+         |-----------------------------------------
+         | STATES
+         | Only states existing in company leads.
+         |-----------------------------------------
+         */
+
+        $states = Lead::query()
+            ->where('company_id', $companyId)
+            ->whereNotNull('state')
+            ->whereRaw("TRIM(state) != ''")
+            ->selectRaw('TRIM(state) AS state_name')
+            ->distinct()
+            ->orderBy('state_name')
+            ->pluck('state_name');
+
+        /*
+         |-----------------------------------------
+         | CITIES WITH STATE MAPPING
+         |
+         | No new API required.
+         | Only company-specific lead data.
+         |-----------------------------------------
+         */
+
+        $cityRows = Lead::query()
+            ->where('company_id', $companyId)
+            ->whereNotNull('city')
+            ->whereRaw("TRIM(city) != ''")
+            ->selectRaw('TRIM(city) AS city_name')
+            ->selectRaw(
+                "COALESCE(TRIM(state), '') AS state_name"
+            )
+            ->distinct()
+            ->orderBy('state_name')
+            ->orderBy('city_name')
+            ->get();
+
+        /*
+         |-----------------------------------------
+         | VIEW
+         |-----------------------------------------
+         */
+
+        return view(
+            'calling-crm.simple-leads',
+            compact(
+                'leads',
+                'employees',
+                'categories',
+                'statuses',
+                'states',
+                'cityRows',
+                'selectedState',
+                'selectedCity',
+                'perPage'
+            )
+        );
     }
+
+    /*
+     |=============================================
+     | UPLOAD LEADS
+     | Existing import flow preserved.
+     |=============================================
+     */
 
     public function upload(Request $request)
     {
@@ -167,20 +328,18 @@ class SimpleLeadController extends Controller
                 'required',
                 'integer',
                 Rule::exists('categories', 'id')
-                    ->where(function ($query) use ($companyId) {
-                        $query->where('company_id', $companyId)
-                            ->orWhereNull('company_id');
+                    ->where(function ($q) use ($companyId) {
+                        $q->where(
+                            'company_id',
+                            $companyId
+                        )->orWhereNull('company_id');
                     }),
             ],
         ]);
 
-        /*
-         * Existing importer requires a lead source and lead status.
-         * Use the first active source/status available to this company.
-         */
         $sourceId = LeadSource::query()
-            ->where(function ($query) use ($companyId) {
-                $query->where('company_id', $companyId)
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
                     ->orWhereNull('company_id');
             })
             ->where('is_active', true)
@@ -188,8 +347,8 @@ class SimpleLeadController extends Controller
             ->value('id');
 
         $statusId = LeadStatus::query()
-            ->where(function ($query) use ($companyId) {
-                $query->where('company_id', $companyId)
+            ->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
                     ->orWhereNull('company_id');
             })
             ->where('is_active', true)
@@ -213,9 +372,19 @@ class SimpleLeadController extends Controller
             duplicateAction: 'skip',
         );
 
-        Excel::import($import, $request->file('file'));
+        Excel::import(
+            $import,
+            $request->file('file')
+        );
 
-        $distribution = app(\App\Services\SmartLeadDistribution::class);
+        /*
+         | Existing Smart Lead Distribution
+         | remains unchanged.
+         */
+
+        $distribution = app(
+            \App\Services\SmartLeadDistribution::class
+        );
 
         $distribution->sync($companyId);
         $distribution->refill($companyId);
@@ -228,15 +397,29 @@ class SimpleLeadController extends Controller
                 'success',
                 "Uploaded: {$result['imported']}, Duplicate skipped: {$result['duplicates']}, Failed: {$result['failed']}."
             )
-            ->with('import_errors', $result['errors']);
+            ->with(
+                'import_errors',
+                $result['errors']
+            );
     }
+
+    /*
+     |=============================================
+     | ASSIGN LEADS
+     |=============================================
+     */
 
     public function assign(Request $request)
     {
         $companyId = $this->companyId($request);
 
         $validated = $request->validate([
-            'lead_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'lead_ids' => [
+                'required',
+                'array',
+                'min:1',
+                'max:1000',
+            ],
             'lead_ids.*' => [
                 'required',
                 'integer',
@@ -254,39 +437,49 @@ class SimpleLeadController extends Controller
             ],
         ]);
 
-        $count = DB::transaction(function () use (
-            $validated,
-            $companyId,
-            $request
-        ) {
-            $leads = Lead::query()
-                ->where('company_id', $companyId)
-                ->whereIn('id', $validated['lead_ids'])
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
+        $count = DB::transaction(
+            function () use (
+                $validated,
+                $companyId,
+                $request
+            ) {
+                $leads = Lead::query()
+                    ->where('company_id', $companyId)
+                    ->whereIn(
+                        'id',
+                        $validated['lead_ids']
+                    )
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
 
-            foreach ($leads as $lead) {
-                $previousUserId = $lead->assigned_to;
+                foreach ($leads as $lead) {
+                    $previousUserId = $lead->assigned_to;
 
-                $lead->update([
-                    'assigned_to' => $validated['assigned_to'],
-                    'call_status' => 'pending',
-                ]);
+                    $lead->update([
+                        'assigned_to' =>
+                            $validated['assigned_to'],
+                        'call_status' => 'pending',
+                    ]);
 
-                LeadAssignment::create([
-                    'company_id' => $companyId,
-                    'lead_id' => $lead->id,
-                    'previous_user_id' => $previousUserId,
-                    'new_user_id' => $validated['assigned_to'],
-                    'assigned_by' => $request->user()->id,
-                    'reason' => 'Assigned from Simple Leads.',
-                    'assigned_at' => now(),
-                ]);
+                    LeadAssignment::create([
+                        'company_id' => $companyId,
+                        'lead_id' => $lead->id,
+                        'previous_user_id' =>
+                            $previousUserId,
+                        'new_user_id' =>
+                            $validated['assigned_to'],
+                        'assigned_by' =>
+                            $request->user()->id,
+                        'reason' =>
+                            'Assigned from Simple Leads.',
+                        'assigned_at' => now(),
+                    ]);
+                }
+
+                return $leads->count();
             }
-
-            return $leads->count();
-        });
+        );
 
         return back()->with(
             'success',
@@ -294,12 +487,23 @@ class SimpleLeadController extends Controller
         );
     }
 
+    /*
+     |=============================================
+     | DELETE LEADS (SOFT DELETE)
+     |=============================================
+     */
+
     public function delete(Request $request)
     {
         $companyId = $this->companyId($request);
 
         $validated = $request->validate([
-            'lead_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'lead_ids' => [
+                'required',
+                'array',
+                'min:1',
+                'max:1000',
+            ],
             'lead_ids.*' => [
                 'required',
                 'integer',
@@ -310,20 +514,25 @@ class SimpleLeadController extends Controller
             ],
         ]);
 
-        $count = DB::transaction(function () use ($companyId, $validated) {
-            $leads = Lead::query()
-                ->where('company_id', $companyId)
-                ->whereIn('id', $validated['lead_ids'])
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
+        $count = DB::transaction(
+            function () use ($companyId, $validated) {
+                $leads = Lead::query()
+                    ->where('company_id', $companyId)
+                    ->whereIn(
+                        'id',
+                        $validated['lead_ids']
+                    )
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
 
-            foreach ($leads as $lead) {
-                $lead->delete();
+                foreach ($leads as $lead) {
+                    $lead->delete();
+                }
+
+                return $leads->count();
             }
-
-            return $leads->count();
-        });
+        );
 
         return back()->with(
             'success',
