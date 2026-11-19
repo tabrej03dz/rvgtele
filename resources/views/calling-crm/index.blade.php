@@ -175,10 +175,10 @@
 
                     @foreach($categories as $category)
                         <option
-                            value="{{ $category }}"
-                            @selected(request('category') == $category)
+                            value="{{ $category->id }}"
+                            @selected((string) request('category') === (string) $category->id)
                         >
-                            {{ $category }}
+                            {{ $category->name }}
                         </option>
                     @endforeach
                 </select>

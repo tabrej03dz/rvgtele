@@ -38,18 +38,27 @@ class CallingCrmController extends Controller
         }
 
         // Category dropdown.
-        $categoryQuery = clone $baseQuery;
+        // Category dropdown - relation se categories lana
+        $categoryQuery = Lead::query()
+            ->whereHas('leadCategory');
+
+        if (!$isSuperAdmin) {
+            $categoryQuery->where('assigned_to', $user->id);
+        }
 
         if ($selectedUserId !== null) {
             $categoryQuery->where('assigned_to', $selectedUserId);
         }
 
-        $categories = $categoryQuery
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
+        $categoryIds = $categoryQuery
+            ->whereNotNull('category_id')
             ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
+            ->pluck('category_id');
+
+        $categories = \App\Models\Category::query()
+            ->whereIn('id', $categoryIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         // Assigned user dropdown.
         $users = collect();
@@ -74,7 +83,7 @@ class CallingCrmController extends Controller
         }
 
         if ($category !== null && $category !== '') {
-            $statusQuery->where('category', $category);
+            $statusQuery->where('category_id', $category);
         }
 
         $statuses = (clone $statusQuery)
