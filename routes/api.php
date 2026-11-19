@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\GetMoreLeadsController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
+Route::post('active-inactive-customer-category', [\App\Http\Controllers\Api\ActiveInactiveCustomerCategoryController::class, 'activeInactiveCustomerCategory']);
+
 Route::middleware('auth:sanctum')->group(function () {
       Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/user', [AuthController::class, 'user']);
