@@ -35,6 +35,7 @@ use App\Http\Controllers\NoAnswerLeadController;
 use App\Http\Controllers\RecycleBinController;
 use App\Http\Controllers\SimpleLeadController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
+use App\Http\Controllers\DialedCallHistoryController;
 
 
 Route::view('/', 'welcome')->name('home');
@@ -46,6 +47,16 @@ Route::middleware(['auth'])->group(function () {
 
 
     Route::get('calling-crm', [CallingCrmController::class, 'index'])->name('calling-crm.index');
+
+
+    // Android Dialer Call History - Web Page
+    Route::get(
+        'calling-crm/dialed-call-history',
+        [DialedCallHistoryController::class, 'index']
+    )
+        ->middleware('permission:calling-crm.view')
+        ->name('dialed-call-history.index');
+
 
     Route::get(
         'calling-crm/no-answer',

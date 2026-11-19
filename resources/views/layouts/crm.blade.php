@@ -371,7 +371,11 @@
             $menuGroups = [
                 'Calling CRM' => [
                     ['Categories', 'categories.index', 'categories.*', 'categories.view|categories.create', 'folder-tree'],
-                    ['Call History', 'calling-crm.index', 'calling-crm.*', 'calling-crm.view', 'history'],
+                    
+                    ['Call History', 'calling-crm.index', 'calling-crm.index', 'calling-crm.view', 'history'],
+
+                    ['Dialed Call History', 'dialed-call-history.index', 'dialed-call-history.*', 'calling-crm.view', 'phone-outgoing'],
+
                     ['No Answer — 1 Call', 'calling-crm.no-answer', 'calling-crm.no-answer*', 'leads.assign', 'phone-missed'],
                     ['Recycle Bin', 'recycle-bin.index', 'recycle-bin.*', 'recycle-bin.view', 'trash-2'],
                     ['Demo Cities', 'demo-cities.index', 'demo-cities.*', 'demo-cities.view', 'map-pinned'],
