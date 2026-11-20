@@ -135,7 +135,7 @@ public function callStatus(Request $request, ?Lead $leadContact = null)
         'call_status' => 'nullable|string|max:255',
         'recording' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm,mp4,3gp,amr|max:20480',
         'remarks' => 'nullable|string',
-        'call_duration' => 'nullable|integer|min:0|max:86400',
+        'call_duration' => 'nullable|integer',
 
         // नए fields
         'mobile' => 'nullable|string|max:30',
