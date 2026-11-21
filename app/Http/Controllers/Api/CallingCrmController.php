@@ -376,30 +376,30 @@ class CallingCrmController extends Controller
     }
 
 
-public function checkCallStatus(Request $request, $id)
-{
-    $contact = \App\Models\Lead::query()
-        ->where('id', $id)
-        ->first();
+    public function checkCallStatus(Request $request, $id)
+    {
+        $contact = \App\Models\Lead::query()
+            ->where('id', $id)
+            ->first();
 
-    if (!$contact) {
+        if (!$contact) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Contact not found',
+                'is_pending' => false,
+            ], 404);
+        }
+
+        // Only pending status returns true
+        $isPending = $contact->call_status === 'pending';
+
         return response()->json([
-            'success' => false,
-            'message' => 'Contact not found',
-            'is_pending' => false,
-        ], 404);
+            'success' => true,
+            'contact_id' => $contact->id,
+            'call_status' => $contact->call_status,
+            'is_pending' => $isPending,
+        ], 200);
     }
-
-    // Only pending status returns true
-    $isPending = $contact->call_status === 'pending';
-
-    return response()->json([
-        'success' => true,
-        'contact_id' => $contact->id,
-        'call_status' => $contact->call_status,
-        'is_pending' => $isPending,
-    ], 200);
-}
 
 
 }
