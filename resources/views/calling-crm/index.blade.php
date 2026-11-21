@@ -498,8 +498,11 @@
                                                             ? \Carbon\Carbon::parse($history->call_at)
                                                             : null;
 
+                                                        // $recordingUrl = $history->recording
+                                                        //     ? \Illuminate\Support\Facades\Storage::disk('public')->url($history->recording)
+                                                        //     : null;
                                                         $recordingUrl = $history->recording
-                                                            ? \Illuminate\Support\Facades\Storage::disk('public')->url($history->recording)
+                                                            ? asset('storage/' . ltrim($history->recording, '/'))
                                                             : null;
                                                     @endphp
 
