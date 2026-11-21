@@ -502,7 +502,7 @@
                                                         //     ? \Illuminate\Support\Facades\Storage::disk('public')->url($history->recording)
                                                         //     : null;
                                                         $recordingUrl = $history->recording
-                                                            ? asset('storage/' . ltrim($history->recording, '/'))
+                                                            ? $this->recordingUrl($history->recording)
                                                             : null;
                                                     @endphp
 

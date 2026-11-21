@@ -691,6 +691,13 @@ public function callStatus(Request $request, ?Lead $leadContact = null)
 }
 
 
+private function recordingUrl(?string $path): ?string
+{
+    return $path
+        ? asset('storage/' . ltrim($path, '/'))
+        : null;
+}
+
 
 public function checkCallStatus(Request $request, $id)
 {
