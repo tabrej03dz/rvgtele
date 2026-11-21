@@ -12,50 +12,6 @@ use Carbon\Carbon;
 
 class CallingCrmController extends Controller
 {
-
-    // public function index(Request $request)
-    // {
-    //     $userId = $request->user();
-    //     $category = $request->query('category');
-
-    //     if (!$category) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Category query parameter is required.',
-    //         ], 400);
-    //     }
-
-    //     $contacts = Lead::where('category', $category)->where('assigned_to', $userId->id)
-    //         ->where('call_status', 'pending')
-    //         ->get();
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'data' => $contacts,
-    //     ]);
-    // }
-
-
-    // public function index(Request $request)
-    // {
-    //     $user = $request->user();
-    //     $category = $request->query('category');
-
-    //     $contacts = Lead::query()
-    //         ->where('assigned_to', $user->id)
-    //         ->where('call_status', 'pending')
-    //         ->when($category !== null && $category !== '', function ($query) use ($category) {
-    //             $query->where('category', $category);
-    //         })
-    //         ->get();
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'data' => $contacts,
-    //     ], 200);
-    // }
-
-
     public function index(Request $request, $category = null)
     {
         $user = $request->user();
