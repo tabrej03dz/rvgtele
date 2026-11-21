@@ -368,12 +368,12 @@ class CallingCrmController extends Controller
     }
 
 
-private function recordingUrl(?string $path): ?string
-{
-    return $path
-        ? asset('storage/' . ltrim($path, '/'))
-        : null;
-}
+    private function recordingUrl(?string $path): ?string
+    {
+        return $path
+            ? asset('storage/' . ltrim($path, '/'))
+            : null;
+    }
 
 
 public function checkCallStatus(Request $request, $id)
