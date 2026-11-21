@@ -644,10 +644,8 @@ public function callStatus(Request $request, ?Lead $leadContact = null)
                 'call_at' => $history->call_at?->format('Y-m-d H:i:s'),
                 'call_duration' => $history->call_duration,
                 'remarks' => $history->remarks,
-                'recording' => $recordingPath,
-                'recording_url' => $recordingPath
-                    ? Storage::disk('public')->url($recordingPath)
-                    : null,
+                'recording' => $history->recording,
+                'recording_url' => $this->recordingUrl($history->recording),
                 'client_call_id' => $clientCallId,
                 'has_lead' => $history->lead_id !== null,
             ],
