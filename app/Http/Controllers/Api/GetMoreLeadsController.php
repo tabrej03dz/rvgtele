@@ -56,30 +56,61 @@ class GetMoreLeadsController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function availableLeads(int $companyId)
-    {
-        return Lead::query()
-            ->where('company_id', $companyId)
-            ->whereNull('assigned_to')
-            ->whereRaw(
-                "LOWER(TRIM(COALESCE(call_status, ''))) = ?",
-                ['pending']
-            )
-            ->where(function ($query) {
-                $query->where('do_not_call', false)
-                    ->orWhereNull('do_not_call');
-            })
-            ->whereRaw(
-                "TRIM(COALESCE(mobile, '')) <> ''"
-            )
-            ->whereRaw(
-                "TRIM(COALESCE(state, '')) <> ''"
-            )
-            ->whereRaw(
-                "TRIM(COALESCE(city, '')) <> ''"
-            );
-    }
+    // private function availableLeads(int $companyId)
+    // {
+    //     return Lead::query()
+    //         ->where('company_id', $companyId)
+    //         ->whereNull('assigned_to')
+    //         ->whereRaw(
+    //             "LOWER(TRIM(COALESCE(call_status, ''))) = ?",
+    //             ['pending']
+    //         )
+    //         ->where(function ($query) {
+    //             $query->where('do_not_call', false)
+    //                 ->orWhereNull('do_not_call');
+    //         })
+    //         ->whereRaw(
+    //             "TRIM(COALESCE(mobile, '')) <> ''"
+    //         )
+    //         ->whereRaw(
+    //             "TRIM(COALESCE(state, '')) <> ''"
+    //         )
+    //         ->whereRaw(
+    //             "TRIM(COALESCE(city, '')) <> ''"
+    //         );
+    // }
 
+
+    private function availableLeads(int $companyId)
+{
+    return Lead::query()
+
+        // Only current company leads
+        ->where('leads.company_id', $companyId)
+
+        // Only unassigned leads
+        ->whereNull('leads.assigned_to')
+
+        // Exclude deleted leads
+        ->whereNull('leads.deleted_at')
+
+        // Only pending leads
+        ->whereRaw(
+            "LOWER(TRIM(COALESCE(leads.call_status, ''))) = ?",
+            ['pending']
+        )
+
+        // Exclude Do Not Call leads
+        ->where(function ($query) {
+            $query->where('leads.do_not_call', false)
+                ->orWhereNull('leads.do_not_call');
+        })
+
+        // Mobile number must be available
+        ->whereRaw(
+            "TRIM(COALESCE(leads.mobile, '')) <> ''"
+        );
+}
     /*
     |--------------------------------------------------------------------------
     | GET STATES
@@ -1329,13 +1360,12 @@ public function store(Request $request)
 {
     /*
     |--------------------------------------------------------------------------
-    | Normalize and validate category input
+    | Normalize category input
     |--------------------------------------------------------------------------
     */
 
     $requestCategory = $request->input('category');
 
-    // Category must be an integer, string or null
     if (
         $requestCategory !== null &&
         !is_string($requestCategory) &&
@@ -1347,9 +1377,9 @@ public function store(Request $request)
         ], 422);
     }
 
-    $requestCategory = $requestCategory !== null
-        ? trim((string) $requestCategory)
-        : '';
+    $requestCategory = trim(
+        (string) ($requestCategory ?? '')
+    );
 
     $request->merge([
         'category' => $requestCategory !== ''
@@ -1370,7 +1400,7 @@ public function store(Request $request)
 
     /*
     |--------------------------------------------------------------------------
-    | State and category both optional
+    | Normalize state and category
     |--------------------------------------------------------------------------
     */
 
@@ -1386,6 +1416,13 @@ public function store(Request $request)
         ? $category
         : null;
 
+    $companyId = $this->companyId($request);
+    $userId = (int) $request->user()->id;
+
+    $stateKey = $state !== null
+        ? mb_strtolower($state)
+        : null;
+
     /*
     |--------------------------------------------------------------------------
     | Detect category ID or category name
@@ -1399,7 +1436,6 @@ public function store(Request $request)
 
         if (ctype_digit($category)) {
 
-            // Numeric category: use category_id
             $categoryId = (int) $category;
 
             if (
@@ -1414,78 +1450,31 @@ public function store(Request $request)
 
         } else {
 
-            // String category: use category name
-            $categoryName = mb_strtolower($category);
+            $categoryName = mb_strtolower(
+                trim($category)
+            );
 
         }
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Prepare normalized category for batch history
+    | Start database transaction
     |--------------------------------------------------------------------------
     */
-
-    $categoryKey = $categoryId !== null
-        ? (string) $categoryId
-        : $categoryName;
-
-    $companyId = $this->companyId($request);
-
-    $userId = (int) $request->user()->id;
-
-    $stateKey = $state !== null
-        ? mb_strtolower($state)
-        : null;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Common category filter
-    |--------------------------------------------------------------------------
-    |
-    | Apply the same category filter during lead selection
-    | and final assignment.
-    |
-    */
-
-    $applyCategoryFilter = function ($query) use (
-        $categoryId,
-        $categoryName
-    ) {
-
-        if ($categoryId !== null) {
-
-            // Match category ID
-            $query->where(
-                'leads.category_id',
-                $categoryId
-            );
-
-        } elseif ($categoryName !== null) {
-
-            // Match category name
-            $query->whereRaw(
-                'LOWER(TRIM(leads.category)) = ?',
-                [$categoryName]
-            );
-
-        }
-
-        return $query;
-    };
 
     return DB::transaction(function () use (
         $companyId,
         $userId,
         $state,
         $stateKey,
-        $categoryKey,
-        $applyCategoryFilter
+        $categoryId,
+        $categoryName
     ) {
 
         /*
         |--------------------------------------------------------------------------
-        | Lock company to prevent duplicate assignments
+        | Lock company
         |--------------------------------------------------------------------------
         */
 
@@ -1496,7 +1485,110 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Find previous batch with same filters
+        | Resolve category name into category IDs
+        |--------------------------------------------------------------------------
+        |
+        | Example:
+        |
+        | category = Expire Data
+        |
+        | Find associated category IDs from existing leads.
+        |
+        */
+
+        $matchedCategoryIds = collect();
+
+        if ($categoryId !== null) {
+
+            $matchedCategoryIds = collect([
+                $categoryId
+            ]);
+
+        } elseif ($categoryName !== null) {
+
+            $matchedCategoryIds = DB::table('leads')
+                ->where('company_id', $companyId)
+                ->whereNull('deleted_at')
+                ->whereNotNull('category_id')
+                ->where('category_id', '>', 0)
+                ->whereRaw(
+                    "LOWER(TRIM(COALESCE(category, ''))) = ?",
+                    [$categoryName]
+                )
+                ->distinct()
+                ->pluck('category_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prepare category key for batch history
+        |--------------------------------------------------------------------------
+        */
+
+        $categoryKey = $categoryId !== null
+            ? (string) $categoryId
+            : $categoryName;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Common category filter
+        |--------------------------------------------------------------------------
+        |
+        | If category ID:
+        | Match directly with category_id.
+        |
+        | If category name:
+        | Match category name OR associated category IDs.
+        |
+        */
+
+        $applyCategoryFilter = function ($query) use (
+            $categoryId,
+            $categoryName,
+            $matchedCategoryIds
+        ) {
+
+            if ($categoryId !== null) {
+
+                $query->where(
+                    'leads.category_id',
+                    $categoryId
+                );
+
+            } elseif ($categoryName !== null) {
+
+                $query->where(function ($subQuery) use (
+                    $categoryName,
+                    $matchedCategoryIds
+                ) {
+
+                    // Match category name
+                    $subQuery->whereRaw(
+                        "LOWER(TRIM(COALESCE(leads.category, ''))) = ?",
+                        [$categoryName]
+                    );
+
+                    // Also match associated category IDs
+                    if ($matchedCategoryIds->isNotEmpty()) {
+
+                        $subQuery->orWhereIn(
+                            'leads.category_id',
+                            $matchedCategoryIds->all()
+                        );
+
+                    }
+                });
+            }
+
+            return $query;
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find previous batch
         |--------------------------------------------------------------------------
         */
 
@@ -1506,7 +1598,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Match previous state filter
+        | Previous batch state filter
         |--------------------------------------------------------------------------
         */
 
@@ -1529,15 +1621,28 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Match previous category ID or name
+        | Previous batch category filter
         |--------------------------------------------------------------------------
         */
 
         if ($categoryKey !== null) {
 
-            $previousQuery->whereRaw(
-                'LOWER(TRIM(category)) = ?',
-                [$categoryKey]
+            $batchCategoryKeys = collect([
+                $categoryKey
+            ]);
+
+            foreach ($matchedCategoryIds as $matchedId) {
+                $batchCategoryKeys->push(
+                    (string) $matchedId
+                );
+            }
+
+            $previousQuery->whereIn(
+                DB::raw('LOWER(TRIM(category))'),
+                $batchCategoryKeys
+                    ->unique()
+                    ->values()
+                    ->all()
             );
 
         } else {
@@ -1556,7 +1661,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Available leads pool
+        | Get available leads pool
         |--------------------------------------------------------------------------
         */
 
@@ -1564,14 +1669,14 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Apply optional state filter
+        | Apply state filter
         |--------------------------------------------------------------------------
         */
 
         if ($stateKey !== null) {
 
             $pool->whereRaw(
-                'LOWER(TRIM(state)) = ?',
+                'LOWER(TRIM(leads.state)) = ?',
                 [$stateKey]
             );
 
@@ -1579,7 +1684,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Apply category ID or category name filter
+        | Apply category name or ID filter
         |--------------------------------------------------------------------------
         */
 
@@ -1587,7 +1692,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Demo city priority (NOT REQUIRED)
+        | Demo city priority
         |--------------------------------------------------------------------------
         */
 
@@ -1599,15 +1704,13 @@ public function store(Request $request)
 
             if ($demoCities->isNotEmpty()) {
 
-                // Clone original filtered pool
                 $demoPool = clone $pool;
 
                 $demoPool->whereIn(
-                    DB::raw('LOWER(TRIM(city))'),
+                    DB::raw('LOWER(TRIM(leads.city))'),
                     $demoCities->all()
                 );
 
-                // First priority: demo city leads
                 $selected = $this->pickLeads($demoPool);
 
             }
@@ -1615,26 +1718,24 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Fallback: Assign normal eligible leads
+        | Fallback to normal eligible leads
         |--------------------------------------------------------------------------
         |
-        | 1. Previous batch not available
-        | 2. Demo city not available
-        | 3. Demo city stock not available
-        |
-        | State and category filters remain applied.
+        | Demo city is not mandatory.
         |
         */
 
         if ($selected->isEmpty()) {
 
-            $selected = $this->pickLeads($pool);
+            $selected = $this->pickLeads(
+                clone $pool
+            );
 
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Check stock availability
+        | Check if stock available
         |--------------------------------------------------------------------------
         */
 
@@ -1656,11 +1757,10 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Release user's existing pending leads
+        | Release user's old pending leads
         |--------------------------------------------------------------------------
         |
-        | Release old pending leads only when fresh
-        | eligible leads are successfully selected.
+        | Only release old leads when fresh leads are found.
         |
         */
 
@@ -1676,7 +1776,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Close existing active batches
+        | Close previous active batches
         |--------------------------------------------------------------------------
         */
 
@@ -1728,13 +1828,8 @@ public function store(Request $request)
             ->insertGetId([
                 'company_id' => $companyId,
                 'user_id' => $userId,
-
-                // Optional state
                 'state' => $state,
-
-                // Store category ID or normalized name
                 'category' => $categoryKey,
-
                 'history_start_id' => $historyStartId,
                 'history_end_id' => null,
                 'created_at' => $now,
@@ -1759,14 +1854,14 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Recheck state before final assignment
+        | Recheck state before assignment
         |--------------------------------------------------------------------------
         */
 
         if ($stateKey !== null) {
 
             $assignQuery->whereRaw(
-                'LOWER(TRIM(state)) = ?',
+                'LOWER(TRIM(leads.state)) = ?',
                 [$stateKey]
             );
 
@@ -1774,7 +1869,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Recheck category ID or name before final assignment
+        | Recheck category before assignment
         |--------------------------------------------------------------------------
         */
 
@@ -1782,7 +1877,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Assign selected leads
+        | Assign leads to current user
         |--------------------------------------------------------------------------
         */
 
@@ -1793,7 +1888,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Rollback if all selected leads could not be assigned
+        | Rollback if assignment is incomplete
         |--------------------------------------------------------------------------
         */
 
@@ -1838,7 +1933,7 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Return success response
+        | Return successful response
         |--------------------------------------------------------------------------
         */
 
