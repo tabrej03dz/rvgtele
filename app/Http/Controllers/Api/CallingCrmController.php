@@ -12,50 +12,138 @@ use Carbon\Carbon;
 
 class CallingCrmController extends Controller
 {
+    // public function index(Request $request, $category = null)
+    // {
+    //     $user = $request->user();
+
+    //     if (!$user) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Unauthenticated.',
+    //         ], 401);
+    //     }
+
+    //     // Query parameter या request body से category लें।
+    //     $requestCategory = $request->input('category');
+
+    //     // गलत format जैसे category[]=1 आने पर स्पष्ट error दें।
+    //     if ($requestCategory !== null && !is_scalar($requestCategory)) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Category must be a single value.',
+    //         ], 422);
+    //     }
+
+    //     $requestCategory = $requestCategory !== null
+    //         ? trim((string) $requestCategory)
+    //         : '';
+
+    //     // Request में category खाली हो तो URL वाली category लें।
+    //     $category = $requestCategory !== ''
+    //         ? $requestCategory
+    //         : trim((string) ($category ?? ''));
+
+    //     $contacts = Lead::query()
+    //         ->where('leads.assigned_to', $user->id)
+    //         ->where('leads.call_status', 'pending')
+    //         ->when($category !== '', function ($query) use ($category) {
+    //             $query->where('leads.category', $category);
+    //         })
+    //         ->get();
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => $contacts,
+    //     ], 200);
+    // }
+
+
     public function index(Request $request, $category = null)
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        // Query parameter या request body से category लें।
-        $requestCategory = $request->input('category');
-
-        // गलत format जैसे category[]=1 आने पर स्पष्ट error दें।
-        if ($requestCategory !== null && !is_scalar($requestCategory)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Category must be a single value.',
-            ], 422);
-        }
-
-        $requestCategory = $requestCategory !== null
-            ? trim((string) $requestCategory)
-            : '';
-
-        // Request में category खाली हो तो URL वाली category लें।
-        $category = $requestCategory !== ''
-            ? $requestCategory
-            : trim((string) ($category ?? ''));
-
-        $contacts = Lead::query()
-            ->where('leads.assigned_to', $user->id)
-            ->where('leads.call_status', 'pending')
-            ->when($category !== '', function ($query) use ($category) {
-                $query->where('leads.category', $category);
-            })
-            ->get();
-
+    if (!$user) {
         return response()->json([
-            'success' => true,
-            'data' => $contacts,
-        ], 200);
+            'success' => false,
+            'message' => 'Unauthenticated.',
+        ], 401);
     }
+
+    // Get category from query parameter or request body
+    $requestCategory = $request->input('category');
+
+    // Validate category format
+    if (
+        $requestCategory !== null &&
+        !is_string($requestCategory) &&
+        !is_int($requestCategory)
+    ) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Category must be a valid ID or name.',
+        ], 422);
+    }
+
+    // Normalize request category
+    $requestCategory = $requestCategory !== null
+        ? trim((string) $requestCategory)
+        : '';
+
+    // Request category gets priority over URL category
+    $category = $requestCategory !== ''
+        ? $requestCategory
+        : trim((string) ($category ?? ''));
+
+    /*
+    |--------------------------------------------------------------------------
+    | Get user's assigned pending leads
+    |--------------------------------------------------------------------------
+    */
+
+    $query = Lead::query()
+        ->where('leads.assigned_to', $user->id)
+        ->where('leads.call_status', 'pending');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Category ID and Category Name Support
+    |--------------------------------------------------------------------------
+    */
+
+    if ($category !== '') {
+
+        if (ctype_digit($category)) {
+
+            // Numeric value: match category_id
+            $query->where(
+                'leads.category_id',
+                (int) $category
+            );
+
+        } else {
+
+            // String value: match category name
+            $query->whereRaw(
+                'LOWER(TRIM(leads.category)) = ?',
+                [mb_strtolower($category)]
+            );
+
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch leads
+    |--------------------------------------------------------------------------
+    */
+
+    $contacts = $query->get();
+
+    return response()->json([
+        'success' => true,
+        'data' => $contacts,
+    ], 200);
+}
 
 
 
