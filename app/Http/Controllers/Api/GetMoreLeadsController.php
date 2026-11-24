@@ -878,17 +878,48 @@ class GetMoreLeadsController extends Controller
 
 public function store(Request $request)
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize empty inputs
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        is_string($request->input('category')) &&
+        trim($request->input('category')) === ''
+    ) {
+        $request->merge([
+            'category' => null,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validate request
+    |--------------------------------------------------------------------------
+    */
+
     $input = $request->validate([
         'state' => ['nullable', 'string', 'max:120'],
-        'category' => ['nullable', 'string', 'max:120'],
+        'category' => ['nullable', 'integer', 'min:1'],
     ]);
 
-    // State and category both optional
-    $state = trim((string) ($input['state'] ?? ''));
-    $category = trim((string) ($input['category'] ?? ''));
+    /*
+    |--------------------------------------------------------------------------
+    | State and category both optional
+    |--------------------------------------------------------------------------
+    */
 
-    $state = $state !== '' ? $state : null;
-    $category = $category !== '' ? $category : null;
+    $state = trim((string) ($input['state'] ?? ''));
+
+    $state = $state !== ''
+        ? $state
+        : null;
+
+    // Category parameter contains category ID
+    $categoryId = isset($input['category'])
+        ? (int) $input['category']
+        : null;
 
     $companyId = $this->companyId($request);
     $userId = (int) $request->user()->id;
@@ -897,17 +928,12 @@ public function store(Request $request)
         ? mb_strtolower($state)
         : null;
 
-    $categoryKey = $category !== null
-        ? mb_strtolower($category)
-        : null;
-
     return DB::transaction(function () use (
         $companyId,
         $userId,
         $state,
         $stateKey,
-        $category,
-        $categoryKey
+        $categoryId
     ) {
 
         /*
@@ -949,12 +975,21 @@ public function store(Request $request)
             });
         }
 
-        // Match previous category filter
-        if ($categoryKey !== null) {
+        /*
+        |--------------------------------------------------------------------------
+        | Match previous category ID
+        |--------------------------------------------------------------------------
+        |
+        | Existing batch table has category column.
+        | Store and compare category ID as string in that column.
+        |
+        */
 
-            $previousQuery->whereRaw(
-                'LOWER(TRIM(category)) = ?',
-                [$categoryKey]
+        if ($categoryId !== null) {
+
+            $previousQuery->where(
+                'category',
+                (string) $categoryId
             );
 
         } else {
@@ -979,7 +1014,12 @@ public function store(Request $request)
 
         $pool = $this->availableLeads($companyId);
 
-        // Apply state filter only when provided
+        /*
+        |--------------------------------------------------------------------------
+        | Apply state filter only when provided
+        |--------------------------------------------------------------------------
+        */
+
         if ($stateKey !== null) {
 
             $pool->whereRaw(
@@ -989,12 +1029,21 @@ public function store(Request $request)
 
         }
 
-        // Apply category filter only when provided
-        if ($categoryKey !== null) {
+        /*
+        |--------------------------------------------------------------------------
+        | Apply category ID filter only when provided
+        |--------------------------------------------------------------------------
+        |
+        | Match request category ID with leads.category_id.
+        | Do not match category name.
+        |
+        */
 
-            $pool->whereRaw(
-                'LOWER(TRIM(category)) = ?',
-                [$categoryKey]
+        if ($categoryId !== null) {
+
+            $pool->where(
+                'leads.category_id',
+                $categoryId
             );
 
         }
@@ -1014,7 +1063,7 @@ public function store(Request $request)
             // Demo cities available
             if ($demoCities->isNotEmpty()) {
 
-                // Clone original pool
+                // Clone original filtered pool
                 $demoPool = clone $pool;
 
                 $demoPool->whereIn(
@@ -1036,7 +1085,7 @@ public function store(Request $request)
         | 2. Demo city not available
         | 3. Demo city stock not available
         |
-        | In all these cases assign leads from normal pool.
+        | State and category ID filters remain applied.
         |
         */
 
@@ -1073,8 +1122,8 @@ public function store(Request $request)
         | Release user's existing pending leads
         |--------------------------------------------------------------------------
         |
-        | Old leads will only be released when fresh leads
-        | are successfully selected.
+        | Old pending leads will only be released when
+        | fresh leads are successfully selected.
         |
         */
 
@@ -1142,8 +1191,15 @@ public function store(Request $request)
             ->insertGetId([
                 'company_id' => $companyId,
                 'user_id' => $userId,
+
+                // Optional state
                 'state' => $state,
-                'category' => $category,
+
+                // Store category ID in existing category column
+                'category' => $categoryId !== null
+                    ? (string) $categoryId
+                    : null,
+
                 'history_start_id' => $historyStartId,
                 'history_end_id' => null,
                 'created_at' => $now,
@@ -1152,11 +1208,11 @@ public function store(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Assign selected leads
+        | Prepare assignment query
         |--------------------------------------------------------------------------
         */
 
-        $updated = DB::table('leads')
+        $assignQuery = DB::table('leads')
             ->where('company_id', $companyId)
             ->whereIn(
                 'id',
@@ -1164,11 +1220,48 @@ public function store(Request $request)
             )
             ->whereNull('assigned_to')
             ->whereNull('deleted_at')
-            ->whereRaw($pendingStatus, ['pending'])
-            ->update([
-                'assigned_to' => $userId,
-                'updated_at' => $now,
-            ]);
+            ->whereRaw($pendingStatus, ['pending']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recheck state before final assignment
+        |--------------------------------------------------------------------------
+        */
+
+        if ($stateKey !== null) {
+
+            $assignQuery->whereRaw(
+                'LOWER(TRIM(state)) = ?',
+                [$stateKey]
+            );
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recheck category ID before final assignment
+        |--------------------------------------------------------------------------
+        */
+
+        if ($categoryId !== null) {
+
+            $assignQuery->where(
+                'category_id',
+                $categoryId
+            );
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Assign selected leads
+        |--------------------------------------------------------------------------
+        */
+
+        $updated = $assignQuery->update([
+            'assigned_to' => $userId,
+            'updated_at' => $now,
+        ]);
 
         /*
         |--------------------------------------------------------------------------
