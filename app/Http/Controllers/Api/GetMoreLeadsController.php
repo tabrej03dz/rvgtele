@@ -569,7 +569,314 @@ class GetMoreLeadsController extends Controller
     // }
 
 
-    public function store(Request $request)
+//     public function store(Request $request)
+// {
+//     $input = $request->validate([
+//         'state' => ['nullable', 'string', 'max:120'],
+//         'category' => ['nullable', 'string', 'max:120'],
+//     ]);
+
+//     // State and category both optional
+//     $state = trim((string) ($input['state'] ?? ''));
+//     $category = trim((string) ($input['category'] ?? ''));
+
+//     $state = $state !== '' ? $state : null;
+//     $category = $category !== '' ? $category : null;
+
+//     $companyId = $this->companyId($request);
+//     $userId = (int) $request->user()->id;
+
+//     $stateKey = $state !== null
+//         ? mb_strtolower($state)
+//         : null;
+
+//     $categoryKey = $category !== null
+//         ? mb_strtolower($category)
+//         : null;
+
+//     return DB::transaction(function () use (
+//         $companyId,
+//         $userId,
+//         $state,
+//         $stateKey,
+//         $category,
+//         $categoryKey
+//     ) {
+
+//         // Lock company to prevent duplicate assignments
+//         DB::table('companies')
+//             ->where('id', $companyId)
+//             ->lockForUpdate()
+//             ->firstOrFail();
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Find previous batch with same filters
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $previousQuery = DB::table('get_more_lead_batches')
+//             ->where('company_id', $companyId)
+//             ->where('user_id', $userId);
+
+//         // Match previous state filter
+//         if ($stateKey !== null) {
+//             $previousQuery->whereRaw(
+//                 'LOWER(TRIM(state)) = ?',
+//                 [$stateKey]
+//             );
+//         } else {
+//             $previousQuery->where(function ($query) {
+//                 $query->whereNull('state')
+//                     ->orWhereRaw("TRIM(state) = ''");
+//             });
+//         }
+
+//         // Match previous category filter
+//         if ($categoryKey !== null) {
+//             $previousQuery->whereRaw(
+//                 'LOWER(TRIM(category)) = ?',
+//                 [$categoryKey]
+//             );
+//         } else {
+//             $previousQuery->where(function ($query) {
+//                 $query->whereNull('category')
+//                     ->orWhereRaw("TRIM(category) = ''");
+//             });
+//         }
+
+//         $previous = $previousQuery
+//             ->orderByDesc('id')
+//             ->first();
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Available leads pool
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $pool = $this->availableLeads($companyId);
+
+//         // Apply state filter only when provided
+//         if ($stateKey !== null) {
+//             $pool->whereRaw(
+//                 'LOWER(TRIM(state)) = ?',
+//                 [$stateKey]
+//             );
+//         }
+
+//         // Apply category filter only when provided
+//         if ($categoryKey !== null) {
+//             $pool->whereRaw(
+//                 'LOWER(TRIM(category)) = ?',
+//                 [$categoryKey]
+//             );
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Previous batch demo-sent city logic
+//         |--------------------------------------------------------------------------
+//         */
+
+//         if ($previous) {
+
+//             $demoCities = $this->demoCities($previous);
+
+//             if ($demoCities->isEmpty()) {
+//                 return $this->batchResponse(
+//                     'no_demo_city',
+//                     $previous->id,
+//                     collect(),
+//                     'No demo-sent city found in previous batch.'
+//                 );
+//             }
+
+//             $pool->whereIn(
+//                 DB::raw('LOWER(TRIM(city))'),
+//                 $demoCities->all()
+//             );
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Select fresh leads
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $selected = $this->pickLeads($pool);
+
+//         if ($selected->isEmpty()) {
+//             return $this->batchResponse(
+//                 'no_stock',
+//                 $previous?->id,
+//                 collect(),
+//                 'No eligible unassigned leads available.'
+//             );
+//         }
+
+//         $now = now();
+
+//         $pendingStatus =
+//             "LOWER(TRIM(COALESCE(call_status, ''))) = ?";
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Release user's existing pending leads
+//         |--------------------------------------------------------------------------
+//         */
+
+//         DB::table('leads')
+//             ->where('company_id', $companyId)
+//             ->where('assigned_to', $userId)
+//             ->whereNull('deleted_at')
+//             ->whereRaw($pendingStatus, ['pending'])
+//             ->update([
+//                 'assigned_to' => null,
+//                 'updated_at' => $now,
+//             ]);
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Close existing active batches
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $activeBatches = DB::table('get_more_lead_batches')
+//             ->where('company_id', $companyId)
+//             ->where('user_id', $userId)
+//             ->whereNull('history_end_id')
+//             ->orderBy('id')
+//             ->get();
+
+//         foreach ($activeBatches as $activeBatch) {
+
+//             $historyEndId = max(
+//                 (int) $activeBatch->history_start_id,
+//                 (int) (
+//                     $this->batchHistory($activeBatch)
+//                         ->max('id') ?? 0
+//                 )
+//             );
+
+//             DB::table('get_more_lead_batches')
+//                 ->where('id', $activeBatch->id)
+//                 ->whereNull('history_end_id')
+//                 ->update([
+//                     'history_end_id' => $historyEndId,
+//                     'updated_at' => $now,
+//                 ]);
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Get current call history ID
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $historyStartId = (int) (
+//             CallHistory::query()
+//                 ->where('user_id', $userId)
+//                 ->max('id') ?? 0
+//         );
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Create new lead batch
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $batchId = DB::table('get_more_lead_batches')
+//             ->insertGetId([
+//                 'company_id' => $companyId,
+//                 'user_id' => $userId,
+
+//                 // Both values can be null
+//                 'state' => $state,
+//                 'category' => $category,
+
+//                 'history_start_id' => $historyStartId,
+//                 'history_end_id' => null,
+//                 'created_at' => $now,
+//                 'updated_at' => $now,
+//             ]);
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Assign selected leads
+//         |--------------------------------------------------------------------------
+//         */
+
+//         $updated = DB::table('leads')
+//             ->where('company_id', $companyId)
+//             ->whereIn(
+//                 'id',
+//                 $selected->pluck('id')->all()
+//             )
+//             ->whereNull('assigned_to')
+//             ->whereNull('deleted_at')
+//             ->whereRaw($pendingStatus, ['pending'])
+//             ->update([
+//                 'assigned_to' => $userId,
+//                 'updated_at' => $now,
+//             ]);
+
+//         // Rollback if all leads could not be assigned
+//         if ($updated !== $selected->count()) {
+//             throw new \RuntimeException(
+//                 'Could not assign all selected leads.'
+//             );
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Save batch items and assignment history
+//         |--------------------------------------------------------------------------
+//         */
+
+//         foreach ($selected as $lead) {
+
+//             DB::table('get_more_lead_items')->insert([
+//                 'batch_id' => $batchId,
+//                 'lead_id' => $lead->id,
+//                 'city' => mb_strtolower(
+//                     trim((string) $lead->city)
+//                 ),
+//             ]);
+
+//             DB::table('lead_assignments')->insert([
+//                 'company_id' => $companyId,
+//                 'lead_id' => $lead->id,
+//                 'previous_user_id' => null,
+//                 'new_user_id' => $userId,
+//                 'assigned_by' => $userId,
+//                 'reason' => 'Get More Leads',
+//                 'assigned_at' => $now,
+//                 'created_at' => $now,
+//                 'updated_at' => $now,
+//             ]);
+
+//             $lead->assigned_to = $userId;
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Return success response
+//         |--------------------------------------------------------------------------
+//         */
+
+//         return $this->batchResponse(
+//             'assigned',
+//             $batchId,
+//             $selected,
+//             'Leads assigned successfully.'
+//         );
+
+//     }, 3);
+// }
+
+
+public function store(Request $request)
 {
     $input = $request->validate([
         'state' => ['nullable', 'string', 'max:120'],
@@ -603,7 +910,12 @@ class GetMoreLeadsController extends Controller
         $categoryKey
     ) {
 
-        // Lock company to prevent duplicate assignments
+        /*
+        |--------------------------------------------------------------------------
+        | Lock company to prevent duplicate assignments
+        |--------------------------------------------------------------------------
+        */
+
         DB::table('companies')
             ->where('id', $companyId)
             ->lockForUpdate()
@@ -621,27 +933,37 @@ class GetMoreLeadsController extends Controller
 
         // Match previous state filter
         if ($stateKey !== null) {
+
             $previousQuery->whereRaw(
                 'LOWER(TRIM(state)) = ?',
                 [$stateKey]
             );
+
         } else {
+
             $previousQuery->where(function ($query) {
+
                 $query->whereNull('state')
                     ->orWhereRaw("TRIM(state) = ''");
+
             });
         }
 
         // Match previous category filter
         if ($categoryKey !== null) {
+
             $previousQuery->whereRaw(
                 'LOWER(TRIM(category)) = ?',
                 [$categoryKey]
             );
+
         } else {
+
             $previousQuery->where(function ($query) {
+
                 $query->whereNull('category')
                     ->orWhereRaw("TRIM(category) = ''");
+
             });
         }
 
@@ -659,60 +981,86 @@ class GetMoreLeadsController extends Controller
 
         // Apply state filter only when provided
         if ($stateKey !== null) {
+
             $pool->whereRaw(
                 'LOWER(TRIM(state)) = ?',
                 [$stateKey]
             );
+
         }
 
         // Apply category filter only when provided
         if ($categoryKey !== null) {
+
             $pool->whereRaw(
                 'LOWER(TRIM(category)) = ?',
                 [$categoryKey]
             );
+
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Previous batch demo-sent city logic
+        | Demo city priority (NOT REQUIRED)
         |--------------------------------------------------------------------------
         */
+
+        $selected = collect();
 
         if ($previous) {
 
             $demoCities = $this->demoCities($previous);
 
-            if ($demoCities->isEmpty()) {
-                return $this->batchResponse(
-                    'no_demo_city',
-                    $previous->id,
-                    collect(),
-                    'No demo-sent city found in previous batch.'
-                );
-            }
+            // Demo cities available
+            if ($demoCities->isNotEmpty()) {
 
-            $pool->whereIn(
-                DB::raw('LOWER(TRIM(city))'),
-                $demoCities->all()
-            );
+                // Clone original pool
+                $demoPool = clone $pool;
+
+                $demoPool->whereIn(
+                    DB::raw('LOWER(TRIM(city))'),
+                    $demoCities->all()
+                );
+
+                // First try assigning demo city leads
+                $selected = $this->pickLeads($demoPool);
+            }
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Select fresh leads
+        | Fallback: Assign normal eligible leads
+        |--------------------------------------------------------------------------
+        |
+        | 1. Previous batch not available
+        | 2. Demo city not available
+        | 3. Demo city stock not available
+        |
+        | In all these cases assign leads from normal pool.
+        |
+        */
+
+        if ($selected->isEmpty()) {
+
+            $selected = $this->pickLeads($pool);
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check stock availability
         |--------------------------------------------------------------------------
         */
 
-        $selected = $this->pickLeads($pool);
-
         if ($selected->isEmpty()) {
+
             return $this->batchResponse(
                 'no_stock',
                 $previous?->id,
                 collect(),
                 'No eligible unassigned leads available.'
             );
+
         }
 
         $now = now();
@@ -724,6 +1072,10 @@ class GetMoreLeadsController extends Controller
         |--------------------------------------------------------------------------
         | Release user's existing pending leads
         |--------------------------------------------------------------------------
+        |
+        | Old leads will only be released when fresh leads
+        | are successfully selected.
+        |
         */
 
         DB::table('leads')
@@ -790,11 +1142,8 @@ class GetMoreLeadsController extends Controller
             ->insertGetId([
                 'company_id' => $companyId,
                 'user_id' => $userId,
-
-                // Both values can be null
                 'state' => $state,
                 'category' => $category,
-
                 'history_start_id' => $historyStartId,
                 'history_end_id' => null,
                 'created_at' => $now,
@@ -821,11 +1170,18 @@ class GetMoreLeadsController extends Controller
                 'updated_at' => $now,
             ]);
 
-        // Rollback if all leads could not be assigned
+        /*
+        |--------------------------------------------------------------------------
+        | Rollback if all selected leads could not be assigned
+        |--------------------------------------------------------------------------
+        */
+
         if ($updated !== $selected->count()) {
+
             throw new \RuntimeException(
                 'Could not assign all selected leads.'
             );
+
         }
 
         /*
@@ -874,7 +1230,6 @@ class GetMoreLeadsController extends Controller
 
     }, 3);
 }
-
     /*
     |--------------------------------------------------------------------------
     | SELECT LEADS FROM DIFFERENT CITIES
