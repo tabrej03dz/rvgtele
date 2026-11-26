@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use App\Models\CallHistory;
 
 class CallingCrmController extends Controller
 {
@@ -45,6 +46,27 @@ class CallingCrmController extends Controller
 
         $reportTimezone = 'Asia/Kolkata';
         $storageTimezone = config('app.timezone', 'UTC');
+
+        $activityOnly = $request->boolean('activity_only');
+
+        if ($activityOnly) {
+            abort_unless($isSuperAdmin, 403);
+        }
+
+        $inactiveCallers = $isSuperAdmin
+            ? $this->inactiveCallers(
+                $selectedUserId === null ? null : (int) $selectedUserId,
+                $storageTimezone
+            )
+            : [];
+
+        if ($activityOnly) {
+            return response()->json(
+                ['users' => $inactiveCallers],
+                200,
+                ['Cache-Control' => 'private, no-store']
+            );
+        }
 
         $today = CarbonImmutable::now($reportTimezone)->startOfDay();
         $tomorrow = $today->addDay();
@@ -211,6 +233,7 @@ class CallingCrmController extends Controller
             'storageTimezone' => $storageTimezone,
             'todayOverview'   => $this->overview($todayCounts),
             'overallOverview' => $this->overview($overallCounts),
+            'inactiveCallers' => $inactiveCallers,
         ]);
     }
 
@@ -277,4 +300,35 @@ class CallingCrmController extends Controller
             'not_interested' => (int) $counts->get('not_interested', 0),
         ];
     }
+
+    private function inactiveCallers(?int $selectedUserId, string $storageTimezone): array
+{
+    $now = CarbonImmutable::now($storageTimezone)->startOfSecond();
+
+    $assignedUserIds = Lead::query()
+        ->whereNotNull('assigned_to')
+        ->select('assigned_to');
+
+    $recentCallerIds = CallHistory::query()
+        ->whereNotNull('user_id')
+        ->select('user_id');
+
+    $this->withinCallDates(
+        $recentCallerIds,
+        $now->subMinutes(10),
+        $now->addSecond()
+    );
+
+    return User::query()
+        ->whereIn('id', $assignedUserIds)
+        ->whereNotIn('id', $recentCallerIds)
+        ->when(
+            $selectedUserId !== null,
+            fn (Builder $query) => $query->whereKey($selectedUserId)
+        )
+        ->orderBy('name')
+        ->orderBy('id')
+        ->pluck('name')
+        ->all();
+}
 }

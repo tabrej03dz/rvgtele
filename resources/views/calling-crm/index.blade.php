@@ -322,8 +322,66 @@
         .calling-report .cr-card-label { font-size: 11px; }
         .calling-report .cr-card-value { font-size: 22px; }
     }
-</style>
 
+    .calling-report .cr-inactive-users {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+
+.calling-report .cr-inactive-users[hidden] {
+    display: none;
+}
+
+.calling-report .cr-inactive-label {
+    color: #9a3412;
+    font-size: 11px;
+}
+
+.calling-report .cr-inactive-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    max-height: 50px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+}
+
+.calling-report .cr-inactive-name {
+    max-width: 100%;
+    padding: 2px 7px;
+    border: 1px solid #fed7aa;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #9a3412;
+    font-size: 11px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+    .calling-report .cr-list-header {
+        flex-wrap: wrap;
+    }
+
+    .calling-report .cr-inactive-users {
+        flex-basis: 100%;
+        order: 3;
+        justify-content: flex-start;
+    }
+
+    .calling-report .cr-inactive-list {
+        justify-content: flex-start;
+    }
+}
+</style>
 <div class="calling-report" id="calling-report">
     <header class="cr-hero">
         <div class="cr-title">
@@ -509,6 +567,32 @@
                     </p>
                 </div>
             </div>
+
+            @if($isSuperAdmin)
+    @php
+        $activityParams = ['activity_only' => 1];
+
+        if ($selectedUserId !== null) {
+            $activityParams['user_id'] = $selectedUserId;
+        }
+    @endphp
+
+    <div
+        id="calling-inactive-users"
+        class="cr-inactive-users"
+        data-url="{{ route('calling-crm.index', $activityParams) }}"
+        aria-label="Users without a recent logged call"
+        @if(empty($inactiveCallers)) hidden @endif
+    >
+        <strong class="cr-inactive-label">No call logged in last 10 min</strong>
+
+        <ul class="cr-inactive-list">
+            @foreach($inactiveCallers as $name)
+                <li class="cr-inactive-name">{{ $name }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 
             <span class="cr-chip">
                 <i data-lucide="layers" class="cr-icon" aria-hidden="true"></i>
@@ -810,6 +894,61 @@
     } else {
         initializeCallingReport();
     }
+})();
+</script>
+
+<script>
+(function () {
+    const panel = document.getElementById('calling-inactive-users');
+
+    if (!panel) {
+        return;
+    }
+
+    const list = panel.querySelector('.cr-inactive-list');
+    let loading = false;
+
+    async function refreshInactiveCallers() {
+        if (document.hidden || loading) {
+            return;
+        }
+
+        loading = true;
+
+        try {
+            const response = await fetch(panel.dataset.url, {
+                headers: { Accept: 'application/json' },
+                cache: 'no-store',
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const { users } = await response.json();
+
+            if (!Array.isArray(users)) {
+                return;
+            }
+
+            const items = users.map(function (name) {
+                const item = document.createElement('li');
+                item.className = 'cr-inactive-name';
+                item.textContent = name;
+                return item;
+            });
+
+            list.replaceChildren(...items);
+            panel.hidden = items.length === 0;
+        } catch (error) {
+            // Keep the last successfully loaded list until the next refresh.
+        } finally {
+            loading = false;
+        }
+    }
+
+    window.setInterval(refreshInactiveCallers, 60_000);
+    document.addEventListener('visibilitychange', refreshInactiveCallers);
 })();
 </script>
 @endsection
