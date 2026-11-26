@@ -84,6 +84,7 @@
                         <th class="px-4 py-3">Category Name</th>
                         <th class="px-4 py-3">Description</th>
                         <th class="px-4 py-3 text-center">Total Leads</th>
+                        <th class="px-4 py-3 text-center">Total Call Count</th>
                         <th class="px-4 py-3">Created</th>
                         <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
@@ -118,6 +119,13 @@
                                 <span class="inline-flex min-w-[65px] items-center justify-center rounded-lg px-3 py-1.5 text-sm font-bold
                                     {{ $category->leads_count > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500' }}">
                                     {{ number_format($category->leads_count) }}
+                                </span>
+                            </td>
+
+                            <td class="px-4 py-4 text-center">
+                                <span class="inline-flex min-w-[65px] items-center justify-center rounded-lg px-3 py-1.5 text-sm font-bold
+                                    {{ $category->total_call_count > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500' }}">
+                                    {{ number_format($category->total_call_count) }}
                                 </span>
                             </td>
 
@@ -159,7 +167,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-16 text-center">
+                            <td colspan="7" class="px-5 py-16 text-center">
                                 <div class="font-semibold text-slate-700">No categories found</div>
                                 @can('categories.create')
                                     <a href="{{ route('categories.create') }}"

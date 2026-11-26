@@ -33,7 +33,11 @@ class CategoryController extends Controller
                     ->selectRaw('COUNT(*)')
                     ->whereColumn('leads.category_id', 'categories.id'),
                 'leads_count'
-            )
+            )->withCount([
+                'leads as total_call_count' => function ($query) {
+                    $query->where('call_status', '!=', 'pending');
+                },
+            ])
             ->orderByDesc('categories.id')
             ->paginate(20)
             ->withQueryString();
