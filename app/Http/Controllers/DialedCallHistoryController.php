@@ -12,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class DialedCallHistoryController extends Controller
 {
+    private const REPORT_TIMEZONE = 'Asia/Kolkata';
+
     public function index(Request $request)
     {
         $currentUser = $request->user();
@@ -40,9 +42,13 @@ class DialedCallHistoryController extends Controller
         $callStatus = trim($filters['call_status'] ?? '');
         $direction = $filters['direction'] ?? null;
         $callType = $filters['call_type'] ?? null;
+        $fromDate = $filters['from_date'] ?? null;
+        $toDate = $filters['to_date'] ?? null;
         $onlyWithoutLead = (bool) ($filters['without_lead'] ?? false);
 
-        // Android dialer records with a mobile number and a recognized direction.
+        $today = CarbonImmutable::now(self::REPORT_TIMEZONE)->startOfDay();
+        $storageTimezone = config('app.timezone', 'UTC');
+
         $baseQuery = CallHistory::query()
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
@@ -71,11 +77,11 @@ class DialedCallHistoryController extends Controller
                 ->get(['id', 'name']);
         }
 
-        // These filters apply both to the overview and to the records table.
-        $overviewQuery = clone $baseQuery;
+        // Search, employee and call status are shared by both overviews and the table.
+        $scope = clone $baseQuery;
 
         if ($search !== '') {
-            $overviewQuery->where(function (Builder $query) use ($search) {
+            $scope->where(function (Builder $query) use ($search) {
                 $query->where('mobile', 'like', "%{$search}%")
                     ->orWhereHas('lead', function (Builder $leadQuery) use ($search) {
                         $leadQuery->where('name', 'like', "%{$search}%");
@@ -84,39 +90,22 @@ class DialedCallHistoryController extends Controller
         }
 
         if ($canFilterEmployees && !empty($filters['user_id'])) {
-            $overviewQuery->where('user_id', $filters['user_id']);
+            $scope->where('user_id', $filters['user_id']);
         }
 
         if ($callStatus !== '') {
-            $overviewQuery->where('call_status', $callStatus);
+            $scope->where('call_status', $callStatus);
         }
 
-        if (!empty($filters['from_date'])) {
-            $overviewQuery->where('call_at', '>=', $filters['from_date'] . ' 00:00:00');
-        }
+        $todayQuery = clone $scope;
+        $todayQuery
+            ->where('call_at', '>=', $today->setTimezone($storageTimezone)->toDateTimeString())
+            ->where('call_at', '<', $today->addDay()->setTimezone($storageTimezone)->toDateTimeString());
 
-        if (!empty($filters['to_date'])) {
-            $endExclusive = CarbonImmutable::createFromFormat('!Y-m-d', $filters['to_date'])
-                ->addDay()
-                ->toDateTimeString();
+        $todayCounts = $this->countCalls($todayQuery);
+        $totalCounts = $this->countCalls(clone $scope);
 
-            $overviewQuery->where('call_at', '<', $endExclusive);
-        }
-
-        // Compute all card counts in one query.
-        $counts = (clone $overviewQuery)
-            ->toBase()
-            ->selectRaw(
-                'COUNT(*) AS total_calls,
-                 COUNT(CASE WHEN direction = ? THEN 1 END) AS incoming_calls,
-                 COUNT(CASE WHEN direction = ? THEN 1 END) AS outgoing_calls,
-                 COUNT(CASE WHEN call_type = ? THEN 1 END) AS missed_calls,
-                 COUNT(CASE WHEN lead_id IS NULL THEN 1 END) AS without_lead',
-                ['incoming', 'outgoing', 'missed']
-            )
-            ->first();
-
-        $query = clone $overviewQuery;
+        $query = clone $scope;
 
         if ($direction !== null && $direction !== '') {
             $query->where('direction', $direction);
@@ -130,10 +119,27 @@ class DialedCallHistoryController extends Controller
             $query->whereNull('lead_id');
         }
 
+        if ($fromDate !== null && $fromDate !== '') {
+            $start = CarbonImmutable::createFromFormat('!Y-m-d', $fromDate, self::REPORT_TIMEZONE)
+                ->setTimezone($storageTimezone)
+                ->toDateTimeString();
+
+            $query->where('call_at', '>=', $start);
+        }
+
+        if ($toDate !== null && $toDate !== '') {
+            $end = CarbonImmutable::createFromFormat('!Y-m-d', $toDate, self::REPORT_TIMEZONE)
+                ->addDay()
+                ->setTimezone($storageTimezone)
+                ->toDateTimeString();
+
+            $query->where('call_at', '<', $end);
+        }
+
         $histories = $query
             ->with([
-                'lead' => function ($query) {
-                    $query->withTrashed()->select('id', 'name', 'mobile');
+                'lead' => function ($leadQuery) {
+                    $leadQuery->withTrashed()->select('id', 'name', 'mobile');
                 },
                 'user:id,name',
             ])
@@ -151,8 +157,13 @@ class DialedCallHistoryController extends Controller
             unset($filterUrlParams['user_id']);
         }
 
-        // Each card replaces the direction, call type, and lead-link filters.
-        $cardFilters = Arr::except($filterUrlParams, ['direction', 'call_type', 'without_lead']);
+        $cardFilters = Arr::except($filterUrlParams, [
+            'direction',
+            'call_type',
+            'without_lead',
+            'from_date',
+            'to_date',
+        ]);
 
         $refreshParams = $filterUrlParams;
 
@@ -168,16 +179,39 @@ class DialedCallHistoryController extends Controller
             'callStatus' => $callStatus,
             'direction' => $direction,
             'callType' => $callType,
+            'fromDate' => $fromDate,
+            'toDate' => $toDate,
             'onlyWithoutLead' => $onlyWithoutLead,
-            'totalCalls' => (int) ($counts->total_calls ?? 0),
-            'incomingCalls' => (int) ($counts->incoming_calls ?? 0),
-            'outgoingCalls' => (int) ($counts->outgoing_calls ?? 0),
-            'missedCalls' => (int) ($counts->missed_calls ?? 0),
-            'withoutLead' => (int) ($counts->without_lead ?? 0),
             'canFilterEmployees' => $canFilterEmployees,
+            'today' => $today,
+            'reportTimezone' => self::REPORT_TIMEZONE,
+            'todayCounts' => $todayCounts,
+            'totalCounts' => $totalCounts,
             'cardFilters' => $cardFilters,
-            'filterUrlParams' => $filterUrlParams,
             'refreshParams' => $refreshParams,
+            'clearWithoutLeadParams' => Arr::except($filterUrlParams, ['without_lead']),
         ]);
+    }
+
+    private function countCalls(Builder $query): array
+    {
+        $counts = $query->toBase()
+            ->selectRaw(
+                'COUNT(*) AS total_calls,
+                 COUNT(CASE WHEN direction = ? THEN 1 END) AS incoming_calls,
+                 COUNT(CASE WHEN direction = ? THEN 1 END) AS outgoing_calls,
+                 COUNT(CASE WHEN call_type = ? THEN 1 END) AS missed_calls,
+                 COUNT(CASE WHEN lead_id IS NULL THEN 1 END) AS without_lead',
+                ['incoming', 'outgoing', 'missed']
+            )
+            ->first();
+
+        return [
+            'total' => (int) ($counts->total_calls ?? 0),
+            'incoming' => (int) ($counts->incoming_calls ?? 0),
+            'outgoing' => (int) ($counts->outgoing_calls ?? 0),
+            'missed' => (int) ($counts->missed_calls ?? 0),
+            'without_lead' => (int) ($counts->without_lead ?? 0),
+        ];
     }
 }
