@@ -9,9 +9,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class CallingCrmController extends Controller
 {
+    private const DEFAULT_PER_PAGE = 100;
+    private const MAX_PER_PAGE = 500;
     private const NOT_ANSWERED_STATUSES = ['not_answered', 'not_answer'];
 
     public function index(Request $request)
@@ -26,6 +29,7 @@ class CallingCrmController extends Controller
             'user_id'       => 'nullable|integer|min:1',
             'date_range'    => 'nullable|in:all,today,yesterday,last_7_days,last_30_days',
             'status_source' => 'nullable|in:lead,history',
+            'per_page'      => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PER_PAGE],
         ]);
 
         $search = trim($filters['search'] ?? '');
@@ -33,6 +37,7 @@ class CallingCrmController extends Controller
         $selectedStatus = $this->normalizeStatus($filters['status'] ?? null);
         $dateRange = $filters['date_range'] ?? 'all';
         $filterByHistory = ($filters['status_source'] ?? 'lead') === 'history';
+        $perPage = (int) ($filters['per_page'] ?? self::DEFAULT_PER_PAGE);
 
         $selectedUserId = $isSuperAdmin
             ? ($filters['user_id'] ?? null)
@@ -173,11 +178,10 @@ class CallingCrmController extends Controller
             ->withCount('callHistories')
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
-        // Keep the overview scope when switching cards.
-        $cardFilters = [];
+        $cardFilters = ['per_page' => $perPage];
 
         if ($categoryId !== null) {
             $cardFilters['category'] = $categoryId;
@@ -199,6 +203,8 @@ class CallingCrmController extends Controller
             'filterByHistory' => $filterByHistory,
             'dateRange'       => $dateRange,
             'search'          => $search,
+            'perPage'         => $perPage,
+            'maxPerPage'      => self::MAX_PER_PAGE,
             'cardFilters'     => $cardFilters,
             'today'           => $today,
             'reportTimezone'  => $reportTimezone,
@@ -250,7 +256,7 @@ class CallingCrmController extends Controller
         });
     }
 
-    private function countCallsByStatus(Builder $query): \Illuminate\Support\Collection
+    private function countCallsByStatus(Builder $query): Collection
     {
         $statusColumn = $query->getModel()->qualifyColumn('call_status');
 
@@ -261,7 +267,7 @@ class CallingCrmController extends Controller
             ->pluck('call_count', 'call_status');
     }
 
-    private function overview(\Illuminate\Support\Collection $counts): array
+    private function overview(Collection $counts): array
     {
         return [
             'demo_sent'      => (int) $counts->get('demo_sent', 0),

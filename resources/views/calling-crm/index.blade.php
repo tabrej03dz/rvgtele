@@ -109,16 +109,13 @@
     .calling-report h3, .calling-report p { margin: 0; }
     .calling-report h1 { font-size: 23px; font-weight: 800; line-height: 1.15; }
     .calling-report h2 { font-size: 16px; font-weight: 800; }
-
-    .calling-report .cr-icon {
-        display: inline-block; width: 16px; height: 16px; flex: none;
-    }
+    .calling-report .cr-icon { display: inline-block; width: 16px; height: 16px; flex: none; }
     .calling-report .cr-heading-icon { width: 21px; height: 21px; color: #4325d5; }
     .calling-report .cr-hero-icon { width: 33px; height: 33px; color: #4924dc; }
-
     .calling-report .cr-hero, .calling-report .cr-strip, .calling-report .cr-list-header {
         display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
+
     .calling-report .cr-hero { min-height: 50px; padding: 0 2px; }
     .calling-report .cr-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
     .calling-report .cr-subtitle { color: var(--muted); font-size: 12px; }
@@ -127,18 +124,22 @@
         min-width: 0; padding: 10px 12px; border: 1px solid var(--border);
         border-radius: 13px; background: #fff; box-shadow: 0 2px 6px #253a7010;
     }
+
     .calling-report .cr-strip {
         flex-wrap: wrap; min-height: 32px; margin-bottom: 9px; padding: 3px 8px;
         border-radius: 8px; background: linear-gradient(90deg, #f1f3ff, #e8ecfb);
     }
+
     .calling-report .cr-chip, .calling-report .cr-button, .calling-report .cr-badge {
         display: inline-flex; align-items: center; justify-content: center;
         gap: 6px; white-space: nowrap; font-weight: 700;
     }
+
     .calling-report .cr-chip {
         padding: 3px 9px; border: 1px solid #dee5fc; border-radius: 999px;
         background: #f8faff; color: #213260; font-size: 11px;
     }
+
     .calling-report .cr-chip .cr-icon, .calling-report .cr-badge .cr-icon {
         width: 13px; height: 13px;
     }
@@ -146,22 +147,27 @@
     .calling-report .cr-cards {
         display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
     }
+
     .calling-report .cr-green {
         --tone: #125735; --light: #f6fdf9; --soft: #e6f8ee; --edge: #d4eddf;
         --accent: #0d9a53; --wave: #d8f3e1;
     }
+
     .calling-report .cr-blue {
         --tone: #1739ae; --light: #f6faff; --soft: #eaf2ff; --edge: #d7e5fc;
         --accent: #2563eb; --wave: #d6e7ff;
     }
+
     .calling-report .cr-amber {
         --tone: #974013; --light: #fffcf6; --soft: #fff2dc; --edge: #f5dfbb;
         --accent: #d56b0c; --wave: #ffebc5;
     }
+
     .calling-report .cr-rose {
         --tone: #a51c3a; --light: #fff8fb; --soft: #fce9ef; --edge: #f5d5e0;
         --accent: #df345b; --wave: #f8d6e2;
     }
+
     .calling-report .cr-card {
         position: relative; isolation: isolate; overflow: hidden;
         display: flex; align-items: center; gap: 10px;
@@ -170,19 +176,23 @@
         color: var(--tone); text-decoration: none; cursor: pointer;
         transition: border-color .15s ease, box-shadow .15s ease;
     }
+
     .calling-report .cr-card:hover { border-color: var(--accent); }
     .calling-report .cr-card[aria-current="true"] {
         border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
     }
+
     .calling-report .cr-card::after {
         position: absolute; z-index: -1; right: -14px; bottom: -35px;
         width: 102px; height: 60px; border-radius: 65% 44% 0 0;
         transform: rotate(-12deg); background: var(--wave); content: "";
     }
+
     .calling-report .cr-card-icon {
         display: grid; place-items: center; flex: 0 0 32px; height: 32px;
         border-radius: 50%; background: var(--accent); color: #fff;
     }
+
     .calling-report .cr-card-label { display: block; font-size: 12px; font-weight: 750; }
     .calling-report .cr-card-value {
         display: block; font-size: 25px; font-weight: 800; line-height: 1.1;
@@ -191,22 +201,29 @@
 
     .calling-report .cr-filters > .cr-title { margin-bottom: 5px; }
     .calling-report .cr-form {
-        display: grid; align-items: end; gap: 8px;
-        grid-template-columns: minmax(150px, 1.65fr) repeat(4, minmax(96px, 1fr)) auto;
+        display: grid;
+        align-items: end;
+        gap: 8px;
+        grid-template-columns: minmax(150px, 1.65fr) repeat(4, minmax(96px, 1fr))
+            minmax(105px, .85fr) auto;
     }
+
     .calling-report .cr-field {
         display: grid; gap: 3px; min-width: 0; font-size: 11px; font-weight: 750;
     }
+
     .calling-report .cr-search { position: relative; min-width: 0; }
     .calling-report .cr-search .cr-icon {
         position: absolute; top: 9px; left: 9px; color: var(--muted); pointer-events: none;
     }
+
     .calling-report .cr-search input { padding-left: 31px; }
     .calling-report input, .calling-report select {
         box-sizing: border-box; width: 100%; min-width: 0; height: 34px;
         padding: 0 8px; border: 1px solid #d9e1f0; border-radius: 8px;
         background-color: #fff; color: var(--ink); font: inherit; font-size: 12px;
     }
+
     .calling-report select { padding-right: 24px; }
     .calling-report input[readonly] { background-color: #f5f7fc; }
     .calling-report .cr-actions { display: flex; gap: 6px; }
@@ -215,6 +232,7 @@
         border-radius: 8px; background: #f3f7ff; color: var(--blue);
         font-size: 12px; text-decoration: none; cursor: pointer;
     }
+
     .calling-report .cr-button:hover { background: #e8efff; }
     .calling-report .cr-primary { background: #131c51; border-color: #131c51; color: #fff; }
     .calling-report .cr-primary:hover { background: #23347c; }
@@ -230,9 +248,11 @@
         padding: 7px 8px; background: #eef2fe; color: #243356;
         font-size: 10px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
     }
+
     .calling-report td {
         padding: 6px 8px; border-bottom: 1px solid #eef2f8; vertical-align: middle;
     }
+
     .calling-report .cr-row:hover { background: #f8faff; }
     .calling-report .cr-right { text-align: right; }
     .calling-report .cr-person { display: flex; align-items: center; gap: 7px; line-height: 1.2; }
@@ -240,11 +260,13 @@
         display: grid; place-items: center; flex: 0 0 28px; height: 28px;
         border-radius: 8px; background: #e9f0ff; color: #1739c0; font-weight: 800;
     }
+
     .calling-report .cr-user-avatar { border-radius: 50%; background: #eeebff; color: #4933b7; }
     .calling-report .cr-name {
         display: block; max-width: clamp(112px, 12vw, 198px); overflow: hidden;
         text-overflow: ellipsis; white-space: nowrap; font-weight: 750;
     }
+
     .calling-report .cr-user-name { max-width: 110px; }
     .calling-report .cr-detail { display: block; color: var(--muted); font-size: 10px; white-space: nowrap; }
     .calling-report .cr-mobile { color: var(--blue); font-weight: 750; white-space: nowrap; }
@@ -254,11 +276,13 @@
         border-radius: 7px; background: var(--soft, #edf0f9);
         color: var(--tone, var(--ink)); font-size: 11px;
     }
+
     .calling-report .cr-status { border-radius: 999px; }
     .calling-report .cr-category {
         display: inline-block; max-width: 105px; overflow: hidden;
         text-overflow: ellipsis; vertical-align: middle;
     }
+
     .calling-report .cr-count { background: #eeebff; color: #4330ac; }
     .calling-report .cr-history-button { min-height: 27px; padding: 0 7px; font-size: 11px; }
     .calling-report .cr-history-button .cr-icon { width: 13px; height: 13px; }
@@ -268,6 +292,7 @@
     .calling-report .cr-history-panel {
         overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: #fff;
     }
+
     .calling-report .cr-history-title { padding: 8px 10px; background: #f2f5ff; }
     .calling-report .cr-history-table { min-width: 790px; }
     .calling-report .cr-remarks { min-width: 150px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -279,14 +304,16 @@
         outline: 2px solid #3d53dc; outline-offset: 2px;
     }
 
-    @media (max-width: 1170px) {
+    @media (max-width: 1280px) {
         .calling-report .cr-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
+
     @media (max-width: 820px) {
         .calling-report .cr-cards, .calling-report .cr-form {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
+
     @media (max-width: 480px) {
         .calling-report .cr-hero, .calling-report .cr-list-header { flex-wrap: wrap; }
         .calling-report .cr-actions { grid-column: 1 / -1; }
@@ -322,6 +349,7 @@
                     <i data-lucide="{{ $section['icon'] }}" class="cr-icon cr-heading-icon" aria-hidden="true"></i>
                     <h2>{{ $section['title'] }}</h2>
                 </div>
+
                 <span class="cr-chip">
                     <i data-lucide="{{ $section['badgeIcon'] }}" class="cr-icon" aria-hidden="true"></i>
                     {{ $section['badge'] }}
@@ -349,15 +377,14 @@
                             && ($selectedStatus ?: null) === $cardStatus;
                     @endphp
 
-                    <a
-                        href="{{ route('calling-crm.index', $cardParams) }}#calling-leads"
+                    <a href="{{ route('calling-crm.index', $cardParams) }}#calling-leads"
                         class="cr-card cr-{{ $tone }}"
                         aria-label="{{ $cardLabel }}, {{ $count }} calls. Show matching leads."
-                        @if($active) aria-current="true" @endif
-                    >
+                        @if($active) aria-current="true" @endif>
                         <span class="cr-card-icon">
                             <i data-lucide="{{ $icon }}" class="cr-icon" aria-hidden="true"></i>
                         </span>
+
                         <div>
                             <span class="cr-card-label">{{ $cardLabel }}</span>
                             <strong class="cr-card-value">{{ $count }}</strong>
@@ -391,7 +418,8 @@
                 <select name="category">
                     <option value="">All Categories</option>
                     @foreach($categories as $category)
-                        <option value="{{ $category->id }}" @selected((string) request('category') === (string) $category->id)>
+                        <option value="{{ $category->id }}"
+                            @selected((string) request('category') === (string) $category->id)>
                             {{ $category->name }}
                         </option>
                     @endforeach
@@ -403,8 +431,10 @@
                 @if($isSuperAdmin)
                     <select name="user_id">
                         <option value="">All Users</option>
+
                         @foreach($users as $assignedUser)
-                            <option value="{{ $assignedUser->id }}" @selected((string) $selectedUserId === (string) $assignedUser->id)>
+                            <option value="{{ $assignedUser->id }}"
+                                @selected((string) $selectedUserId === (string) $assignedUser->id)>
                                 {{ $assignedUser->name }}
                             </option>
                         @endforeach
@@ -442,11 +472,19 @@
                 </select>
             </label>
 
+            <label class="cr-field">
+                Records Per Page
+                <input type="number" name="per_page" min="1" max="{{ $maxPerPage }}" step="1"
+                    inputmode="numeric" value="{{ $perPage }}"
+                    title="Enter a whole number between 1 and {{ $maxPerPage }}">
+            </label>
+
             <div class="cr-actions">
                 <button type="submit" class="cr-button cr-primary">
                     <i data-lucide="filter" class="cr-icon" aria-hidden="true"></i>
                     Apply Filters
                 </button>
+
                 <a href="{{ $indexUrl }}" class="cr-button cr-reset">
                     <i data-lucide="rotate-ccw" class="cr-icon" aria-hidden="true"></i>
                     Reset
@@ -498,6 +536,7 @@
                         <th scope="col" class="cr-right">Action</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     @forelse($contacts as $contact)
                         @php
@@ -524,6 +563,7 @@
 
                         <tr class="cr-row">
                             <td>{{ $contacts->firstItem() + $loop->index }}</td>
+
                             <td>
                                 <div class="cr-person">
                                     <span class="cr-avatar" aria-hidden="true">
@@ -535,6 +575,7 @@
                                     </div>
                                 </div>
                             </td>
+
                             <td>
                                 @if($contact->mobile)
                                     <a class="cr-mobile" href="tel:{{ preg_replace('/[^0-9+]/', '', $contact->mobile) }}">
@@ -544,25 +585,33 @@
                                     —
                                 @endif
                             </td>
+
                             <td>
-                                <span class="cr-badge cr-category" title="{{ $categoryName }}">{{ $categoryName }}</span>
+                                <span class="cr-badge cr-category" title="{{ $categoryName }}">
+                                    {{ $categoryName }}
+                                </span>
                             </td>
+
                             <td>
                                 <div class="cr-person">
                                     <span class="cr-avatar cr-user-avatar" aria-hidden="true">
                                         {{ mb_strtoupper(mb_substr($assignedName, 0, 1)) }}
                                     </span>
                                     <div>
-                                        <strong class="cr-name cr-user-name" title="{{ $assignedName }}">{{ $assignedName }}</strong>
+                                        <strong class="cr-name cr-user-name" title="{{ $assignedName }}">
+                                            {{ $assignedName }}
+                                        </strong>
                                         <span class="cr-detail">User ID: {{ $contact->assigned_to ?? '—' }}</span>
                                     </div>
                                 </div>
                             </td>
+
                             <td>
                                 <span class="cr-badge cr-status cr-{{ $statusColors[$leadStatus] ?? 'neutral' }}">
                                     {{ $statusLabel($leadStatus) }}
                                 </span>
                             </td>
+
                             <td>
                                 @if($updatedAt)
                                     <time datetime="{{ $updatedAt->toIso8601String() }}">
@@ -573,17 +622,20 @@
                                     —
                                 @endif
                             </td>
+
                             <td>
                                 <span class="cr-badge cr-count">
                                     {{ number_format($callCount) }} {{ $callCount === 1 ? 'Call' : 'Calls' }}
                                 </span>
                             </td>
+
                             <td>
                                 <span class="cr-badge cr-green" title="Latest call duration (HH:MM:SS)">
                                     <i data-lucide="clock-3" class="cr-icon" aria-hidden="true"></i>
                                     {{ $latestDuration }}
                                 </span>
                             </td>
+
                             <td class="cr-right">
                                 <button type="button" class="cr-button cr-history-button"
                                     data-history-toggle aria-controls="{{ $historyRowId }}" aria-expanded="false">
@@ -615,6 +667,7 @@
                                                 <th scope="col" class="cr-right">Recording</th>
                                             </tr>
                                         </thead>
+
                                         <tbody>
                                             @forelse($histories as $history)
                                                 @php
@@ -624,17 +677,21 @@
                                                         ? asset('storage/' . ltrim($history->recording, '/'))
                                                         : null;
                                                 @endphp
+
                                                 <tr>
                                                     <td>{{ $loop->iteration }}</td>
+
                                                     <td>
                                                         <strong>{{ $history->user?->name ?? 'Unknown User' }}</strong>
                                                         <span class="cr-detail">User ID: {{ $history->user_id ?? '—' }}</span>
                                                     </td>
+
                                                     <td>
                                                         <span class="cr-badge cr-status cr-{{ $statusColors[$historyStatus] ?? 'neutral' }}">
                                                             {{ $statusLabel($historyStatus) }}
                                                         </span>
                                                     </td>
+
                                                     <td>
                                                         @if($callDate)
                                                             <time datetime="{{ $callDate->toIso8601String() }}">
@@ -645,10 +702,13 @@
                                                             —
                                                         @endif
                                                     </td>
+
                                                     <td>
                                                         <span class="cr-badge">{{ $formatDuration($history->call_duration) }}</span>
                                                     </td>
+
                                                     <td class="cr-remarks">{{ $history->remarks ?: '—' }}</td>
+
                                                     <td class="cr-right">
                                                         @if($recordingUrl)
                                                             <audio controls preload="none" src="{{ $recordingUrl }}" aria-label="Call recording">
