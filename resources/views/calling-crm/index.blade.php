@@ -3,32 +3,68 @@
 @section('title', $title)
 
 @section('content')
-
 @php
+    $overviewCards = [
+        ['demo_sent', 'Today Demo Sent', 'Total Demo Sent', 'send', 'green'],
+        ['total', 'Today Total Calling', 'Total Calling', 'phone', 'blue'],
+        ['not_answered', 'Today Not Answered', 'Total Not Answered', 'phone-missed', 'amber'],
+        ['not_interested', 'Today Not Interested', 'Total Not Interested', 'ban', 'rose'],
+    ];
+
+    $overviewSections = [
+        [
+            'title' => "Today's Calling Overview",
+            'icon' => 'calendar-days',
+            'badge' => $today->format('d M Y, l'),
+            'badgeIcon' => 'calendar',
+            'counts' => $todayOverview,
+            'today' => true,
+        ],
+        [
+            'title' => 'Overall Calling Overview',
+            'icon' => 'bar-chart-3',
+            'badge' => 'All Time (Complete Data)',
+            'badgeIcon' => 'layers',
+            'counts' => $overallOverview,
+            'today' => false,
+        ],
+    ];
+
+    $dateRanges = [
+        'all' => 'All Time',
+        'today' => 'Today',
+        'yesterday' => 'Yesterday',
+        'last_7_days' => 'Last 7 Days',
+        'last_30_days' => 'Last 30 Days',
+    ];
+
     $statusLabels = [
-        'answered'       => 'Answered',
-        'not_answered'   => 'Not Answered',
-        'not_answer'     => 'Not Answer',
-        'busy'           => 'Busy',
-        'demo_sent'      => 'Demo Sent',
+        'answered' => 'Answered',
+        'not_answer' => 'Not Answered',
+        'not_answered' => 'Not Answered',
+        'busy' => 'Busy',
+        'demo_sent' => 'Demo Sent',
         'not_interested' => 'Not Interested',
-        'converted'      => 'Converted',
+        'converted' => 'Converted',
     ];
 
     $statusColors = [
-        'answered'       => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        'converted'      => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        'demo_sent'      => 'bg-blue-50 text-blue-700 border-blue-200',
-        'not_answered'   => 'bg-amber-50 text-amber-700 border-amber-200',
-        'not_answer'     => 'bg-amber-50 text-amber-700 border-amber-200',
-        'busy'           => 'bg-orange-50 text-orange-700 border-orange-200',
-        'not_interested' => 'bg-rose-50 text-rose-700 border-rose-200',
+        'answered' => 'green',
+        'converted' => 'green',
+        'not_answer' => 'amber',
+        'not_answered' => 'amber',
+        'busy' => 'amber',
+        'demo_sent' => 'blue',
+        'not_interested' => 'rose',
     ];
 
-    $defaultColor = 'bg-slate-100 text-slate-700 border-slate-200';
+    $statusLabel = static function ($value) use ($statusLabels) {
+        $value = (string) $value;
 
-    // call_duration is stored in seconds.
-    $formatCallDuration = static function ($seconds) {
+        return $statusLabels[$value] ?? (ucwords(str_replace('_', ' ', $value)) ?: 'Unknown');
+    };
+
+    $formatDuration = static function ($seconds) {
         if ($seconds === null || !is_numeric($seconds)) {
             return '—';
         }
@@ -42,668 +78,614 @@
             $seconds % 60
         );
     };
+
+    $reportDate = static fn ($value) => $value
+        ? \Carbon\CarbonImmutable::parse($value, $storageTimezone)->setTimezone($reportTimezone)
+        : null;
+
+    $indexUrl = route('calling-crm.index');
+    $createRoute = 'calling-crm.create';
+    $createUrl = \Illuminate\Support\Facades\Route::has($createRoute)
+        ? route($createRoute)
+        : null;
 @endphp
 
-<div class="mx-auto max-w-[1500px] space-y-5">
+<style>
+    .calling-report {
+        --ink: #101936;
+        --muted: #53617c;
+        --blue: #1736bd;
+        --border: #e0e6f3;
+        display: grid;
+        gap: 12px;
+        max-width: 1560px;
+        margin: 0 auto;
+        color: var(--ink);
+        font-size: 13px;
+        line-height: 1.4;
+    }
 
-    {{-- HEADER --}}
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900">
-                Calling CRM
-            </h1>
+    .calling-report h1, .calling-report h2, .calling-report h3, .calling-report p { margin: 0; }
+    .calling-report h1 { font-size: 23px; font-weight: 800; line-height: 1.15; }
+    .calling-report h2 { font-size: 16px; font-weight: 800; }
+    .calling-report .cr-icon { display: inline-block; width: 16px; height: 16px; flex: none; }
+    .calling-report .cr-heading-icon { width: 21px; height: 21px; color: #4325d5; }
+    .calling-report .cr-hero-icon { width: 33px; height: 33px; color: #4924dc; }
+    .calling-report .cr-hero, .calling-report .cr-strip, .calling-report .cr-list-header {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .calling-report .cr-hero { min-height: 50px; padding: 0 2px; }
+    .calling-report .cr-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .calling-report .cr-subtitle { color: var(--muted); font-size: 12px; }
+    .calling-report .cr-panel {
+        min-width: 0; padding: 10px 12px; border: 1px solid var(--border);
+        border-radius: 13px; background: #fff; box-shadow: 0 2px 6px #253a7010;
+    }
+    .calling-report .cr-strip {
+        flex-wrap: wrap; min-height: 32px; margin-bottom: 9px; padding: 3px 8px;
+        border-radius: 8px; background: linear-gradient(90deg, #f1f3ff, #e8ecfb);
+    }
+    .calling-report .cr-chip, .calling-report .cr-button, .calling-report .cr-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 6px; white-space: nowrap; font-weight: 700;
+    }
+    .calling-report .cr-chip {
+        padding: 3px 9px; border: 1px solid #dee5fc; border-radius: 999px;
+        background: #f8faff; color: #213260; font-size: 11px;
+    }
+    .calling-report .cr-chip .cr-icon, .calling-report .cr-badge .cr-icon {
+        width: 13px; height: 13px;
+    }
+    .calling-report .cr-cards {
+        display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+    }
+    .calling-report .cr-green {
+        --tone: #125735; --light: #f6fdf9; --soft: #e6f8ee; --edge: #d4eddf;
+        --accent: #0d9a53; --wave: #d8f3e1;
+    }
+    .calling-report .cr-blue {
+        --tone: #1739ae; --light: #f6faff; --soft: #eaf2ff; --edge: #d7e5fc;
+        --accent: #2563eb; --wave: #d6e7ff;
+    }
+    .calling-report .cr-amber {
+        --tone: #974013; --light: #fffcf6; --soft: #fff2dc; --edge: #f5dfbb;
+        --accent: #d56b0c; --wave: #ffebc5;
+    }
+    .calling-report .cr-rose {
+        --tone: #a51c3a; --light: #fff8fb; --soft: #fce9ef; --edge: #f5d5e0;
+        --accent: #df345b; --wave: #f8d6e2;
+    }
+    .calling-report .cr-card {
+        position: relative; isolation: isolate; overflow: hidden;
+        display: flex; align-items: center; gap: 10px;
+        min-height: 62px; padding: 6px 11px; border: 1px solid var(--edge);
+        border-radius: 10px; background: linear-gradient(var(--light), var(--soft));
+        color: var(--tone);
+    }
+    .calling-report .cr-card::after {
+        position: absolute; z-index: -1; right: -14px; bottom: -35px;
+        width: 102px; height: 60px; border-radius: 65% 44% 0 0;
+        transform: rotate(-12deg); background: var(--wave); content: "";
+    }
+    .calling-report .cr-card-icon {
+        display: grid; place-items: center; flex: 0 0 32px; height: 32px;
+        border-radius: 50%; background: var(--accent); color: #fff;
+    }
+    .calling-report .cr-card-label { display: block; font-size: 12px; font-weight: 750; }
+    .calling-report .cr-card-value {
+        display: block; font-size: 25px; font-weight: 800; line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
 
-            <p class="mt-1 text-sm text-slate-500">
-                View leads, filter by category and user,
-                and check complete call history.
-            </p>
+    .calling-report .cr-filters > .cr-title { margin-bottom: 5px; }
+    .calling-report .cr-form {
+        display: grid; align-items: end; gap: 8px;
+        grid-template-columns: minmax(150px, 1.65fr) repeat(4, minmax(96px, 1fr)) auto;
+    }
+    .calling-report .cr-field { display: grid; gap: 3px; min-width: 0; font-size: 11px; font-weight: 750; }
+    .calling-report .cr-search { position: relative; min-width: 0; }
+    .calling-report .cr-search .cr-icon {
+        position: absolute; top: 9px; left: 9px; color: var(--muted); pointer-events: none;
+    }
+    .calling-report .cr-search input { padding-left: 31px; }
+    .calling-report input, .calling-report select {
+        box-sizing: border-box; width: 100%; min-width: 0; height: 34px;
+        padding: 0 8px; border: 1px solid #d9e1f0; border-radius: 8px;
+        background-color: #fff; color: var(--ink); font: inherit; font-size: 12px;
+    }
+    .calling-report select { padding-right: 24px; }
+    .calling-report input[readonly] { background-color: #f5f7fc; }
+    .calling-report .cr-actions { display: flex; gap: 6px; }
+    .calling-report .cr-button {
+        min-height: 34px; padding: 0 10px; border: 1px solid #c6d3f7;
+        border-radius: 8px; background: #f3f7ff; color: var(--blue);
+        font-size: 12px; text-decoration: none; cursor: pointer;
+    }
+    .calling-report .cr-button:hover { background: #e8efff; }
+    .calling-report .cr-primary { background: #131c51; border-color: #131c51; color: #fff; }
+    .calling-report .cr-primary:hover { background: #23347c; }
+    .calling-report .cr-reset { background: #fff; color: var(--ink); }
+    .calling-report .cr-error { margin-top: 7px; color: #a51c3a; }
+
+    .calling-report .cr-list { padding: 0; overflow: hidden; }
+    .calling-report .cr-list-header { padding: 9px 12px; }
+    .calling-report .cr-scroll { overflow-x: auto; }
+    .calling-report table { width: 100%; border-collapse: collapse; text-align: left; }
+    .calling-report .cr-leads { min-width: 930px; font-size: 12px; }
+    .calling-report th {
+        padding: 7px 8px; background: #eef2fe; color: #243356;
+        font-size: 10px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
+    }
+    .calling-report td { padding: 6px 8px; border-bottom: 1px solid #eef2f8; vertical-align: middle; }
+    .calling-report .cr-row:hover { background: #f8faff; }
+    .calling-report .cr-right { text-align: right; }
+    .calling-report .cr-person { display: flex; align-items: center; gap: 7px; line-height: 1.2; }
+    .calling-report .cr-avatar {
+        display: grid; place-items: center; flex: 0 0 28px; height: 28px;
+        border-radius: 8px; background: #e9f0ff; color: #1739c0; font-weight: 800;
+    }
+    .calling-report .cr-user-avatar { border-radius: 50%; background: #eeebff; color: #4933b7; }
+    .calling-report .cr-name {
+        display: block; max-width: clamp(112px, 12vw, 198px); overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; font-weight: 750;
+    }
+    .calling-report .cr-user-name { max-width: 110px; }
+    .calling-report .cr-detail { display: block; color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .calling-report .cr-mobile { color: var(--blue); font-weight: 750; white-space: nowrap; }
+    .calling-report .cr-mobile:hover { text-decoration: underline; }
+    .calling-report .cr-badge {
+        padding: 2px 7px; border: 1px solid var(--edge, #e5eaf6);
+        border-radius: 7px; background: var(--soft, #edf0f9);
+        color: var(--tone, var(--ink)); font-size: 11px;
+    }
+    .calling-report .cr-status { border-radius: 999px; }
+    .calling-report .cr-category {
+        display: inline-block; max-width: 105px; overflow: hidden;
+        text-overflow: ellipsis; vertical-align: middle;
+    }
+    .calling-report .cr-count { background: #eeebff; color: #4330ac; }
+    .calling-report .cr-history-button { min-height: 27px; padding: 0 7px; font-size: 11px; }
+    .calling-report .cr-history-button .cr-icon { width: 13px; height: 13px; }
+    .calling-report [data-history-row][hidden] { display: none; }
+    .calling-report .cr-history-wrap { background: #f7f9ff; }
+    .calling-report .cr-history-wrap > td { padding: 10px; }
+    .calling-report .cr-history-panel { overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: #fff; }
+    .calling-report .cr-history-title { padding: 8px 10px; background: #f2f5ff; }
+    .calling-report .cr-history-table { min-width: 790px; }
+    .calling-report .cr-remarks { min-width: 150px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .calling-report audio { width: 190px; height: 32px; }
+    .calling-report .cr-recording-link { display: block; color: var(--blue); font-size: 11px; }
+    .calling-report .cr-empty { padding: 22px 12px; text-align: center; }
+    .calling-report .cr-pagination { padding: 8px 12px; }
+    .calling-report :is(button, a, input, select, [tabindex]):focus-visible {
+        outline: 2px solid #3d53dc; outline-offset: 2px;
+    }
+
+    @media (max-width: 1170px) {
+        .calling-report .cr-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 820px) {
+        .calling-report .cr-cards, .calling-report .cr-form {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 480px) {
+        .calling-report .cr-hero, .calling-report .cr-list-header { flex-wrap: wrap; }
+        .calling-report .cr-actions { grid-column: 1 / -1; }
+        .calling-report .cr-card { padding: 6px; gap: 6px; }
+        .calling-report .cr-card-icon { flex-basis: 26px; height: 26px; }
+        .calling-report .cr-card-label { font-size: 11px; }
+        .calling-report .cr-card-value { font-size: 22px; }
+    }
+</style>
+
+<div class="calling-report" id="calling-report">
+    <header class="cr-hero">
+        <div class="cr-title">
+            <i data-lucide="phone-call" class="cr-icon cr-hero-icon" aria-hidden="true"></i>
+            <div>
+                <h1>Calling CRM</h1>
+                <p class="cr-subtitle">Manage leads, track calls, and review call history.</p>
+            </div>
         </div>
 
-        <span class="inline-flex items-center gap-2 self-start rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700">
-            <i data-lucide="headset" class="h-4 w-4"></i>
-            Calling Records
-        </span>
-    </div>
+        @if($createUrl)
+            <a href="{{ $createUrl }}" class="cr-button">
+                <i data-lucide="phone-plus" class="cr-icon" aria-hidden="true"></i>
+                Add Calling Record
+            </a>
+        @endif
+    </header>
 
-    {{-- SUMMARY CARDS --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p class="text-xs font-semibold uppercase text-slate-500">
-                Total Leads
-            </p>
-
-            <h2 class="mt-2 text-3xl font-bold text-slate-900">
-                {{ number_format($contacts->total()) }}
-            </h2>
-
-            <p class="mt-1 text-xs text-slate-400">
-                Matching current filters
-            </p>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p class="text-xs font-semibold uppercase text-slate-500">
-                Leads on This Page
-            </p>
-
-            <h2 class="mt-2 text-3xl font-bold text-blue-600">
-                {{ $contacts->count() }}
-            </h2>
-
-            <p class="mt-1 text-xs text-slate-400">
-                Current page records
-            </p>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p class="text-xs font-semibold uppercase text-slate-500">
-                Total Call Histories
-            </p>
-
-            <h2 class="mt-2 text-3xl font-bold text-emerald-600">
-                {{ number_format($contacts->sum('call_histories_count')) }}
-            </h2>
-
-            <p class="mt-1 text-xs text-slate-400">
-                History records on this page
-            </p>
-        </div>
-    </div>
-
-    {{-- CALL STATUS COUNT BOXES --}}
-    @if($statuses->isNotEmpty())
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            @foreach($statuses as $boxStatus)
-                <div class="rounded-xl border p-5 shadow-sm {{ $statusColors[$boxStatus] ?? $defaultColor }}">
-                    <p class="text-xs font-semibold uppercase">
-                        {{ $statusLabels[$boxStatus] ?? (ucwords(str_replace('_', ' ', $boxStatus)) ?: 'Unknown') }}
-                    </p>
-
-                    <p class="mt-2 text-3xl font-bold">
-                        {{ number_format($statusCounts->get($boxStatus, 0)) }}
-                    </p>
+    @foreach($overviewSections as $section)
+        <section class="cr-panel">
+            <header class="cr-strip">
+                <div class="cr-title">
+                    <i data-lucide="{{ $section['icon'] }}" class="cr-icon cr-heading-icon" aria-hidden="true"></i>
+                    <h2>{{ $section['title'] }}</h2>
                 </div>
-            @endforeach
+                <span class="cr-chip">
+                    <i data-lucide="{{ $section['badgeIcon'] }}" class="cr-icon" aria-hidden="true"></i>
+                    {{ $section['badge'] }}
+                </span>
+            </header>
+
+            <div class="cr-cards">
+                @foreach($overviewCards as [$key, $todayLabel, $overallLabel, $icon, $tone])
+                    <div class="cr-card cr-{{ $tone }}">
+                        <span class="cr-card-icon">
+                            <i data-lucide="{{ $icon }}" class="cr-icon" aria-hidden="true"></i>
+                        </span>
+                        <div>
+                            <span class="cr-card-label">{{ $section['today'] ? $todayLabel : $overallLabel }}</span>
+                            <strong class="cr-card-value">{{ number_format($section['counts'][$key]) }}</strong>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endforeach
+
+    <section class="cr-panel cr-filters" aria-labelledby="calling-filters-heading">
+        <div class="cr-title">
+            <i data-lucide="filter" class="cr-icon cr-heading-icon" aria-hidden="true"></i>
+            <h2 id="calling-filters-heading">Search &amp; Filters</h2>
         </div>
-    @endif
 
-    {{-- FILTERS --}}
-    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div class="mb-4 flex items-center gap-2">
-            <i data-lucide="filter" class="h-5 w-5 text-blue-600"></i>
-            <h2 class="font-bold text-slate-900">Search & Filters</h2>
-        </div>
-
-        <form
-            method="GET"
-            action="{{ route('calling-crm.index') }}"
-            class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12"
-        >
-            <div class="xl:col-span-4">
-                <label for="search" class="mb-1 block text-xs font-semibold text-slate-600">
-                    Search Lead
-                </label>
-
-                <div class="relative">
-                    <i
-                        data-lucide="search"
-                        class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                    ></i>
-
-                    <input
-                        id="search"
-                        type="text"
-                        name="search"
-                        value="{{ request('search') }}"
-                        placeholder="Name, mobile, lead ID..."
-                        class="w-full rounded-lg border-slate-300 py-2.5 pl-10 pr-3 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                </div>
+        <form method="GET" action="{{ $indexUrl }}" class="cr-form">
+            <div class="cr-search">
+                <i data-lucide="search" class="cr-icon" aria-hidden="true"></i>
+                <input type="search" name="search" maxlength="255"
+                    value="{{ request('search') }}"
+                    aria-label="Search by name, mobile or lead ID"
+                    placeholder="Search by name, mobile or lead ID…">
             </div>
 
-            <div class="xl:col-span-2">
-                <label for="category" class="mb-1 block text-xs font-semibold text-slate-600">
-                    Category
-                </label>
-
-                <select
-                    id="category"
-                    name="category"
-                    class="w-full rounded-lg border-slate-300 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
-                >
+            <label class="cr-field">
+                Category
+                <select name="category">
                     <option value="">All Categories</option>
-
                     @foreach($categories as $category)
-                        <option
-                            value="{{ $category->id }}"
-                            @selected((string) request('category') === (string) $category->id)
-                        >
+                        <option value="{{ $category->id }}" @selected((string) request('category') === (string) $category->id)>
                             {{ $category->name }}
                         </option>
                     @endforeach
                 </select>
-            </div>
+            </label>
 
-            <div class="xl:col-span-2">
-                <label for="assigned-user-filter" class="mb-1 block text-xs font-semibold text-slate-600">
-                    Assigned User
-                </label>
-
+            <label class="cr-field">
+                Assigned User
                 @if($isSuperAdmin)
-                    <select
-                        id="assigned-user-filter"
-                        name="user_id"
-                        class="w-full rounded-lg border-slate-300 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
+                    <select name="user_id">
                         <option value="">All Users</option>
-
                         @foreach($users as $assignedUser)
-                            <option
-                                value="{{ $assignedUser->id }}"
-                                @selected((string) request('user_id') === (string) $assignedUser->id)
-                            >
-                                {{ $assignedUser->name }} (#{{ $assignedUser->id }})
+                            <option value="{{ $assignedUser->id }}" @selected((string) $selectedUserId === (string) $assignedUser->id)>
+                                {{ $assignedUser->name }}
                             </option>
                         @endforeach
                     </select>
                 @else
-                    <input
-                        id="assigned-user-filter"
-                        type="text"
-                        value="{{ auth()->user()->name }}"
-                        readonly
-                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600"
-                    >
+                    <input type="text" value="{{ auth()->user()->name }}" readonly>
                 @endif
-            </div>
+            </label>
 
-            <div class="xl:col-span-2">
-                <label for="status" class="mb-1 block text-xs font-semibold text-slate-600">
-                    Call Status
-                </label>
-
-                <select
-                    id="status"
-                    name="status"
-                    class="w-full rounded-lg border-slate-300 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
-                >
+            <label class="cr-field">
+                Call Status
+                <select name="status">
                     <option value="">All Statuses</option>
-
                     @foreach($statuses as $status)
-                        <option
-                            value="{{ $status }}"
-                            @selected(request('status') == $status)
-                        >
-                            {{ $statusLabels[$status] ?? ucwords(str_replace('_', ' ', $status)) }}
+                        <option value="{{ $status }}" @selected($selectedStatus === $status)>
+                            {{ $statusLabel($status) }}
                         </option>
                     @endforeach
                 </select>
-            </div>
+            </label>
 
-            <div class="flex items-end gap-2 xl:col-span-2">
-                <button
-                    type="submit"
-                    class="flex-1 rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-                >
-                    Filter
+            <label class="cr-field">
+                Date Range
+                <select name="date_range">
+                    @foreach($dateRanges as $range => $label)
+                        <option value="{{ $range }}" @selected($dateRange === $range)>
+                            {{ $label }}
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+
+            <div class="cr-actions">
+                <button type="submit" class="cr-button cr-primary">
+                    <i data-lucide="filter" class="cr-icon" aria-hidden="true"></i>
+                    Apply Filters
                 </button>
-
-                <a
-                    href="{{ route('calling-crm.index') }}"
-                    class="rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
+                <a href="{{ $indexUrl }}" class="cr-button cr-reset">
+                    <i data-lucide="rotate-ccw" class="cr-icon" aria-hidden="true"></i>
                     Reset
                 </a>
             </div>
         </form>
+
+        @if($errors->any())
+            <div class="cr-error" role="alert">{{ $errors->first() }}</div>
+        @endif
     </section>
 
-    {{-- LEADS TABLE --}}
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div class="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h2 class="font-bold text-slate-900">Calling Lead List</h2>
-
-                <p class="mt-1 text-sm text-slate-500">
-                    {{ $contacts->firstItem() ?? 0 }}
-                    –
-                    {{ $contacts->lastItem() ?? 0 }}
-                    of
-                    {{ $contacts->total() }}
-                    leads
-                </p>
+    <section class="cr-panel cr-list" aria-labelledby="calling-leads-heading">
+        <header class="cr-list-header">
+            <div class="cr-title">
+                <i data-lucide="users" class="cr-icon cr-heading-icon" aria-hidden="true"></i>
+                <div>
+                    <h2 id="calling-leads-heading">Calling Lead List</h2>
+                    <p class="cr-subtitle">
+                        {{ $contacts->firstItem() ?? 0 }} – {{ $contacts->lastItem() ?? 0 }}
+                        of {{ number_format($contacts->total()) }} leads
+                    </p>
+                </div>
             </div>
-
-            <span class="self-start rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            <span class="cr-chip">
+                <i data-lucide="layers" class="cr-icon" aria-hidden="true"></i>
                 Non-Pending Leads
             </span>
-        </div>
+        </header>
 
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[1350px] text-sm">
-                <thead class="bg-slate-50">
-                    <tr class="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <th class="px-4 py-3">#</th>
-                        <th class="px-4 py-3">Lead Details</th>
-                        <th class="px-4 py-3">Mobile</th>
-                        <th class="px-4 py-3">Category</th>
-                        <th class="px-4 py-3">Assigned User</th>
-                        <th class="px-4 py-3">Call Status</th>
-                        <th class="px-4 py-3">Updated At</th>
-                        <th class="px-4 py-3">Calls</th>
-                        <th class="px-4 py-3">Latest Call Duration</th>
-                        <th class="px-4 py-3 text-right">Action</th>
+        <div class="cr-scroll" role="region" tabindex="0" aria-label="Calling leads table">
+            <table class="cr-leads">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Lead Details</th>
+                        <th scope="col">Mobile</th>
+                        <th scope="col">Category</th>
+                        <th scope="col">Assigned User</th>
+                        <th scope="col">Call Status</th>
+                        <th scope="col">Updated At</th>
+                        <th scope="col">Calls</th>
+                        <th scope="col">Latest Call Duration</th>
+                        <th scope="col" class="cr-right">Action</th>
                     </tr>
                 </thead>
+                <tbody>
+                    @forelse($contacts as $contact)
+                        @php
+                            $leadName = $contact->name ?: 'Unnamed Lead';
+                            $assignedName = $contact->assignedUser?->name ?? 'Unknown User';
+                            $categoryName = $contact->leadCategory?->name ?: '—';
+                            $leadStatus = (string) $contact->call_status;
+                            $historyRowId = 'calling-history-' . $contact->id;
+                            $updatedAt = $reportDate($contact->updated_at);
+                            $callCount = (int) $contact->call_histories_count;
 
-                @forelse($contacts as $contact)
-                    @php
-                        $currentStatus = $contact->call_status ?? '';
+                            $histories = $contact->callHistories->sort(
+                                static function ($first, $second) use ($reportDate) {
+                                    $firstDate = $reportDate($first->call_at ?? $first->created_at);
+                                    $secondDate = $reportDate($second->call_at ?? $second->created_at);
 
-                        $statusText = $statusLabels[$currentStatus]
-                            ?? ucwords(str_replace('_', ' ', $currentStatus));
+                                    return (($secondDate?->getTimestamp() ?? 0) <=> ($firstDate?->getTimestamp() ?? 0))
+                                        ?: ((int) $second->id <=> (int) $first->id);
+                                }
+                            )->values();
 
-                        $badgeClass = $statusColors[$currentStatus] ?? $defaultColor;
-                        $historyRowId = 'history-row-' . $contact->id;
+                            $latestDuration = $formatDuration($histories->first()?->call_duration);
+                        @endphp
 
-                        // Latest call first. Fall back to created_at and break ties by ID.
-                        $sortedHistories = $contact->callHistories
-                            ->sort(static function ($first, $second) {
-                                $firstDate = $first->call_at ?? $first->created_at;
-                                $secondDate = $second->call_at ?? $second->created_at;
-
-                                $firstTimestamp = $firstDate
-                                    ? \Carbon\Carbon::parse($firstDate)->getTimestamp()
-                                    : 0;
-
-                                $secondTimestamp = $secondDate
-                                    ? \Carbon\Carbon::parse($secondDate)->getTimestamp()
-                                    : 0;
-
-                                return ($secondTimestamp <=> $firstTimestamp)
-                                    ?: ((int) $second->id <=> (int) $first->id);
-                            })
-                            ->values();
-
-                        $latestHistory = $sortedHistories->first();
-                        $latestDurationText = $formatCallDuration($latestHistory?->call_duration);
-                    @endphp
-
-                    <tbody class="border-b border-slate-100">
-                        {{-- MAIN ROW --}}
-                        <tr class="transition hover:bg-slate-50">
-                            <td class="px-4 py-4 text-slate-500">
-                                {{ $contacts->firstItem() + $loop->index }}
-                            </td>
-
-                            <td class="px-4 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 font-bold text-blue-600">
-                                        {{ mb_strtoupper(mb_substr($contact->name ?: 'L', 0, 1)) }}
-                                    </div>
-
+                        <tr class="cr-row">
+                            <td>{{ $contacts->firstItem() + $loop->index }}</td>
+                            <td>
+                                <div class="cr-person">
+                                    <span class="cr-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($leadName, 0, 1)) }}</span>
                                     <div>
-                                        <div class="max-w-[200px] truncate font-semibold text-slate-900">
-                                            {{ $contact->name ?: 'Unnamed Lead' }}
-                                        </div>
-
-                                        <div class="mt-1 text-xs text-slate-400">
-                                            Lead ID: {{ $contact->id }}
-                                        </div>
+                                        <strong class="cr-name" title="{{ $leadName }}">{{ $leadName }}</strong>
+                                        <span class="cr-detail">Lead ID: {{ $contact->id }}</span>
                                     </div>
                                 </div>
                             </td>
-
-                            {{-- MOBILE --}}
-                            <td class="px-4 py-4">
+                            <td>
                                 @if($contact->mobile)
-                                    <a
-                                        href="tel:{{ preg_replace('/[^0-9+]/', '', $contact->mobile) }}"
-                                        class="whitespace-nowrap font-medium text-blue-600 hover:underline"
-                                    >
+                                    <a class="cr-mobile" href="tel:{{ preg_replace('/[^0-9+]/', '', $contact->mobile) }}">
                                         {{ $contact->mobile }}
                                     </a>
-                                @else
-                                    <span class="text-slate-400">—</span>
-                                @endif
-                            </td>
-
-                            <td class="px-4 py-4">
-                                <span class="inline-flex rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                                    {{ $contact->leadCategory?->name ?: '—' }}
-                                </span>
-                            </td>
-
-                            <td class="px-4 py-4">
-                                <div class="flex items-center gap-2">
-                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700">
-                                        {{ mb_strtoupper(mb_substr($contact->assignedUser?->name ?? 'U', 0, 1)) }}
-                                    </div>
-
-                                    <div>
-                                        <p class="font-semibold text-slate-800">
-                                            {{ $contact->assignedUser?->name ?? 'Unknown User' }}
-                                        </p>
-
-                                        <p class="text-xs text-slate-400">
-                                            User ID: {{ $contact->assigned_to ?? '—' }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <td class="px-4 py-4">
-                                <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold {{ $badgeClass }}">
-                                    {{ $statusText ?: 'Unknown' }}
-                                </span>
-                            </td>
-
-                            <td class="px-4 py-4 text-slate-600">
-                                @if($contact->updated_at)
-                                    <div class="whitespace-nowrap">
-                                        {{ \Carbon\Carbon::parse($contact->updated_at)->format('d M Y') }}
-                                    </div>
-
-                                    <div class="mt-1 text-xs text-slate-400">
-                                        {{ \Carbon\Carbon::parse($contact->updated_at)->format('h:i A') }}
-                                    </div>
                                 @else
                                     —
                                 @endif
                             </td>
-
-                            <td class="px-4 py-4">
-                                <span class="inline-flex whitespace-nowrap rounded-lg bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-                                    {{ $contact->call_histories_count }} Calls
+                            <td>
+                                <span class="cr-badge cr-category" title="{{ $categoryName }}">{{ $categoryName }}</span>
+                            </td>
+                            <td>
+                                <div class="cr-person">
+                                    <span class="cr-avatar cr-user-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($assignedName, 0, 1)) }}</span>
+                                    <div>
+                                        <strong class="cr-name cr-user-name" title="{{ $assignedName }}">{{ $assignedName }}</strong>
+                                        <span class="cr-detail">User ID: {{ $contact->assigned_to ?? '—' }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="cr-badge cr-status cr-{{ $statusColors[$leadStatus] ?? 'neutral' }}">
+                                    {{ $statusLabel($leadStatus) }}
                                 </span>
                             </td>
-
-                            {{-- LATEST DURATION: ALWAYS VISIBLE --}}
-                            <td class="px-4 py-4">
-                                <span
-                                    title="Latest call duration (HH:MM:SS)"
-                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-50 px-3 py-1.5 font-semibold text-emerald-700"
-                                >
-                                    <i data-lucide="clock-3" class="h-4 w-4"></i>
-                                    {{ $latestDurationText }}
+                            <td>
+                                @if($updatedAt)
+                                    <time datetime="{{ $updatedAt->toIso8601String() }}">
+                                        {{ $updatedAt->format('d M Y') }}
+                                        <span class="cr-detail">{{ $updatedAt->format('h:i A') }}</span>
+                                    </time>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>
+                                <span class="cr-badge cr-count">
+                                    {{ number_format($callCount) }} {{ $callCount === 1 ? 'Call' : 'Calls' }}
                                 </span>
                             </td>
-
-                            <td class="px-4 py-4 text-right">
-                                <button
-                                    type="button"
-                                    data-history-toggle
-                                    data-target="{{ $historyRowId }}"
-                                    aria-expanded="false"
-                                    aria-controls="{{ $historyRowId }}"
-                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                                >
-                                    <i data-lucide="history" class="h-4 w-4"></i>
+                            <td>
+                                <span class="cr-badge cr-green" title="Latest call duration (HH:MM:SS)">
+                                    <i data-lucide="clock-3" class="cr-icon" aria-hidden="true"></i>
+                                    {{ $latestDuration }}
+                                </span>
+                            </td>
+                            <td class="cr-right">
+                                <button type="button" class="cr-button cr-history-button"
+                                    data-history-toggle aria-controls="{{ $historyRowId }}" aria-expanded="false">
+                                    <i data-lucide="history" class="cr-icon" aria-hidden="true"></i>
                                     <span data-history-label>View History</span>
                                 </button>
                             </td>
                         </tr>
 
-                        {{-- EXPANDED HISTORY --}}
-                        <tr id="{{ $historyRowId }}" data-history-row class="hidden bg-slate-50/80">
-                            <td colspan="10" class="p-3 sm:p-5">
-                                <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                    <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
-                                            <div class="flex items-center gap-2">
-                                                <i data-lucide="history" class="h-5 w-5 text-blue-600"></i>
-                                                <h3 class="font-bold text-slate-900">Complete Call History</h3>
-                                            </div>
+                        <tr id="{{ $historyRowId }}" class="cr-history-wrap" data-history-row hidden>
+                            <td colspan="10">
+                                <div class="cr-history-panel">
+                                    <header class="cr-history-title">
+                                        <h3><strong>Complete Call History</strong></h3>
+                                        <p class="cr-subtitle">{{ $leadName }} · Lead ID: {{ $contact->id }} · {{ $contact->mobile ?: '—' }}</p>
+                                    </header>
 
-                                            <p class="mt-1 text-xs text-slate-500">
-                                                {{ $contact->name ?: 'Lead' }}
-                                                · Lead ID: {{ $contact->id }}
-                                                · Mobile: {{ $contact->mobile ?: '—' }}
-                                            </p>
-                                        </div>
-
-                                        <span class="inline-flex self-start rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                                            {{ $contact->call_histories_count }} Call Records
-                                        </span>
-                                    </div>
-
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full min-w-[1050px] text-sm">
-                                            <thead class="bg-slate-50">
-                                                <tr class="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                    <th class="w-14 px-4 py-3">#</th>
-                                                    <th class="px-4 py-3">Called By</th>
-                                                    <th class="px-4 py-3">Call Status</th>
-                                                    <th class="px-4 py-3">Call Date & Time</th>
-                                                    <th class="px-4 py-3">Duration</th>
-                                                    <th class="px-4 py-3">Remarks</th>
-                                                    <th class="px-4 py-3 text-right">Recording</th>
+                                    <table class="cr-history-table" aria-label="Call history for {{ $leadName }}">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">#</th>
+                                                <th scope="col">Called By</th>
+                                                <th scope="col">Call Status</th>
+                                                <th scope="col">Call Date &amp; Time</th>
+                                                <th scope="col">Duration</th>
+                                                <th scope="col">Remarks</th>
+                                                <th scope="col" class="cr-right">Recording</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($histories as $history)
+                                                @php
+                                                    $historyStatus = (string) $history->call_status;
+                                                    $callDate = $reportDate($history->call_at ?? $history->created_at);
+                                                    $recordingUrl = $history->recording
+                                                        ? asset('storage/' . ltrim($history->recording, '/'))
+                                                        : null;
+                                                @endphp
+                                                <tr>
+                                                    <td>{{ $loop->iteration }}</td>
+                                                    <td>
+                                                        <strong>{{ $history->user?->name ?? 'Unknown User' }}</strong>
+                                                        <span class="cr-detail">User ID: {{ $history->user_id ?? '—' }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="cr-badge cr-status cr-{{ $statusColors[$historyStatus] ?? 'neutral' }}">
+                                                            {{ $statusLabel($historyStatus) }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        @if($callDate)
+                                                            <time datetime="{{ $callDate->toIso8601String() }}">
+                                                                {{ $callDate->format('d M Y') }}
+                                                                <span class="cr-detail">{{ $callDate->format('h:i A') }}</span>
+                                                            </time>
+                                                        @else
+                                                            —
+                                                        @endif
+                                                    </td>
+                                                    <td><span class="cr-badge">{{ $formatDuration($history->call_duration) }}</span></td>
+                                                    <td class="cr-remarks">{{ $history->remarks ?: '—' }}</td>
+                                                    <td class="cr-right">
+                                                        @if($recordingUrl)
+                                                            <audio controls preload="none" src="{{ $recordingUrl }}" aria-label="Call recording">
+                                                                Your browser does not support audio playback.
+                                                            </audio>
+                                                            <a href="{{ $recordingUrl }}" target="_blank" rel="noopener noreferrer" class="cr-recording-link">
+                                                                Open Recording
+                                                            </a>
+                                                        @else
+                                                            <span class="cr-detail">No Recording</span>
+                                                        @endif
+                                                    </td>
                                                 </tr>
-                                            </thead>
-
-                                            <tbody class="divide-y divide-slate-100">
-                                                @forelse($sortedHistories as $history)
-                                                    @php
-                                                        $historyStatus = $history->call_status ?? '';
-
-                                                        $historyStatusText = $statusLabels[$historyStatus]
-                                                            ?? ucwords(str_replace('_', ' ', $historyStatus));
-
-                                                        $historyColor = $statusColors[$historyStatus]
-                                                            ?? $defaultColor;
-
-                                                        $durationText = $formatCallDuration($history->call_duration);
-
-                                                        $callDate = $history->call_at
-                                                            ? \Carbon\Carbon::parse($history->call_at)
-                                                            : null;
-
-                                                        // $recordingUrl = $history->recording
-                                                        //     ? \Illuminate\Support\Facades\Storage::disk('public')->url($history->recording)
-                                                        //     : null;
-                                                        $recordingUrl = $history->recording
-                                                            ? asset('storage/' . ltrim($history->recording, '/'))
-                                                            : null;
-                                                    @endphp
-
-                                                    <tr class="transition hover:bg-blue-50/40">
-                                                        <td class="px-4 py-4 text-slate-500">
-                                                            {{ $loop->iteration }}
-                                                        </td>
-
-                                                        <td class="px-4 py-4">
-                                                            <div class="flex items-center gap-3">
-                                                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700">
-                                                                    {{ mb_strtoupper(mb_substr($history->user?->name ?? 'U', 0, 1)) }}
-                                                                </div>
-
-                                                                <div class="min-w-0">
-                                                                    <div class="max-w-[180px] truncate font-semibold text-slate-900">
-                                                                        {{ $history->user?->name ?? 'Unknown User' }}
-                                                                    </div>
-
-                                                                    <div class="mt-0.5 text-xs text-slate-400">
-                                                                        User ID: {{ $history->user_id ?? '—' }}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-
-                                                        <td class="px-4 py-4">
-                                                            <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold {{ $historyColor }}">
-                                                                {{ $historyStatusText ?: 'Unknown' }}
-                                                            </span>
-                                                        </td>
-
-                                                        <td class="px-4 py-4 text-slate-600">
-                                                            @if($callDate)
-                                                                <div class="whitespace-nowrap font-medium text-slate-800">
-                                                                    {{ $callDate->format('d M Y') }}
-                                                                </div>
-
-                                                                <div class="mt-0.5 text-xs text-slate-400">
-                                                                    {{ $callDate->format('h:i A') }}
-                                                                </div>
-                                                            @else
-                                                                <span class="text-slate-400">—</span>
-                                                            @endif
-                                                        </td>
-
-                                                        <td class="px-4 py-4">
-                                                            <span
-                                                                title="Duration (HH:MM:SS)"
-                                                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1.5 font-semibold text-slate-700"
-                                                            >
-                                                                <i data-lucide="clock-3" class="h-3.5 w-3.5"></i>
-                                                                {{ $durationText }}
-                                                            </span>
-                                                        </td>
-
-                                                        <td class="px-4 py-4">
-                                                            <div class="max-w-[300px] whitespace-pre-wrap break-words text-slate-600">{{ $history->remarks ?: 'No remarks added' }}</div>
-                                                        </td>
-
-                                                        <td class="px-4 py-4 text-right">
-                                                            @if($recordingUrl)
-                                                                <div class="flex flex-col items-end gap-2">
-                                                                    <audio
-                                                                        controls
-                                                                        preload="none"
-                                                                        class="h-9 w-[200px]"
-                                                                        src="{{ $recordingUrl }}"
-                                                                    >
-                                                                        Your browser does not support audio.
-                                                                    </audio>
-
-                                                                    <a
-                                                                        href="{{ $recordingUrl }}"
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
-                                                                    >
-                                                                        <i data-lucide="external-link" class="h-3.5 w-3.5"></i>
-                                                                        Open Recording
-                                                                    </a>
-                                                                </div>
-                                                            @else
-                                                                <span class="text-xs text-slate-400">No Recording</span>
-                                                            @endif
-                                                        </td>
-                                                    </tr>
-                                                @empty
-                                                    <tr>
-                                                        <td colspan="7" class="px-5 py-14 text-center">
-                                                            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                                                                <i data-lucide="history" class="h-6 w-6 text-slate-400"></i>
-                                                            </div>
-
-                                                            <h3 class="mt-3 font-semibold text-slate-700">No Call History Found</h3>
-                                                            <p class="mt-1 text-sm text-slate-500">No call records available for this lead.</p>
-                                                        </td>
-                                                    </tr>
-                                                @endforelse
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="7" class="cr-empty">No call history found.</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
                                 </div>
                             </td>
                         </tr>
-                    </tbody>
-                @empty
-                    <tbody>
+                    @empty
                         <tr>
-                            <td colspan="10" class="px-5 py-14 text-center">
-                                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                                    <i data-lucide="search" class="h-6 w-6 text-slate-400"></i>
-                                </div>
-
-                                <h3 class="mt-3 font-semibold text-slate-700">No Calling Leads Found</h3>
-
-                                <p class="mt-1 text-sm text-slate-500">
-                                    No leads match the selected filters.
-                                </p>
-
-                                <a
-                                    href="{{ route('calling-crm.index') }}"
-                                    class="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                                >
-                                    Clear Filters
-                                </a>
+                            <td colspan="10" class="cr-empty">
+                                <strong>No calling leads found</strong>
+                                <p class="cr-subtitle">No leads match the selected filters.</p>
+                                <a href="{{ $indexUrl }}" class="cr-button">Clear Filters</a>
                             </td>
                         </tr>
-                    </tbody>
-                @endforelse
+                    @endforelse
+                </tbody>
             </table>
         </div>
 
         @if($contacts->hasPages())
-            <div class="border-t border-slate-200 px-5 py-4">
-                {{ $contacts->withQueryString()->links() }}
+            <div class="cr-pagination">
+                {{ $contacts->onEachSide(1)->links() }}
             </div>
         @endif
     </section>
 </div>
 
-{{-- EXPAND / COLLAPSE HISTORY --}}
 <script>
 (function () {
-    function initializeCallingHistory() {
-        const buttons = document.querySelectorAll('[data-history-toggle]');
+    function initializeCallingReport() {
+        const report = document.getElementById('calling-report');
 
-        buttons.forEach(function (button) {
-            if (button.dataset.initialized === '1') {
+        if (!report || report.dataset.initialized === '1') {
+            return;
+        }
+
+        report.dataset.initialized = '1';
+
+        function toggleHistory(button, open) {
+            const row = document.getElementById(button.getAttribute('aria-controls'));
+
+            if (!row) {
                 return;
             }
 
-            button.dataset.initialized = '1';
+            row.hidden = !open;
+            button.setAttribute('aria-expanded', String(open));
+            button.querySelector('[data-history-label]').textContent = open
+                ? 'Hide History'
+                : 'View History';
 
-            button.addEventListener('click', function () {
-                const historyRow = document.getElementById(button.dataset.target);
+            if (!open) {
+                row.querySelectorAll('audio').forEach(audio => audio.pause());
+            }
+        }
 
-                if (!historyRow) {
-                    return;
-                }
+        report.addEventListener('click', function (event) {
+            const button = event.target.closest('[data-history-toggle]');
 
-                const shouldOpen = historyRow.classList.contains('hidden');
+            if (!button || !report.contains(button)) {
+                return;
+            }
 
-                document.querySelectorAll('[data-history-row]').forEach(function (row) {
-                    row.classList.add('hidden');
-                });
+            const wasOpen = button.getAttribute('aria-expanded') === 'true';
 
-                document.querySelectorAll('[data-history-toggle]').forEach(function (btn) {
-                    btn.setAttribute('aria-expanded', 'false');
+            report.querySelectorAll('[data-history-toggle][aria-expanded="true"]')
+                .forEach(openButton => toggleHistory(openButton, false));
 
-                    const label = btn.querySelector('[data-history-label]');
-
-                    if (label) {
-                        label.textContent = 'View History';
-                    }
-                });
-
-                if (shouldOpen) {
-                    historyRow.classList.remove('hidden');
-                    button.setAttribute('aria-expanded', 'true');
-
-                    const label = button.querySelector('[data-history-label]');
-
-                    if (label) {
-                        label.textContent = 'Hide History';
-                    }
-                }
-            });
+            if (!wasOpen) {
+                toggleHistory(button, true);
+            }
         });
 
-        if (window.lucide) {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeCallingHistory);
+        document.addEventListener('DOMContentLoaded', initializeCallingReport);
     } else {
-        initializeCallingHistory();
+        initializeCallingReport();
     }
 })();
 </script>
-
 @endsection
