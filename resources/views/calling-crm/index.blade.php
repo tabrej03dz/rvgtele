@@ -5,10 +5,10 @@
 @section('content')
 @php
     $overviewCards = [
-        ['demo_sent', 'Today Demo Sent', 'Total Demo Sent', 'send', 'green'],
-        ['total', 'Today Total Calling', 'Total Calling', 'phone', 'blue'],
-        ['not_answered', 'Today Not Answered', 'Total Not Answered', 'phone-missed', 'amber'],
-        ['not_interested', 'Today Not Interested', 'Total Not Interested', 'ban', 'rose'],
+        ['demo_sent', 'Today Demo Sent', 'Total Demo Sent', 'send', 'green', 'demo_sent'],
+        ['total', 'Today Total Calling', 'Total Calling', 'phone', 'blue', null],
+        ['not_answered', 'Today Not Answered', 'Total Not Answered', 'phone-missed', 'amber', 'not_answered'],
+        ['not_interested', 'Today Not Interested', 'Total Not Interested', 'ban', 'rose', 'not_interested'],
     ];
 
     $overviewSections = [
@@ -18,7 +18,7 @@
             'badge' => $today->format('d M Y, l'),
             'badgeIcon' => 'calendar',
             'counts' => $todayOverview,
-            'today' => true,
+            'range' => 'today',
         ],
         [
             'title' => 'Overall Calling Overview',
@@ -26,7 +26,7 @@
             'badge' => 'All Time (Complete Data)',
             'badgeIcon' => 'layers',
             'counts' => $overallOverview,
-            'today' => false,
+            'range' => 'all',
         ],
     ];
 
@@ -105,18 +105,24 @@
         line-height: 1.4;
     }
 
-    .calling-report h1, .calling-report h2, .calling-report h3, .calling-report p { margin: 0; }
+    .calling-report h1, .calling-report h2,
+    .calling-report h3, .calling-report p { margin: 0; }
     .calling-report h1 { font-size: 23px; font-weight: 800; line-height: 1.15; }
     .calling-report h2 { font-size: 16px; font-weight: 800; }
-    .calling-report .cr-icon { display: inline-block; width: 16px; height: 16px; flex: none; }
+
+    .calling-report .cr-icon {
+        display: inline-block; width: 16px; height: 16px; flex: none;
+    }
     .calling-report .cr-heading-icon { width: 21px; height: 21px; color: #4325d5; }
     .calling-report .cr-hero-icon { width: 33px; height: 33px; color: #4924dc; }
+
     .calling-report .cr-hero, .calling-report .cr-strip, .calling-report .cr-list-header {
         display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
     .calling-report .cr-hero { min-height: 50px; padding: 0 2px; }
     .calling-report .cr-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
     .calling-report .cr-subtitle { color: var(--muted); font-size: 12px; }
+
     .calling-report .cr-panel {
         min-width: 0; padding: 10px 12px; border: 1px solid var(--border);
         border-radius: 13px; background: #fff; box-shadow: 0 2px 6px #253a7010;
@@ -136,6 +142,7 @@
     .calling-report .cr-chip .cr-icon, .calling-report .cr-badge .cr-icon {
         width: 13px; height: 13px;
     }
+
     .calling-report .cr-cards {
         display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
     }
@@ -160,7 +167,12 @@
         display: flex; align-items: center; gap: 10px;
         min-height: 62px; padding: 6px 11px; border: 1px solid var(--edge);
         border-radius: 10px; background: linear-gradient(var(--light), var(--soft));
-        color: var(--tone);
+        color: var(--tone); text-decoration: none; cursor: pointer;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .calling-report .cr-card:hover { border-color: var(--accent); }
+    .calling-report .cr-card[aria-current="true"] {
+        border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
     }
     .calling-report .cr-card::after {
         position: absolute; z-index: -1; right: -14px; bottom: -35px;
@@ -182,7 +194,9 @@
         display: grid; align-items: end; gap: 8px;
         grid-template-columns: minmax(150px, 1.65fr) repeat(4, minmax(96px, 1fr)) auto;
     }
-    .calling-report .cr-field { display: grid; gap: 3px; min-width: 0; font-size: 11px; font-weight: 750; }
+    .calling-report .cr-field {
+        display: grid; gap: 3px; min-width: 0; font-size: 11px; font-weight: 750;
+    }
     .calling-report .cr-search { position: relative; min-width: 0; }
     .calling-report .cr-search .cr-icon {
         position: absolute; top: 9px; left: 9px; color: var(--muted); pointer-events: none;
@@ -207,7 +221,7 @@
     .calling-report .cr-reset { background: #fff; color: var(--ink); }
     .calling-report .cr-error { margin-top: 7px; color: #a51c3a; }
 
-    .calling-report .cr-list { padding: 0; overflow: hidden; }
+    .calling-report .cr-list { padding: 0; overflow: hidden; scroll-margin-top: 76px; }
     .calling-report .cr-list-header { padding: 9px 12px; }
     .calling-report .cr-scroll { overflow-x: auto; }
     .calling-report table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -216,7 +230,9 @@
         padding: 7px 8px; background: #eef2fe; color: #243356;
         font-size: 10px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
     }
-    .calling-report td { padding: 6px 8px; border-bottom: 1px solid #eef2f8; vertical-align: middle; }
+    .calling-report td {
+        padding: 6px 8px; border-bottom: 1px solid #eef2f8; vertical-align: middle;
+    }
     .calling-report .cr-row:hover { background: #f8faff; }
     .calling-report .cr-right { text-align: right; }
     .calling-report .cr-person { display: flex; align-items: center; gap: 7px; line-height: 1.2; }
@@ -249,7 +265,9 @@
     .calling-report [data-history-row][hidden] { display: none; }
     .calling-report .cr-history-wrap { background: #f7f9ff; }
     .calling-report .cr-history-wrap > td { padding: 10px; }
-    .calling-report .cr-history-panel { overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: #fff; }
+    .calling-report .cr-history-panel {
+        overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: #fff;
+    }
     .calling-report .cr-history-title { padding: 8px 10px; background: #f2f5ff; }
     .calling-report .cr-history-table { min-width: 790px; }
     .calling-report .cr-remarks { min-width: 150px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -311,16 +329,40 @@
             </header>
 
             <div class="cr-cards">
-                @foreach($overviewCards as [$key, $todayLabel, $overallLabel, $icon, $tone])
-                    <div class="cr-card cr-{{ $tone }}">
+                @foreach($overviewCards as [$key, $todayLabel, $overallLabel, $icon, $tone, $cardStatus])
+                    @php
+                        $cardLabel = $section['range'] === 'today' ? $todayLabel : $overallLabel;
+                        $count = number_format($section['counts'][$key]);
+
+                        $cardParams = array_merge($cardFilters, [
+                            'date_range' => $section['range'],
+                            'status_source' => 'history',
+                        ]);
+
+                        if ($cardStatus !== null) {
+                            $cardParams['status'] = $cardStatus;
+                        }
+
+                        $active = $filterByHistory
+                            && $search === ''
+                            && $dateRange === $section['range']
+                            && ($selectedStatus ?: null) === $cardStatus;
+                    @endphp
+
+                    <a
+                        href="{{ route('calling-crm.index', $cardParams) }}#calling-leads"
+                        class="cr-card cr-{{ $tone }}"
+                        aria-label="{{ $cardLabel }}, {{ $count }} calls. Show matching leads."
+                        @if($active) aria-current="true" @endif
+                    >
                         <span class="cr-card-icon">
                             <i data-lucide="{{ $icon }}" class="cr-icon" aria-hidden="true"></i>
                         </span>
                         <div>
-                            <span class="cr-card-label">{{ $section['today'] ? $todayLabel : $overallLabel }}</span>
-                            <strong class="cr-card-value">{{ number_format($section['counts'][$key]) }}</strong>
+                            <span class="cr-card-label">{{ $cardLabel }}</span>
+                            <strong class="cr-card-value">{{ $count }}</strong>
                         </div>
-                    </div>
+                    </a>
                 @endforeach
             </div>
         </section>
@@ -333,10 +375,13 @@
         </div>
 
         <form method="GET" action="{{ $indexUrl }}" class="cr-form">
+            @if($filterByHistory)
+                <input type="hidden" name="status_source" value="history">
+            @endif
+
             <div class="cr-search">
                 <i data-lucide="search" class="cr-icon" aria-hidden="true"></i>
-                <input type="search" name="search" maxlength="255"
-                    value="{{ request('search') }}"
+                <input type="search" name="search" maxlength="255" value="{{ $search }}"
                     aria-label="Search by name, mobile or lead ID"
                     placeholder="Search by name, mobile or lead ID…">
             </div>
@@ -370,9 +415,14 @@
             </label>
 
             <label class="cr-field">
-                Call Status
+                {{ $filterByHistory ? 'Call History Status' : 'Call Status' }}
                 <select name="status">
                     <option value="">All Statuses</option>
+
+                    @if($selectedStatus && !$statuses->containsStrict($selectedStatus))
+                        <option value="{{ $selectedStatus }}" selected>{{ $statusLabel($selectedStatus) }}</option>
+                    @endif
+
                     @foreach($statuses as $status)
                         <option value="{{ $status }}" @selected($selectedStatus === $status)>
                             {{ $statusLabel($status) }}
@@ -409,7 +459,7 @@
         @endif
     </section>
 
-    <section class="cr-panel cr-list" aria-labelledby="calling-leads-heading">
+    <section id="calling-leads" class="cr-panel cr-list" aria-labelledby="calling-leads-heading">
         <header class="cr-list-header">
             <div class="cr-title">
                 <i data-lucide="users" class="cr-icon cr-heading-icon" aria-hidden="true"></i>
@@ -421,9 +471,14 @@
                     </p>
                 </div>
             </div>
+
             <span class="cr-chip">
                 <i data-lucide="layers" class="cr-icon" aria-hidden="true"></i>
-                Non-Pending Leads
+                @if($filterByHistory)
+                    {{ $dateRanges[$dateRange] }} · {{ $selectedStatus ? $statusLabel($selectedStatus) : 'All Calls' }}
+                @else
+                    Non-Pending Leads
+                @endif
             </span>
         </header>
 
@@ -436,7 +491,7 @@
                         <th scope="col">Mobile</th>
                         <th scope="col">Category</th>
                         <th scope="col">Assigned User</th>
-                        <th scope="col">Call Status</th>
+                        <th scope="col">{{ $filterByHistory ? 'Current Lead Status' : 'Call Status' }}</th>
                         <th scope="col">Updated At</th>
                         <th scope="col">Calls</th>
                         <th scope="col">Latest Call Duration</th>
@@ -471,7 +526,9 @@
                             <td>{{ $contacts->firstItem() + $loop->index }}</td>
                             <td>
                                 <div class="cr-person">
-                                    <span class="cr-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($leadName, 0, 1)) }}</span>
+                                    <span class="cr-avatar" aria-hidden="true">
+                                        {{ mb_strtoupper(mb_substr($leadName, 0, 1)) }}
+                                    </span>
                                     <div>
                                         <strong class="cr-name" title="{{ $leadName }}">{{ $leadName }}</strong>
                                         <span class="cr-detail">Lead ID: {{ $contact->id }}</span>
@@ -492,7 +549,9 @@
                             </td>
                             <td>
                                 <div class="cr-person">
-                                    <span class="cr-avatar cr-user-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($assignedName, 0, 1)) }}</span>
+                                    <span class="cr-avatar cr-user-avatar" aria-hidden="true">
+                                        {{ mb_strtoupper(mb_substr($assignedName, 0, 1)) }}
+                                    </span>
                                     <div>
                                         <strong class="cr-name cr-user-name" title="{{ $assignedName }}">{{ $assignedName }}</strong>
                                         <span class="cr-detail">User ID: {{ $contact->assigned_to ?? '—' }}</span>
@@ -539,7 +598,9 @@
                                 <div class="cr-history-panel">
                                     <header class="cr-history-title">
                                         <h3><strong>Complete Call History</strong></h3>
-                                        <p class="cr-subtitle">{{ $leadName }} · Lead ID: {{ $contact->id }} · {{ $contact->mobile ?: '—' }}</p>
+                                        <p class="cr-subtitle">
+                                            {{ $leadName }} · Lead ID: {{ $contact->id }} · {{ $contact->mobile ?: '—' }}
+                                        </p>
                                     </header>
 
                                     <table class="cr-history-table" aria-label="Call history for {{ $leadName }}">
@@ -584,14 +645,17 @@
                                                             —
                                                         @endif
                                                     </td>
-                                                    <td><span class="cr-badge">{{ $formatDuration($history->call_duration) }}</span></td>
+                                                    <td>
+                                                        <span class="cr-badge">{{ $formatDuration($history->call_duration) }}</span>
+                                                    </td>
                                                     <td class="cr-remarks">{{ $history->remarks ?: '—' }}</td>
                                                     <td class="cr-right">
                                                         @if($recordingUrl)
                                                             <audio controls preload="none" src="{{ $recordingUrl }}" aria-label="Call recording">
                                                                 Your browser does not support audio playback.
                                                             </audio>
-                                                            <a href="{{ $recordingUrl }}" target="_blank" rel="noopener noreferrer" class="cr-recording-link">
+                                                            <a href="{{ $recordingUrl }}" target="_blank"
+                                                                rel="noopener noreferrer" class="cr-recording-link">
                                                                 Open Recording
                                                             </a>
                                                         @else
@@ -624,7 +688,7 @@
 
         @if($contacts->hasPages())
             <div class="cr-pagination">
-                {{ $contacts->onEachSide(1)->links() }}
+                {{ $contacts->fragment('calling-leads')->onEachSide(1)->links() }}
             </div>
         @endif
     </section>
