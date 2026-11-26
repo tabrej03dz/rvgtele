@@ -13,6 +13,8 @@ use Illuminate\Validation\Rule;
 class DialedCallHistoryController extends Controller
 {
     private const REPORT_TIMEZONE = 'Asia/Kolkata';
+    private const DEFAULT_PER_PAGE = 100;
+    private const MAX_PER_PAGE = 500;
 
     public function index(Request $request)
     {
@@ -34,7 +36,7 @@ class DialedCallHistoryController extends Controller
                 'date_format:Y-m-d',
                 Rule::when($request->filled('from_date'), ['after_or_equal:from_date']),
             ],
-            'per_page' => ['nullable', 'integer', Rule::in([20, 50, 100])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PER_PAGE],
             'without_lead' => ['nullable', 'boolean'],
         ]);
 
@@ -45,6 +47,7 @@ class DialedCallHistoryController extends Controller
         $fromDate = $filters['from_date'] ?? null;
         $toDate = $filters['to_date'] ?? null;
         $onlyWithoutLead = (bool) ($filters['without_lead'] ?? false);
+        $perPage = (int) ($filters['per_page'] ?? self::DEFAULT_PER_PAGE);
 
         $today = CarbonImmutable::now(self::REPORT_TIMEZONE)->startOfDay();
         $storageTimezone = config('app.timezone', 'UTC');
@@ -136,6 +139,17 @@ class DialedCallHistoryController extends Controller
             $query->where('call_at', '<', $end);
         }
 
+        $filterUrlParams = array_filter(
+            $filters,
+            static fn ($value) => $value !== null && $value !== ''
+        );
+
+        if (!$canFilterEmployees) {
+            unset($filterUrlParams['user_id']);
+        }
+
+        $filterUrlParams['per_page'] = $perPage;
+
         $histories = $query
             ->with([
                 'lead' => function ($leadQuery) {
@@ -145,17 +159,8 @@ class DialedCallHistoryController extends Controller
             ])
             ->orderByDesc('call_at')
             ->orderByDesc('id')
-            ->paginate((int) ($filters['per_page'] ?? 20))
-            ->withQueryString();
-
-        $filterUrlParams = array_filter(
-            $filters,
-            static fn ($value) => $value !== null && $value !== ''
-        );
-
-        if (!$canFilterEmployees) {
-            unset($filterUrlParams['user_id']);
-        }
+            ->paginate($perPage)
+            ->appends($filterUrlParams);
 
         $cardFilters = Arr::except($filterUrlParams, [
             'direction',
@@ -181,6 +186,8 @@ class DialedCallHistoryController extends Controller
             'callType' => $callType,
             'fromDate' => $fromDate,
             'toDate' => $toDate,
+            'perPage' => $perPage,
+            'maxPerPage' => self::MAX_PER_PAGE,
             'onlyWithoutLead' => $onlyWithoutLead,
             'canFilterEmployees' => $canFilterEmployees,
             'today' => $today,

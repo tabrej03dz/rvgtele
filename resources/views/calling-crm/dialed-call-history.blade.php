@@ -493,13 +493,10 @@
 
                 <label class="dc-field">
                     Records Per Page
-                    <select name="per_page">
-                        @foreach([20, 50, 100] as $size)
-                            <option value="{{ $size }}" @selected((int) ($filters['per_page'] ?? 20) === $size)>
-                                {{ $size }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <input type="number" name="per_page"
+                        min="1" max="{{ $maxPerPage }}" step="1" inputmode="numeric"
+                        value="{{ $perPage }}"
+                        title="Enter a whole number between 1 and {{ $maxPerPage }}">
                 </label>
             </div>
 
@@ -622,7 +619,9 @@
                                 </span>
                             </td>
 
-                            <td class="dc-nowrap dc-duration">{{ $formatDuration($call->call_duration) }}</td>
+                            <td class="dc-nowrap dc-duration">
+                                {{ $formatDuration($call->call_duration) }}
+                            </td>
 
                             <td class="dc-nowrap">
                                 @if($callAt)
