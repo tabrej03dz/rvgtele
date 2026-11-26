@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\CallHistory;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 
 class DialedCallHistoryController extends Controller
@@ -13,223 +16,168 @@ class DialedCallHistoryController extends Controller
     {
         $currentUser = $request->user();
         $companyId = (int) $currentUser->company_id;
-
         $isSuperAdmin = $currentUser->hasRole('super_admin');
+        $isCompanyAdmin = $currentUser->hasAnyRole(['owner', 'admin']);
+        $canFilterEmployees = $isSuperAdmin || $isCompanyAdmin;
 
-        $isCompanyAdmin = $currentUser->hasAnyRole([
-            'owner',
-            'admin',
-        ]);
-
-        // Filters validate करें
         $filters = $request->validate([
-            'search' => 'nullable|string|max:100',
-            'direction' => [
+            'search' => ['nullable', 'string', 'max:100'],
+            'direction' => ['nullable', Rule::in(['incoming', 'outgoing'])],
+            'call_type' => ['nullable', Rule::in(['incoming', 'outgoing', 'missed', 'rejected'])],
+            'call_status' => ['nullable', 'string', 'max:255'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
+            'from_date' => ['nullable', 'date_format:Y-m-d'],
+            'to_date' => [
                 'nullable',
-                Rule::in(['incoming', 'outgoing']),
+                'date_format:Y-m-d',
+                Rule::when($request->filled('from_date'), ['after_or_equal:from_date']),
             ],
-            'call_type' => [
-                'nullable',
-                Rule::in([
-                    'incoming',
-                    'outgoing',
-                    'missed',
-                    'rejected',
-                ]),
-            ],
-            'call_status' => 'nullable|string|max:255',
-            'user_id' => 'nullable|integer|min:1',
-            'from_date' => 'nullable|date_format:Y-m-d',
-            'to_date' => 'nullable|date_format:Y-m-d|after_or_equal:from_date',
-            'per_page' => 'nullable|integer|in:20,50,100',
+            'per_page' => ['nullable', 'integer', Rule::in([20, 50, 100])],
+            'without_lead' => ['nullable', 'boolean'],
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Base Query
-        |--------------------------------------------------------------------------
-        |
-        | सिर्फ Android dialer से sync की गई history.
-        | जिन records में mobile और direction है।
-        |
-        */
+        $search = trim($filters['search'] ?? '');
+        $callStatus = trim($filters['call_status'] ?? '');
+        $direction = $filters['direction'] ?? null;
+        $callType = $filters['call_type'] ?? null;
+        $onlyWithoutLead = (bool) ($filters['without_lead'] ?? false);
 
+        // Android dialer records with a mobile number and a recognized direction.
         $baseQuery = CallHistory::query()
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
-            ->whereIn('direction', [
-                'incoming',
-                'outgoing',
-            ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Company और employee visibility
-        |--------------------------------------------------------------------------
-        */
+            ->whereIn('direction', ['incoming', 'outgoing']);
 
         if (!$isSuperAdmin) {
+            $baseQuery->whereHas('user', function (Builder $query) use ($companyId) {
+                $query->where('company_id', $companyId);
+            });
 
-            $baseQuery->whereHas(
-                'user',
-                function ($q) use ($companyId) {
-                    $q->where('company_id', $companyId);
-                }
-            );
-
-            // Employee केवल अपनी calls देखेगा
             if (!$isCompanyAdmin) {
-                $baseQuery->where(
-                    'user_id',
-                    $currentUser->id
-                );
+                $baseQuery->where('user_id', $currentUser->id);
             }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Employee dropdown
-        |--------------------------------------------------------------------------
-        */
+        $employees = collect();
 
-        $employeeIds = (clone $baseQuery)
-            ->distinct()
-            ->pluck('user_id');
+        if ($canFilterEmployees) {
+            $employeeIds = (clone $baseQuery)
+                ->whereNotNull('user_id')
+                ->select('user_id');
 
-        $employees = User::query()
-            ->whereIn('id', $employeeIds)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            $employees = User::query()
+                ->whereIn('id', $employeeIds)
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Filtered Query
-        |--------------------------------------------------------------------------
-        */
+        // These filters apply both to the overview and to the records table.
+        $overviewQuery = clone $baseQuery;
 
-        $query = clone $baseQuery;
-
-        // Search by mobile / lead name
-        if (!empty($filters['search'])) {
-
-            $search = trim($filters['search']);
-
-            $query->where(function ($q) use ($search) {
-
-                $q->where('mobile', 'like', "%{$search}%")
-
-                  ->orWhereHas(
-                      'lead',
-                      function ($leadQuery) use ($search) {
-
-                          $leadQuery->where(
-                              'name',
-                              'like',
-                              "%{$search}%"
-                          );
-                      }
-                  );
+        if ($search !== '') {
+            $overviewQuery->where(function (Builder $query) use ($search) {
+                $query->where('mobile', 'like', "%{$search}%")
+                    ->orWhereHas('lead', function (Builder $leadQuery) use ($search) {
+                        $leadQuery->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
-        if (!empty($filters['direction'])) {
-            $query->where(
-                'direction',
-                $filters['direction']
-            );
+        if ($canFilterEmployees && !empty($filters['user_id'])) {
+            $overviewQuery->where('user_id', $filters['user_id']);
         }
 
-        if (!empty($filters['call_type'])) {
-            $query->where(
-                'call_type',
-                $filters['call_type']
-            );
-        }
-
-        if (!empty($filters['call_status'])) {
-            $query->where(
-                'call_status',
-                $filters['call_status']
-            );
-        }
-
-        if (!empty($filters['user_id'])) {
-            $query->where(
-                'user_id',
-                $filters['user_id']
-            );
+        if ($callStatus !== '') {
+            $overviewQuery->where('call_status', $callStatus);
         }
 
         if (!empty($filters['from_date'])) {
-            $query->where(
-                'call_at',
-                '>=',
-                $filters['from_date'] . ' 00:00:00'
-            );
+            $overviewQuery->where('call_at', '>=', $filters['from_date'] . ' 00:00:00');
         }
 
         if (!empty($filters['to_date'])) {
-            $query->where(
-                'call_at',
-                '<=',
-                $filters['to_date'] . ' 23:59:59'
-            );
+            $endExclusive = CarbonImmutable::createFromFormat('!Y-m-d', $filters['to_date'])
+                ->addDay()
+                ->toDateTimeString();
+
+            $overviewQuery->where('call_at', '<', $endExclusive);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Counts
-        |--------------------------------------------------------------------------
-        */
+        // Compute all card counts in one query.
+        $counts = (clone $overviewQuery)
+            ->toBase()
+            ->selectRaw(
+                'COUNT(*) AS total_calls,
+                 COUNT(CASE WHEN direction = ? THEN 1 END) AS incoming_calls,
+                 COUNT(CASE WHEN direction = ? THEN 1 END) AS outgoing_calls,
+                 COUNT(CASE WHEN call_type = ? THEN 1 END) AS missed_calls,
+                 COUNT(CASE WHEN lead_id IS NULL THEN 1 END) AS without_lead',
+                ['incoming', 'outgoing', 'missed']
+            )
+            ->first();
 
-        $totalCalls = (clone $query)->count();
+        $query = clone $overviewQuery;
 
-        $incomingCalls = (clone $query)
-            ->where('direction', 'incoming')
-            ->count();
+        if ($direction !== null && $direction !== '') {
+            $query->where('direction', $direction);
+        }
 
-        $outgoingCalls = (clone $query)
-            ->where('direction', 'outgoing')
-            ->count();
+        if ($callType !== null && $callType !== '') {
+            $query->where('call_type', $callType);
+        }
 
-        $missedCalls = (clone $query)
-            ->where('call_type', 'missed')
-            ->count();
-
-        $withoutLead = (clone $query)
-            ->whereNull('lead_id')
-            ->count();
-
-        /*
-        |--------------------------------------------------------------------------
-        | History
-        |--------------------------------------------------------------------------
-        */
+        if ($onlyWithoutLead) {
+            $query->whereNull('lead_id');
+        }
 
         $histories = $query
             ->with([
-                'lead' => function ($q) {
-                    $q->withTrashed()
-                        ->select('id', 'name', 'mobile');
+                'lead' => function ($query) {
+                    $query->withTrashed()->select('id', 'name', 'mobile');
                 },
                 'user:id,name',
             ])
             ->orderByDesc('call_at')
             ->orderByDesc('id')
-            ->paginate($filters['per_page'] ?? 20)
+            ->paginate((int) ($filters['per_page'] ?? 20))
             ->withQueryString();
+
+        $filterUrlParams = array_filter(
+            $filters,
+            static fn ($value) => $value !== null && $value !== ''
+        );
+
+        if (!$canFilterEmployees) {
+            unset($filterUrlParams['user_id']);
+        }
+
+        // Each card replaces the direction, call type, and lead-link filters.
+        $cardFilters = Arr::except($filterUrlParams, ['direction', 'call_type', 'without_lead']);
+
+        $refreshParams = $filterUrlParams;
+
+        if ($histories->currentPage() > 1) {
+            $refreshParams['page'] = $histories->currentPage();
+        }
 
         return view('calling-crm.dialed-call-history', [
             'histories' => $histories,
             'employees' => $employees,
             'filters' => $filters,
-            'totalCalls' => $totalCalls,
-            'incomingCalls' => $incomingCalls,
-            'outgoingCalls' => $outgoingCalls,
-            'missedCalls' => $missedCalls,
-            'withoutLead' => $withoutLead,
-            'canFilterEmployees' =>
-                $isSuperAdmin || $isCompanyAdmin,
+            'search' => $search,
+            'callStatus' => $callStatus,
+            'direction' => $direction,
+            'callType' => $callType,
+            'onlyWithoutLead' => $onlyWithoutLead,
+            'totalCalls' => (int) ($counts->total_calls ?? 0),
+            'incomingCalls' => (int) ($counts->incoming_calls ?? 0),
+            'outgoingCalls' => (int) ($counts->outgoing_calls ?? 0),
+            'missedCalls' => (int) ($counts->missed_calls ?? 0),
+            'withoutLead' => (int) ($counts->without_lead ?? 0),
+            'canFilterEmployees' => $canFilterEmployees,
+            'cardFilters' => $cardFilters,
+            'filterUrlParams' => $filterUrlParams,
+            'refreshParams' => $refreshParams,
         ]);
     }
 }
