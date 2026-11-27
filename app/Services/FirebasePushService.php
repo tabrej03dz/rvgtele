@@ -22,7 +22,9 @@ class FirebasePushService
         string $deviceToken,
         string $title,
         string $body,
-        array $data = []
+        array $data = [],
+        string $androidChannel = 'follow_up_reminders',
+        ?string $androidClickAction = 'FLUTTER_NOTIFICATION_CLICK',
     ): array {
         try {
             $deviceToken = trim($deviceToken);
@@ -109,14 +111,14 @@ class FirebasePushService
                             'priority' => 'high',
 
                             'notification' => [
-                                'channel_id' =>
-                                    'follow_up_reminders',
+                                'channel_id' => $androidChannel,
 
                                 'sound' =>
                                     'default',
 
-                                'click_action' =>
-                                    'FLUTTER_NOTIFICATION_CLICK',
+                                ...($androidClickAction === null
+                                    ? []
+                                    : ['click_action' => $androidClickAction]),
 
                                 'default_sound' =>
                                     true,

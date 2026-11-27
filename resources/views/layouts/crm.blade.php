@@ -414,6 +414,16 @@
                 ],
             ];
 
+            if ($isSuperAdmin) {
+                $menuGroups['CRM Settings'][] = [
+                    'Employee Notifications',
+                    'employee-notifications.index',
+                    'employee-notifications.*',
+                    'dashboard.view',
+                    'megaphone',
+                ];
+            }
+
             $groupIcons = [
                 'Calling CRM' => 'headset',
                 'Workspace' => 'layout-grid',

@@ -14,13 +14,30 @@ use App\Http\Controllers\Api\DemoCityController;
 use App\Http\Controllers\Api\DeviceCallLogController;
 use App\Http\Controllers\Api\MobileApkController;
 use App\Http\Controllers\Api\GetMoreLeadsController;
+use App\Http\Controllers\EmployeePushController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::post('active-inactive-customer-category', [\App\Http\Controllers\Api\ActiveInactiveCustomerCategoryController::class, 'activeInactiveCustomerCategory']);
 
 Route::middleware('auth:sanctum')->group(function () {
-      Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    Route::get(
+        'employee-notifications/{notification}',
+        [EmployeePushController::class, 'show'],
+    )
+        ->whereNumber('notification')
+        ->name('api.employee-notifications.show');
+
+    Route::get(
+        'employee-notifications/{notification}/{kind}',
+        [EmployeePushController::class, 'attachment'],
+    )
+        ->whereNumber('notification')
+        ->whereIn('kind', ['image', 'video'])
+        ->name('api.employee-notifications.attachment');
+
+    Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get(

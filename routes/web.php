@@ -36,6 +36,7 @@ use App\Http\Controllers\RecycleBinController;
 use App\Http\Controllers\SimpleLeadController;
 use App\Http\Controllers\WhatsappMessageTemplateController;
 use App\Http\Controllers\DialedCallHistoryController;
+use App\Http\Controllers\EmployeePushController;
 
 
 Route::view('/', 'welcome')->name('home');
@@ -44,6 +45,30 @@ Route::get('mobile-apks/{mobileApk}/download', [MobileApkController::class, 'dow
                 ->name('mobile-apks.download');
 
 Route::middleware(['auth'])->group(function () {
+
+
+        Route::middleware('role:super_admin')
+        ->prefix('employee-notifications')
+        ->name('employee-notifications.')
+        ->group(function () {
+            Route::get('/', [EmployeePushController::class, 'index'])
+                ->name('index');
+
+            Route::post('/', [EmployeePushController::class, 'store'])
+                ->name('store');
+
+            Route::get('/{notification}', [EmployeePushController::class, 'details'])
+                ->whereNumber('notification')
+                ->name('details');
+
+            Route::get('/{notification}/edit', [EmployeePushController::class, 'edit'])
+                ->whereNumber('notification')
+                ->name('edit');
+
+            Route::post('/{notification}/resend', [EmployeePushController::class, 'resend'])
+                ->whereNumber('notification')
+                ->name('resend');
+        });
 
 
     Route::get('calling-crm', [CallingCrmController::class, 'index'])->name('calling-crm.index');
