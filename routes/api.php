@@ -371,6 +371,7 @@ Route::get(
         Route::get('/options', 'options');
         Route::get('/', 'index');
         Route::post('/', 'store');
+        Route::get('/by-number', 'findByNumber');
         Route::get('/{lead}', 'show');
         Route::put('/{lead}', 'update');
         Route::patch('/{lead}', 'update');

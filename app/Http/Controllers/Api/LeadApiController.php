@@ -5003,5 +5003,42 @@ public function saveCallResult(
     );
 }
 
+public function findByNumber(Request $request): JsonResponse
+{
+    $validated = $request->validate([
+        'mobile' => ['required', 'string', 'max:30', 'regex:/\A[0-9+(). -]+\z/'],
+    ]);
+
+    $digits = preg_replace('/[^0-9]/', '', $validated['mobile']);
+
+    if (!preg_match('/\A(?:91|0)?([0-9]{10})\z/', $digits, $matches)) {
+        return $this->error('Enter a valid 10-digit Indian mobile number.', 422);
+    }
+
+    $mobile = $matches[1];
+    $variants = [$mobile, '91' . $mobile, '0' . $mobile];
+
+    $lead = $this->filteredLeadQuery($request)
+        ->where(function (Builder $query) use ($variants): void {
+            foreach (['mobile', 'alternate_mobile', 'whatsapp_number'] as $column) {
+                $normalized = "leads.{$column}";
+
+                foreach (['+', ' ', '-', '(', ')', '.'] as $separator) {
+                    $normalized = "REPLACE({$normalized}, '{$separator}', '')";
+                }
+
+                $query->orWhereIn(DB::raw($normalized), $variants);
+            }
+        })
+        ->orderByDesc('leads.id')
+        ->first();
+
+    if (!$lead) {
+        return $this->error('Lead not found for this mobile number.', 404);
+    }
+
+    return $this->success($this->loadLead($lead), 'Lead fetched successfully.');
+}
+
 
 }
