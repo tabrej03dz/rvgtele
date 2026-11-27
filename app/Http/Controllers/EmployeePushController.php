@@ -85,6 +85,11 @@ class EmployeePushController extends Controller
 
     private function publish(Request $request, ?object $source = null): RedirectResponse
     {
+        $request->mergeIfMissing([
+            'audience' => $request->input('recipient_ids', []) === []
+                ? 'all'
+                : 'selected',
+        ]);
         $data = $request->validate([
             'audience' => ['required', 'in:all,selected'],
             'recipient_ids' => [
