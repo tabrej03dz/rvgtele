@@ -415,7 +415,7 @@
             ];
 
             if ($isSuperAdmin) {
-                $menuGroups['CRM Settings'][] = [
+                $menuGroups['Calling CRM'][] = [
                     'Employee Notifications',
                     'employee-notifications.index',
                     'employee-notifications.*',
