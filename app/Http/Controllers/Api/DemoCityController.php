@@ -115,23 +115,46 @@ class DemoCityController extends Controller
     |
     */
 
+    // public function categories(Request $request)
+    // {
+    //     $companyId = $this->companyId($request);
+
+    //     $categories = Category::query()
+    //         ->where('company_id', $companyId)
+    //         ->orderBy('name')
+    //         ->get([
+    //             'id',
+    //             'name',
+    //         ]);
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Categories fetched successfully.',
+    //         'data' => $categories,
+    //     ]);
+    // }
+
     public function categories(Request $request)
     {
-        $companyId = $this->companyId($request);
+        $companyId = (int) ($request->user()->company_id ?? 0);
+
+        abort_if($companyId <= 0, 422, 'Company is not selected.');
 
         $categories = Category::query()
-            ->where('company_id', $companyId)
-            ->orderBy('name')
-            ->get([
-                'id',
-                'name',
-            ]);
+            ->where('categories.company_id', $companyId)
+            ->whereHas('leads', function ($query) use ($companyId) {
+                $query->where('leads.company_id', $companyId)
+                    ->whereNull('leads.assigned_to');
+            })
+            ->orderBy('categories.name')
+            ->get(['categories.id', 'categories.name']);
 
         return response()->json([
             'success' => true,
             'message' => 'Categories fetched successfully.',
             'data' => $categories,
         ]);
+    }
     }
 
 
