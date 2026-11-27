@@ -220,6 +220,52 @@ class EmployeePushController extends Controller
         return $queued;
     }
 
+public function inbox(Request $request): JsonResponse
+{
+    $notifications = DB::table('employee_push_recipients as r')
+        ->join('employee_push_notifications as n', 'n.id', '=', 'r.notification_id')
+        ->where('r.user_id', $request->user()->id)
+        ->orderByDesc('n.id')
+        ->paginate(20, [
+            'n.id',
+            'n.message',
+            'n.created_at',
+            'n.updated_at',
+            'n.image_path',
+            'n.video_path',
+        ])
+        ->through(function (object $item): array {
+            $hasImage = filled($item->image_path);
+            $hasVideo = filled($item->video_path);
+            $detailUrl = url("/api/employee-notifications/{$item->id}");
+
+            return [
+                'id' => (int) $item->id,
+                'message' => $item->message,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at,
+                'has_image' => $hasImage,
+                'has_video' => $hasVideo,
+                'image_url' => $hasImage ? "{$detailUrl}/image" : null,
+                'video_url' => $hasVideo ? "{$detailUrl}/video" : null,
+            ];
+        });
+
+    return response()->json([
+        'status' => true,
+        'data' => $notifications->items(),
+        'pagination' => [
+            'current_page' => $notifications->currentPage(),
+            'last_page' => $notifications->lastPage(),
+            'per_page' => $notifications->perPage(),
+            'total' => $notifications->total(),
+            'next_page' => $notifications->hasMorePages()
+                ? $notifications->currentPage() + 1
+                : null,
+        ],
+    ])->header('Cache-Control', 'private, no-store');
+}
+
     public function show(Request $request, int $notification): JsonResponse
     {
         $item = $this->notificationFor($request, $notification);

@@ -23,6 +23,11 @@ Route::post('active-inactive-customer-category', [\App\Http\Controllers\Api\Acti
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get(
+        'employee-notifications',
+        [EmployeePushController::class, 'inbox'],
+    )->name('api.employee-notifications.inbox');
+
+    Route::get(
         'employee-notifications/{notification}',
         [EmployeePushController::class, 'show'],
     )
