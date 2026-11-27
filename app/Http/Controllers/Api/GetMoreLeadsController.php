@@ -119,32 +119,63 @@ private function availableLeads(int $companyId)
     |--------------------------------------------------------------------------
     */
 
+    // public function states(Request $request)
+    // {
+    //     $companyId = $this->companyId($request);
+    //     $userId = (int) $request->user()->id;
+
+    //     $available = $this->availableLeads($companyId)
+    //         ->selectRaw('TRIM(state) AS state_name')
+    //         ->distinct()
+    //         ->pluck('state_name');
+
+    //     /*
+    //      | Include states where user already has
+    //      | an existing batch.
+    //      */
+
+    //     $previous = DB::table('get_more_lead_batches')
+    //         ->where('company_id', $companyId)
+    //         ->where('user_id', $userId)
+    //         ->pluck('state');
+
+    //     $states = $available
+    //         ->merge($previous)
+    //         ->filter(fn ($v) => trim((string) $v) !== '')
+    //         ->unique(
+    //             fn ($v) => mb_strtolower(trim($v))
+    //         )
+    //         ->sort()
+    //         ->values();
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'States fetched successfully.',
+    //         'data' => $states,
+    //     ]);
+    // }
+
+
     public function states(Request $request)
     {
         $companyId = $this->companyId($request);
-        $userId = (int) $request->user()->id;
 
-        $available = $this->availableLeads($companyId)
-            ->selectRaw('TRIM(state) AS state_name')
-            ->distinct()
-            ->pluck('state_name');
+        $states = $this->availableLeads($companyId)
 
-        /*
-         | Include states where user already has
-         | an existing batch.
-         */
-
-        $previous = DB::table('get_more_lead_batches')
-            ->where('company_id', $companyId)
-            ->where('user_id', $userId)
-            ->pluck('state');
-
-        $states = $available
-            ->merge($previous)
-            ->filter(fn ($v) => trim((string) $v) !== '')
-            ->unique(
-                fn ($v) => mb_strtolower(trim($v))
+            // Only non-empty states
+            ->whereRaw(
+                "TRIM(COALESCE(leads.state, '')) <> ''"
             )
+
+            // Get unique state names
+            ->selectRaw('TRIM(leads.state) AS state_name')
+            ->distinct()
+            ->pluck('state_name')
+
+            // Remove duplicate state names
+            ->unique(fn ($v) => mb_strtolower(trim($v)))
+
+            // Sort alphabetically
             ->sort()
             ->values();
 
