@@ -136,9 +136,7 @@ class DemoCityController extends Controller
 
     public function categories(Request $request)
     {
-        $companyId = (int) ($request->user()->company_id ?? 0);
-
-        abort_if($companyId <= 0, 422, 'Company is not selected.');
+        $companyId = $this->companyId($request);
 
         $categories = Category::query()
             ->where('categories.company_id', $companyId)
@@ -154,7 +152,6 @@ class DemoCityController extends Controller
             'message' => 'Categories fetched successfully.',
             'data' => $categories,
         ]);
-    }
     }
 
 
