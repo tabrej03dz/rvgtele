@@ -18,6 +18,7 @@ use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
+use App\Services\FirebasePushService;
 
 class EmployeePushController extends Controller
 {
@@ -143,7 +144,7 @@ class EmployeePushController extends Controller
                 ]);
             }
 
-            [$id, $participantCount, $queuedCount] = DB::transaction(function () use (
+            [$id, $participantCount] = DB::transaction(function () use (
                 $request,
                 $source,
                 $message,
@@ -180,7 +181,7 @@ class EmployeePushController extends Controller
                     ]);
                 }
 
-                return [$id, $participantCount, $this->queuePushes($id)];
+                return [$id, $participantCount];
             });
         } catch (Throwable $exception) {
             if ($newFiles !== []) {
@@ -190,40 +191,85 @@ class EmployeePushController extends Controller
             throw $exception;
         }
 
-        $notice = $queuedCount > 0
-            ? "Notification #{$id} saved for {$participantCount} participant(s). Push queued for {$queuedCount} device(s)."
-            : "Notification #{$id} saved for {$participantCount} participant(s). No registered mobile devices were found.";
+       $delivery = $this->sendPushesDirectly($id, $message, $attachments);
+
+        if ($delivery['devices'] === 0) {
+            return redirect()
+                ->route('employee-notifications.index')
+                ->with(
+                    'error',
+                    "Notification #{$id} saved for {$participantCount} employee(s). No registered Android or iOS devices were found."
+                );
+        }
+
+        $notice = "Notification #{$id} saved for {$participantCount} employee(s). "
+            . "Firebase accepted {$delivery['accepted']} of {$delivery['devices']} device send(s). "
+            . "Failed: {$delivery['failed']}.";
 
         return redirect()
             ->route('employee-notifications.index')
-            ->with('success', $notice);
+            ->with($delivery['failed'] > 0 ? 'error' : 'success', $notice);
     }
 
-    private function queuePushes(int $id): int
-    {
-        $queue = Queue::connection('database');
-        $queued = 0;
+private function sendPushesDirectly(
+    int $notificationId,
+    string $message,
+    array $attachments,
+): array {
+    $firebase = app(FirebasePushService::class);
 
-        DeviceToken::query()
-            ->whereIn('user_id', DB::table('employee_push_recipients')
-                ->where('notification_id', $id)
-                ->select('user_id'))
-            ->whereIn('platform', ['android', 'ios'])
-            ->where('token', '<>', '')
-            ->select(['id', 'user_id'])
-            ->chunkById(250, function (Collection $devices) use ($id, $queue, &$queued): void {
-                $jobs = $devices->map(fn (DeviceToken $device) => new SendEmployeePush(
-                    notificationId: $id,
-                    deviceId: $device->id,
-                    userId: $device->user_id,
-                ));
+    $body = $message !== '' ? $message : match (true) {
+        filled($attachments['image'] ?? null) && filled($attachments['video'] ?? null) =>
+            'New image and video. Tap to open.',
+        filled($attachments['video'] ?? null) => 'New video. Tap to open.',
+        default => 'New image. Tap to open.',
+    };
 
-                $queue->bulk($jobs->all(), '', 'broadcasts');
-                $queued += $jobs->count();
-            });
+    $delivery = [
+        'devices' => 0,
+        'accepted' => 0,
+        'failed' => 0,
+    ];
 
-        return $queued;
-    }
+    DeviceToken::query()
+        ->whereIn('user_id', DB::table('employee_push_recipients')
+            ->where('notification_id', $notificationId)
+            ->select('user_id'))
+        ->whereIn('platform', ['android', 'ios'])
+        ->whereNotNull('token')
+        ->where('token', '<>', '')
+        ->select(['id', 'token'])
+        ->chunkById(100, function (Collection $devices) use (
+            $firebase,
+            $notificationId,
+            $body,
+            &$delivery,
+        ): void {
+            foreach ($devices as $device) {
+                $delivery['devices']++;
+
+                $result = $firebase->sendToToken(
+                    deviceToken: $device->token,
+                    title: 'TeleCRM',
+                    body: $body,
+                    data: [
+                        'type' => 'employee_notification',
+                        'notification_id' => (string) $notificationId,
+                    ],
+                    androidChannel: 'employee_notifications',
+                    androidClickAction: null,
+                );
+
+                if ($result['success'] ?? false) {
+                    $delivery['accepted']++;
+                } else {
+                    $delivery['failed']++;
+                }
+            }
+        });
+
+    return $delivery;
+}
 
 public function inbox(Request $request): JsonResponse
 {
