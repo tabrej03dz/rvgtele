@@ -319,16 +319,46 @@ class CallingCrmController extends Controller
         $now->addSecond()
     );
 
-    return User::query()
+    $inactiveUsers = User::query()
         ->whereIn('id', $assignedUserIds)
         ->whereNotIn('id', $recentCallerIds)
-        ->when(
-            $selectedUserId !== null,
-            fn (Builder $query) => $query->whereKey($selectedUserId)
-        )
+        ->when($selectedUserId !== null, fn (Builder $query) => $query->whereKey($selectedUserId))
         ->orderBy('name')
         ->orderBy('id')
-        ->pluck('name')
-        ->all();
+        ->get(['id', 'name']);
+
+    if ($inactiveUsers->isEmpty()) {
+        return [];
+    }
+
+    $lastCalls = CallHistory::query()
+        ->whereIn('user_id', $inactiveUsers->modelKeys())
+        ->whereRaw('COALESCE(call_at, created_at) < ?', [$now->addSecond()])
+        ->select('user_id')
+        ->selectRaw('MAX(COALESCE(call_at, created_at)) AS last_call_at')
+        ->groupBy('user_id')
+        ->pluck('last_call_at', 'user_id');
+
+    return $inactiveUsers->map(function (User $user) use ($lastCalls, $now, $storageTimezone): array {
+        $lastCallAt = $lastCalls->get($user->id);
+        $duration = 'No call logged yet';
+
+        if ($lastCallAt !== null) {
+            $lastCall = CarbonImmutable::parse($lastCallAt, $storageTimezone);
+            $seconds = max(0, $now->getTimestamp() - $lastCall->getTimestamp());
+            $totalMinutes = intdiv($seconds, 60);
+            $hours = intdiv($totalMinutes, 60);
+            $minutes = $totalMinutes % 60;
+
+            $duration = $hours > 0
+                ? "{$hours} hr {$minutes} min"
+                : "{$minutes} min";
+        }
+
+        return [
+            'name' => $user->name,
+            'duration' => $duration,
+        ];
+    })->values()->all();
 }
 }

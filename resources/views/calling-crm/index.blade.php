@@ -587,8 +587,10 @@
         <strong class="cr-inactive-label">No call logged in last 10 min</strong>
 
         <ul class="cr-inactive-list">
-            @foreach($inactiveCallers as $name)
-                <li class="cr-inactive-name">{{ $name }}</li>
+            @foreach($inactiveCallers as $caller)
+                <li class="cr-inactive-name">
+                    {{ $caller['name'] }} · {{ $caller['duration'] }}
+                </li>
             @endforeach
         </ul>
     </div>
@@ -931,10 +933,10 @@
                 return;
             }
 
-            const items = users.map(function (name) {
+            const items = users.map(function (caller) {
                 const item = document.createElement('li');
                 item.className = 'cr-inactive-name';
-                item.textContent = name;
+                item.textContent = `${caller.name} · ${caller.duration}`;
                 return item;
             });
 
