@@ -60,6 +60,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/{notification}', [EmployeePushController::class, 'details'])
                 ->whereNumber('notification')
                 ->name('details');
+            Route::delete('/{notification}', [EmployeePushController::class, 'destroy'])
+                ->whereNumber('notification')
+                ->name('destroy');
 
             Route::get('/{notification}/edit', [EmployeePushController::class, 'edit'])
                 ->whereNumber('notification')
@@ -68,6 +71,8 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{notification}/resend', [EmployeePushController::class, 'resend'])
                 ->whereNumber('notification')
                 ->name('resend');
+
+                
         });
 
 

@@ -22,6 +22,8 @@ use App\Services\FirebasePushService;
 
 class EmployeePushController extends Controller
 {
+
+    private const HISTORY_PER_PAGE = 10;
     public function index(): View
     {
         $history = DB::table('employee_push_notifications as n')
@@ -33,7 +35,7 @@ class EmployeePushController extends Controller
                 'participant_count',
             )
             ->orderByDesc('n.id')
-            ->paginate(20);
+            ->paginate(self::HISTORY_PER_PAGE);
 
         return view('employee-notifications.index', [
             'history' => $history,
@@ -409,4 +411,72 @@ public function inbox(Request $request): JsonResponse
                 'branch_manager',
             ]));
     }
+
+public function destroy(Request $request, int $notification): RedirectResponse
+{
+    $paths = DB::transaction(function () use ($notification): array {
+        $item = DB::table('employee_push_notifications')
+            ->where('id', $notification)
+            ->lockForUpdate()
+            ->first(['id', 'image_path', 'video_path']);
+
+        abort_if($item === null, 404, 'Notification not found.');
+
+        DB::table('employee_push_notifications')
+            ->where('id', $notification)
+            ->delete();
+
+        return array_unique(array_filter([
+            $item->image_path,
+            $item->video_path,
+        ]));
+    });
+
+    $disk = Storage::disk('local');
+    $failedFiles = 0;
+
+    foreach ($paths as $path) {
+        $stillUsed = DB::table('employee_push_notifications')
+            ->where('image_path', $path)
+            ->orWhere('video_path', $path)
+            ->exists();
+
+        if ($stillUsed) {
+            continue;
+        }
+
+        try {
+            if ($disk->delete($path)) {
+                continue;
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        $failedFiles++;
+
+        logger()->warning('Could not delete employee notification attachment.', [
+            'notification_id' => $notification,
+            'path' => $path,
+        ]);
+    }
+
+    $requestedPage = max(1, $request->integer('history_page', 1));
+    $total = DB::table('employee_push_notifications')->count();
+    $lastPage = max(1, (int) ceil($total / self::HISTORY_PER_PAGE));
+
+    $url = route('employee-notifications.index', [
+        'page' => min($requestedPage, $lastPage),
+    ]) . '#notification-history';
+
+    if ($failedFiles > 0) {
+        return redirect()->to($url)->with(
+            'error',
+            "Notification #{$notification} deleted, but {$failedFiles} attachment file(s) could not be removed. Check Laravel logs."
+        );
+    }
+
+    return redirect()->to($url)
+        ->with('success', "Notification #{$notification} deleted successfully.");
+}
 }

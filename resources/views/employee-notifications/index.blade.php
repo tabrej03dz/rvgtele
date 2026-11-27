@@ -167,8 +167,13 @@
         </form>
 
         @if ($history !== null)
-            <section class="space-y-4 rounded-xl border bg-white p-5">
-                <h2 class="text-lg font-bold text-slate-900">Notification History</h2>
+            <section id="notification-history" class="scroll-mt-24 space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-lg font-bold text-slate-900">Notification History</h2>
+                    <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                        {{ number_format($history->total()) }} notifications
+                    </span>
+                </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
@@ -218,11 +223,26 @@
                                         </a>
                                     </td>
 
-                                    <td class="p-2 whitespace-nowrap">
-                                        <a href="{{ route('employee-notifications.edit', $item->id) }}"
-                                            class="font-semibold text-indigo-700">
-                                            Edit &amp; Resend
-                                        </a>
+                                    <td class="p-2">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <a href="{{ route('employee-notifications.edit', $item->id) }}"
+                                                class="whitespace-nowrap rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                                                Edit &amp; Resend
+                                            </a>
+
+                                            <form method="POST"
+                                                action="{{ route('employee-notifications.destroy', $item->id) }}"
+                                                onsubmit="return confirm('Delete notification #{{ (int) $item->id }} from history and employee inboxes?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="history_page" value="{{ $history->currentPage() }}">
+
+                                                <button type="submit"
+                                                    class="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -236,7 +256,11 @@
                     </table>
                 </div>
 
-                {{ $history->links() }}
+                @if ($history->hasPages())
+                    <div class="border-t border-slate-100 pt-4">
+                        {{ $history->fragment('notification-history')->onEachSide(1)->links() }}
+                    </div>
+                @endif
             </section>
         @endif
     </div>
