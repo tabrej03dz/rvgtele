@@ -113,18 +113,6 @@ class SendCallIdleReminders extends Command
                         return;
                     }
 
-                    if ($minutes === null) {
-                        return;
-                    }
-
-                    $matched++;
-
-                    if ($dryRun) {
-                        $this->line("#{$employee->id} {$employee->name} | {$minutes} min");
-
-                        return;
-                    }
-
                     $message = $this->generateFollowUp($employee);
 
                     if ($this->queueReminder((int) $employee->id, $message, $shiftStart, $shiftEnd)) {
