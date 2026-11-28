@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use App\Models\CallHistory;
+use App\Exports\CallingCrmLeadsExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class CallingCrmController extends Controller
 {
@@ -22,6 +24,12 @@ class CallingCrmController extends Controller
     {
         $user = $request->user();
         $isSuperAdmin = $user->hasRole('super_admin');
+
+        $exportLeads = $request->boolean('export_leads');
+
+        if ($exportLeads) {
+            abort_unless($user->can('calling-crm.view'), 403);
+        }
 
         $filters = $request->validate([
             'search'        => 'nullable|string|max:255',
@@ -191,6 +199,14 @@ class CallingCrmController extends Controller
             });
         }
 
+
+        if ($exportLeads) {
+            $filename = 'call-history-leads-' . now($reportTimezone)->format('Y-m-d-His') . '.xlsx';
+            $download = Excel::download(new CallingCrmLeadsExport($contactsQuery), $filename);
+            $download->headers->set('Cache-Control', 'private, no-store');
+
+            return $download;
+        }
         $contacts = $contactsQuery
             ->with([
                 'leadCategory',

@@ -226,7 +226,7 @@
 
     .calling-report select { padding-right: 24px; }
     .calling-report input[readonly] { background-color: #f5f7fc; }
-    .calling-report .cr-actions { display: flex; gap: 6px; }
+    .calling-report .cr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
     .calling-report .cr-button {
         min-height: 34px; padding: 0 10px; border: 1px solid #c6d3f7;
         border-radius: 8px; background: #f3f7ff; color: var(--blue);
@@ -542,6 +542,13 @@
                     <i data-lucide="filter" class="cr-icon" aria-hidden="true"></i>
                     Apply Filters
                 </button>
+
+                @can('calling-crm.view')
+                    <button type="submit" name="export_leads" value="1" class="cr-button">
+                        <i data-lucide="download" class="cr-icon" aria-hidden="true"></i>
+                        Export Leads (.xlsx)
+                    </button>
+                @endcan
 
                 <a href="{{ $indexUrl }}" class="cr-button cr-reset">
                     <i data-lucide="rotate-ccw" class="cr-icon" aria-hidden="true"></i>
