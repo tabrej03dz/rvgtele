@@ -94,7 +94,24 @@ class SendCallIdleReminders extends Command
                 &$failed,
             ): void {
                 try {
-                    $minutes = $this->idleMinutes($employee, $shiftStart, $shiftEnd);
+                    // $minutes = $this->idleMinutes($employee, $shiftStart, $shiftEnd);
+                    $activity = $this->eligibleActivity($employee, $shiftStart, $shiftEnd);
+
+                    if ($activity === null) {
+                        return;
+                    }
+
+                    $matched++;
+
+                    if ($dryRun) {
+                        $duration = $activity['last_call'] === null
+                            ? 'कोई आउटगोइंग कॉल दर्ज नहीं है'
+                            : $this->formatIdleDuration($activity['last_call'], $activity['now']);
+
+                        $this->line("#{$employee->id} {$employee->name} | {$duration}");
+
+                        return;
+                    }
 
                     if ($minutes === null) {
                         return;
@@ -154,43 +171,95 @@ class SendCallIdleReminders extends Command
                 ->where('token', '<>', ''));
     }
 
-    private function idleMinutes(
-        User $employee,
-        CarbonImmutable $shiftStart,
-        CarbonImmutable $shiftEnd,
-    ): ?int {
-        $now = CarbonImmutable::now($shiftStart->timezone)->startOfSecond();
+    // private function idleMinutes(
+    //     User $employee,
+    //     CarbonImmutable $shiftStart,
+    //     CarbonImmutable $shiftEnd,
+    // ): ?int {
+    //     $now = CarbonImmutable::now($shiftStart->timezone)->startOfSecond();
 
-        if ($now->lessThan($shiftStart) || $now->greaterThanOrEqualTo($shiftEnd)) {
-            return null;
-        }
+    //     if ($now->lessThan($shiftStart) || $now->greaterThanOrEqualTo($shiftEnd)) {
+    //         return null;
+    //     }
 
-        $lastCall = $this->latestOutgoingCall((int) $employee->id, $now);
+    //     $lastCall = $this->latestOutgoingCall((int) $employee->id, $now);
 
-        if ($lastCall !== null && $lastCall->lessThan($shiftStart)) {
-            $lastCall = null;
-        }
+    //     if ($lastCall !== null && $lastCall->lessThan($shiftStart)) {
+    //         $lastCall = null;
+    //     }
 
-        $activityAt = $lastCall ?? $shiftStart;
+    //     $activityAt = $lastCall ?? $shiftStart;
 
-        if ($employee->created_at && $employee->created_at->greaterThan($activityAt)) {
-            $activityAt = CarbonImmutable::instance($employee->created_at);
-        }
+    //     if ($employee->created_at && $employee->created_at->greaterThan($activityAt)) {
+    //         $activityAt = CarbonImmutable::instance($employee->created_at);
+    //     }
 
-        $lastReminder = $employee->last_call_idle_reminder_at;
+    //     $lastReminder = $employee->last_call_idle_reminder_at;
+
+    //     if (
+    //         $lastReminder
+    //         && CarbonImmutable::parse($lastReminder, $shiftStart->timezone)
+    //             ->greaterThanOrEqualTo($activityAt)
+    //     ) {
+    //         return null;
+    //     }
+
+    //     $seconds = $now->getTimestamp() - $activityAt->getTimestamp();
+
+    //     return $seconds > 600 ? intdiv($seconds, 60) : null;
+    // }
+
+
+    /**
+ * @return array{now: CarbonImmutable, last_call: ?CarbonImmutable}|null
+ */
+private function eligibleActivity(
+    User $employee,
+    CarbonImmutable $shiftStart,
+    CarbonImmutable $shiftEnd,
+): ?array {
+    $now = CarbonImmutable::now($shiftStart->timezone)->startOfSecond();
+
+    if ($now->lessThan($shiftStart) || $now->greaterThanOrEqualTo($shiftEnd)) {
+        return null;
+    }
+
+    $lastCall = $this->latestOutgoingCall((int) $employee->id, $now);
+
+    $activityAt = $lastCall !== null && $lastCall->greaterThan($shiftStart)
+        ? $lastCall
+        : $shiftStart;
+
+    if ($employee->created_at && $employee->created_at->greaterThan($activityAt)) {
+        $activityAt = CarbonImmutable::instance($employee->created_at);
+    }
+
+    $idleSeconds = $now->getTimestamp() - $activityAt->getTimestamp();
+
+    if ($idleSeconds <= 600) {
+        return null;
+    }
+
+    $lastReminder = $employee->last_call_idle_reminder_at;
+
+    if ($lastReminder) {
+        $lastReminderAt = CarbonImmutable::parse($lastReminder, $now->timezone);
+        $repeatSeconds = max(1, (int) config('call_idle_reminders.repeat_minutes', 10)) * 60;
+        $secondsSinceReminder = $now->getTimestamp() - $lastReminderAt->getTimestamp();
 
         if (
-            $lastReminder
-            && CarbonImmutable::parse($lastReminder, $shiftStart->timezone)
-                ->greaterThanOrEqualTo($activityAt)
+            $lastReminderAt->greaterThanOrEqualTo($activityAt)
+            && $secondsSinceReminder < $repeatSeconds
         ) {
             return null;
         }
-
-        $seconds = $now->getTimestamp() - $activityAt->getTimestamp();
-
-        return $seconds > 600 ? intdiv($seconds, 60) : null;
     }
+
+    return [
+        'now' => $now,
+        'last_call' => $lastCall,
+    ];
+}
 
     private function latestOutgoingCall(int $userId, CarbonImmutable $now): ?CarbonImmutable
     {
@@ -381,7 +450,17 @@ class SendCallIdleReminders extends Command
         return DB::transaction(function () use ($userId, $message, $shiftStart, $shiftEnd): bool {
             $employee = $this->employees()->whereKey($userId)->lockForUpdate()->first();
 
-            if (!$employee || $this->idleMinutes($employee, $shiftStart, $shiftEnd) === null) {
+            // if (!$employee || $this->idleMinutes($employee, $shiftStart, $shiftEnd) === null) {
+            //     return false;
+            // }
+
+            if (!$employee) {
+                return false;
+            }
+
+            $activity = $this->eligibleActivity($employee, $shiftStart, $shiftEnd);
+
+            if ($activity === null) {
                 return false;
             }
 
@@ -396,8 +475,8 @@ class SendCallIdleReminders extends Command
                 return false;
             }
 
-            $now = CarbonImmutable::now($shiftStart->timezone)->startOfSecond();
-            $lastCall = $this->latestOutgoingCall($userId, $now);
+            $now = $activity['now'];
+            $lastCall = $activity['last_call'];
             $name = Str::limit(trim($employee->name), 100, '');
 
             if ($lastCall === null) {
