@@ -108,7 +108,7 @@ class SendCallIdleReminders extends Command
                         return;
                     }
 
-                    $message = $this->message($employee->name, $minutes);
+                    $message = $this->generateFollowUp($employee);
 
                     if ($this->queueReminder((int) $employee->id, $message, $shiftStart, $shiftEnd)) {
                         $queued++;
@@ -165,24 +165,13 @@ class SendCallIdleReminders extends Command
             return null;
         }
 
-        $lastCall = CallHistory::query()
-            ->where('user_id', $employee->id)
-            ->where(function (Builder $calls): void {
-                $calls->where('direction', 'outgoing')
-                    ->orWhere(function (Builder $legacy): void {
-                        $legacy->whereNull('direction')
-                            ->where(function (Builder $types): void {
-                                $types->whereNull('call_type')
-                                    ->orWhere('call_type', 'outgoing');
-                            });
-                    });
-            })
-            ->whereRaw('COALESCE(call_at, created_at) BETWEEN ? AND ?', [$shiftStart, $now])
-            ->max(DB::raw('COALESCE(call_at, created_at)'));
+        $lastCall = $this->latestOutgoingCall((int) $employee->id, $now);
 
-        $activityAt = $lastCall
-            ? CarbonImmutable::parse($lastCall, $shiftStart->timezone)
-            : $shiftStart;
+        if ($lastCall !== null && $lastCall->lessThan($shiftStart)) {
+            $lastCall = null;
+        }
+
+        $activityAt = $lastCall ?? $shiftStart;
 
         if ($employee->created_at && $employee->created_at->greaterThan($activityAt)) {
             $activityAt = CarbonImmutable::instance($employee->created_at);
@@ -203,16 +192,103 @@ class SendCallIdleReminders extends Command
         return $seconds > 600 ? intdiv($seconds, 60) : null;
     }
 
-    private function message(string $name, int $minutes): string
+    private function latestOutgoingCall(int $userId, CarbonImmutable $now): ?CarbonImmutable
     {
-        $name = Str::limit(trim($name), 100, '');
-        $fallback = 'पिछले 10 मिनट से अधिक समय से कोई कॉल दर्ज नहीं हुई है। कृपया अपनी अगली कॉल शुरू करें।';
+        $lastCall = CallHistory::query()
+            ->where('user_id', $userId)
+            ->where(function (Builder $calls): void {
+                $calls->where('direction', 'outgoing')
+                    ->orWhere(function (Builder $legacy): void {
+                        $legacy->whereNull('direction')
+                            ->where(function (Builder $types): void {
+                                $types->whereNull('call_type')
+                                    ->orWhere('call_type', 'outgoing');
+                            });
+                    });
+            })
+            ->whereRaw('COALESCE(call_at, created_at) <= ?', [$now])
+            ->max(DB::raw('COALESCE(call_at, created_at)'));
+
+        return $lastCall === null
+            ? null
+            : CarbonImmutable::parse($lastCall, $now->timezone);
+    }
+
+    // private function message(string $name, int $minutes): string
+    // {
+    //     $name = Str::limit(trim($name), 100, '');
+    //     $fallback = 'पिछले 10 मिनट से अधिक समय से कोई कॉल दर्ज नहीं हुई है। कृपया अपनी अगली कॉल शुरू करें।';
+
+    //     $key = config('call_idle_reminders.openai_key');
+    //     $model = config('call_idle_reminders.openai_model');
+
+    //     if (blank($key) || blank($model)) {
+    //         return "{$name} जी, {$fallback}";
+    //     }
+
+    //     try {
+    //         $response = Http::withToken($key)
+    //             ->acceptJson()
+    //             ->connectTimeout(3)
+    //             ->timeout(8)
+    //             ->post('https://api.openai.com/v1/chat/completions', [
+    //                 'model' => $model,
+    //                 'store' => false,
+    //                 'max_completion_tokens' => 512,
+    //                 'messages' => [
+    //                     [
+    //                         'role' => 'system',
+    //                         'content' => 'Write a respectful Hindi push notification from TeleCRM. '
+    //                             . 'Say no outgoing call was recorded for over 10 minutes '
+    //                             . 'and politely ask the employee to start their next call. '
+    //                             . 'Use at most two short sentences. Return only the text '
+    //                             . 'without greeting, name, heading, emoji or quotes.',
+    //                     ],
+    //                     [
+    //                         'role' => 'user',
+    //                         'content' => "Whole minutes since recorded activity: {$minutes}.",
+    //                     ],
+    //                 ],
+    //             ]);
+
+    //         $body = $response->json('choices.0.message.content');
+
+    //         if ($response->successful() && is_string($body) && trim($body) !== '') {
+    //             return "{$name} जी, " . Str::limit(Str::squish($body), 300, '');
+    //         }
+
+    //         Log::warning('Call idle reminder used fallback text.', [
+    //             'openai_status' => $response->status(),
+    //         ]);
+    //     } catch (ConnectionException) {
+    //         Log::warning('Call idle reminder used fallback text after an OpenAI connection failure.');
+    //     }
+
+    //     return "{$name} जी, {$fallback}";
+    // }
+
+    private function generateFollowUp(User $employee): string
+    {
+        $previousFollowUp = $this->previousFollowUp($employee);
+
+        $fallbacks = [
+            'कृपया अपनी अगली लीड को कॉल करें।',
+            'कृपया अगली कॉल करके अपना फॉलो-अप आगे बढ़ाएँ।',
+            'कृपया कॉलिंग फिर से शुरू करें और अगली लीड से बात करें।',
+        ];
+
+        $previousText = Str::lower(Str::squish($previousFollowUp));
+
+        $fallback = collect($fallbacks)
+            ->first(fn (string $line) => Str::lower(Str::squish($line)) !== $previousText);
 
         $key = config('call_idle_reminders.openai_key');
         $model = config('call_idle_reminders.openai_model');
 
         if (blank($key) || blank($model)) {
-            return "{$name} जी, {$fallback}";
+            Log::warning('Call idle reminder used fallback text because OpenAI config is missing.');
+
+            return $fallback;
         }
 
         try {
@@ -227,23 +303,29 @@ class SendCallIdleReminders extends Command
                     'messages' => [
                         [
                             'role' => 'system',
-                            'content' => 'Write a respectful Hindi push notification from TeleCRM. '
-                                . 'Say no outgoing call was recorded for over 10 minutes '
-                                . 'and politely ask the employee to start their next call. '
-                                . 'Use at most two short sentences. Return only the text '
-                                . 'without greeting, name, heading, emoji or quotes.',
+                            'content' => 'Write one short, respectful Hindi sentence for a TeleCRM push. '
+                                . 'Politely ask the employee to resume calling or call the next lead. '
+                                . 'Vary the wording from the previous sentence. '
+                                . 'Write at most 20 words. Omit names, greetings, elapsed time, '
+                                . 'numbers, emojis, headings, threats and quotes. Return only the sentence.',
                         ],
                         [
                             'role' => 'user',
-                            'content' => "Whole minutes since recorded activity: {$minutes}.",
+                            'content' => $previousFollowUp === ''
+                                ? 'Write the first reminder sentence.'
+                                : "Previous reminder sentence: {$previousFollowUp}",
                         ],
                     ],
                 ]);
 
             $body = $response->json('choices.0.message.content');
 
-            if ($response->successful() && is_string($body) && trim($body) !== '') {
-                return "{$name} जी, " . Str::limit(Str::squish($body), 300, '');
+            if ($response->successful() && is_string($body)) {
+                $line = Str::limit(Str::squish($body), 180, '');
+
+                if ($line !== '' && Str::lower($line) !== $previousText) {
+                    return $line;
+                }
             }
 
             Log::warning('Call idle reminder used fallback text.', [
@@ -253,7 +335,41 @@ class SendCallIdleReminders extends Command
             Log::warning('Call idle reminder used fallback text after an OpenAI connection failure.');
         }
 
-        return "{$name} जी, {$fallback}";
+        return $fallback;
+    }
+
+    private function previousFollowUp(User $employee): string
+    {
+        if (!$employee->last_call_idle_reminder_at) {
+            return '';
+        }
+
+        $message = DB::table('employee_push_notifications as n')
+            ->join('employee_push_recipients as r', 'r.notification_id', '=', 'n.id')
+            ->where('r.user_id', $employee->id)
+            ->whereNull('n.created_by')
+            ->where('n.created_at', $employee->last_call_idle_reminder_at)
+            ->orderByDesc('n.id')
+            ->value('n.message');
+
+        $parts = explode("\n", (string) $message, 2);
+
+        return trim($parts[1] ?? '');
+    }
+
+    private function formatIdleDuration(CarbonImmutable $lastCall, CarbonImmutable $now): string
+    {
+        $totalMinutes = intdiv(max(0, $now->getTimestamp() - $lastCall->getTimestamp()), 60);
+        $hours = intdiv($totalMinutes, 60);
+        $minutes = $totalMinutes % 60;
+
+        if ($hours === 0) {
+            return "{$minutes} मिनट";
+        }
+
+        return $minutes === 0
+            ? "{$hours} घंटे"
+            : "{$hours} घंटे {$minutes} मिनट";
     }
 
     private function queueReminder(
@@ -280,7 +396,18 @@ class SendCallIdleReminders extends Command
                 return false;
             }
 
-            $now = now();
+            $now = CarbonImmutable::now($shiftStart->timezone)->startOfSecond();
+            $lastCall = $this->latestOutgoingCall($userId, $now);
+            $name = Str::limit(trim($employee->name), 100, '');
+
+            if ($lastCall === null) {
+                $activityText = 'आपकी कोई आउटगोइंग कॉल अभी तक दर्ज नहीं हुई है।';
+            } else {
+                $duration = $this->formatIdleDuration($lastCall, $now);
+                $activityText = "आपकी आखिरी आउटगोइंग कॉल {$duration} पहले दर्ज हुई थी।";
+            }
+
+            $message = "{$name} जी, {$activityText}\n{$message}";
 
             $notificationId = DB::table('employee_push_notifications')->insertGetId([
                 'created_by' => null,
