@@ -26,3 +26,10 @@ Schedule::call(function () {
     ->name('hostinger-automatic-cron-test')
     ->everyMinute()
     ->withoutOverlapping();
+
+
+    Schedule::command('calling:send-idle-reminders')
+    ->everyMinute()
+    ->when(fn () => config('call_idle_reminders.enabled'))
+    ->withoutOverlapping(30)
+    ->appendOutputTo(storage_path('logs/call-idle-reminders.log'));
