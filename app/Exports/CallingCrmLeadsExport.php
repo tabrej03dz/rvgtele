@@ -2,7 +2,6 @@
 
 namespace App\Exports;
 
-use App\Support\DistributionValue;
 use Generator;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromGenerator;
@@ -17,33 +16,21 @@ class CallingCrmLeadsExport extends StringValueBinder implements
     WithHeadings,
     WithStrictNullComparison
 {
+    private array $columns;
+
     public function __construct(private Builder $query)
     {
+        $lead = $query->getModel();
+
+        $this->columns = $lead->getConnection()
+            ->getSchemaBuilder()
+            ->getColumnListing($lead->getTable());
     }
 
     public function headings(): array
     {
         return [
-            'name',
-            'mobile',
-            'alternate_mobile',
-            'whatsapp_number',
-            'email',
-            'company_name',
-            'category',
-            'preferred_language',
-            'address',
-            'city',
-            'district',
-            'state',
-            'pincode',
-            'required_product',
-            'estimated_budget',
-            'expected_deal_value',
-            'expected_closing_date',
-            'next_follow_up_at',
-            'priority',
-            'temperature',
+            ...$this->columns,
             'lead_source',
             'lead_status',
             'assigned_employee_email',
@@ -55,7 +42,6 @@ class CallingCrmLeadsExport extends StringValueBinder implements
     {
         $leads = (clone $this->query)
             ->with([
-                'leadCategory:id,name',
                 'source:id,name',
                 'status:id,name',
                 'assignedUser:id,email',
@@ -64,38 +50,20 @@ class CallingCrmLeadsExport extends StringValueBinder implements
             ->lazyById(500);
 
         foreach ($leads as $lead) {
-            $mobile = DistributionValue::phone($lead->mobile);
+            $attributes = $lead->getRawOriginal();
+            $row = [];
 
-            if ($mobile === null) {
-                continue;
+            foreach ($this->columns as $column) {
+                $value = $attributes[$column] ?? null;
+                $row[] = is_bool($value) ? (int) $value : $value;
             }
 
-            yield [
-                trim((string) $lead->name) ?: "Lead {$lead->id}",
-                $mobile,
-                DistributionValue::phone($lead->alternate_mobile),
-                DistributionValue::phone($lead->whatsapp_number),
-                $lead->email,
-                $lead->company_name,
-                $lead->category ?: $lead->leadCategory?->name,
-                $lead->preferred_language,
-                $lead->address,
-                $lead->city,
-                $lead->district,
-                $lead->state,
-                $lead->pincode,
-                $lead->required_product,
-                $lead->estimated_budget,
-                $lead->expected_deal_value,
-                $lead->expected_closing_date?->format('Y-m-d'),
-                $lead->next_follow_up_at?->format('Y-m-d H:i:s'),
-                $lead->priority,
-                $lead->temperature,
-                $lead->source?->name,
-                $lead->status?->name,
-                $lead->assignedUser?->email,
-                $lead->team?->name,
-            ];
+            $row[] = $lead->source?->name;
+            $row[] = $lead->status?->name;
+            $row[] = $lead->assignedUser?->email;
+            $row[] = $lead->team?->name;
+
+            yield $row;
         }
     }
 }

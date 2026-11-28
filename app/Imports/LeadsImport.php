@@ -998,6 +998,18 @@ private function field(
         $normalizedRow[$normalizedHeading] = $value;
     }
 
+    // The Call History export contains raw IDs alongside import-friendly columns.
+    if (
+        array_key_exists('companyid', $normalizedRow)
+        && array_key_exists('callstatus', $normalizedRow)
+        && array_key_exists('leadstatusid', $normalizedRow)
+        && array_key_exists('assignedemployeeemail', $normalizedRow)
+    ) {
+        $heading = $field === 'assigned_to' ? 'assigned_employee_email' : $field;
+
+        return $normalizedRow[$this->normalizeHeading($heading)] ?? null;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | STEP 1: Exact heading match
