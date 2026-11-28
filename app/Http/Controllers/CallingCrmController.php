@@ -95,6 +95,7 @@ class CallingCrmController extends Controller
                 ->select('assigned_to');
 
             $users = User::query()
+                ->where('users.is_active', 1)
                 ->whereIn('id', $assignedUserIds)
                 ->orderBy('name')
                 ->get(['id', 'name']);
@@ -336,6 +337,7 @@ class CallingCrmController extends Controller
     );
 
     $inactiveUsers = User::query()
+        ->where('users.is_active', 1)
         ->whereIn('id', $assignedUserIds)
         ->whereNotIn('id', $recentCallerIds)
         ->when($selectedUserId !== null, fn (Builder $query) => $query->whereKey($selectedUserId))
