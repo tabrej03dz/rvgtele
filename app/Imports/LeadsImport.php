@@ -1074,10 +1074,8 @@ private function field(
              */
 
             if (
-                !str_contains(
-                    $headingKey,
-                    $aliasKey
-                )
+                ($field === 'lead_status' && $headingKey === 'callstatus')
+                || !str_contains($headingKey, $aliasKey)
             ) {
                 continue;
             }
